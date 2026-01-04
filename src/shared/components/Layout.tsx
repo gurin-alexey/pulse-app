@@ -1,28 +1,23 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { Calendar, CheckSquare, LayoutDashboard, Menu, Folder, AlertCircle, LogOut, Plus, Loader2, ChevronRight } from "lucide-react"
+import { Calendar, CheckSquare, LayoutDashboard, Menu, LogOut, ChevronRight } from "lucide-react"
 import { useState } from "react"
 import clsx from "clsx"
-import { useProjects } from "@/hooks/useProjects"
 import { useTags } from "@/hooks/useTags"
 import { supabase } from "@/lib/supabase"
-import { useCreateProject } from "@/hooks/useCreateProject"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
 import { DailyPlanner } from "@/features/calendar/DailyPlanner"
+import { Sidebar } from "@/shared/components/Sidebar"
 
 export function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isTagsOpen, setIsTagsOpen] = useState(false)
-  const [isCreatingProject, setIsCreatingProject] = useState(false)
-  const [newProjectName, setNewProjectName] = useState("")
 
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const taskId = searchParams.get('task')
 
-  const { data: projects, isLoading, isError } = useProjects()
   const { data: tags, isLoading: tagsLoading } = useTags()
-  const { mutate: createProject, isPending: isCreating } = useCreateProject()
 
   const navItems = [
     { label: "Dashboard", path: "/", icon: LayoutDashboard },
@@ -33,22 +28,6 @@ export function Layout() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/login')
-  }
-
-  const handleCreateProject = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newProjectName.trim()) return
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    createProject({ name: newProjectName, userId: user.id }, {
-      onSuccess: (project) => {
-        setIsCreatingProject(false)
-        setNewProjectName("")
-        navigate(`/projects/${project.id}`)
-      }
-    })
   }
 
   return (
@@ -83,78 +62,7 @@ export function Layout() {
             )
           })}
 
-          <div className="mt-8">
-            <div className="px-3 mb-2 flex items-center justify-between group">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Projects
-              </span>
-              <button
-                onClick={() => setIsCreatingProject(true)}
-                className="text-gray-400 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100 p-1"
-                title="Create Project"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-
-            {isCreatingProject && (
-              <form onSubmit={handleCreateProject} className="px-3 mb-2">
-                <div className="relative">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    onBlur={() => !newProjectName && setIsCreatingProject(false)}
-                    placeholder="Project Name..."
-                    disabled={isCreating}
-                    className="w-full py-1.5 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
-                  />
-                  {isCreating && (
-                    <div className="absolute right-2 top-1.5 text-blue-500">
-                      <Loader2 size={14} className="animate-spin" />
-                    </div>
-                  )}
-                </div>
-              </form>
-            )}
-
-            {isLoading ? (
-              <div className="px-3 space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />
-                ))}
-              </div>
-            ) : isError ? (
-              <div className="px-3 py-2 text-sm text-red-500 flex items-center gap-2">
-                <AlertCircle size={16} />
-                <span>Error loading</span>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {projects?.map((project) => (
-                  <Link
-                    key={project.id}
-                    to={`/projects/${project.id}`}
-                    className={clsx(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:bg-gray-100",
-                      location.pathname === `/projects/${project.id}` && "bg-blue-50 text-blue-600"
-                    )}
-                  >
-                    <Folder size={20} />
-                    <span className="whitespace-nowrap truncate">
-                      {project.name}
-                    </span>
-                  </Link>
-                ))}
-                {projects?.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-400">
-                    No projects yet
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <Sidebar activePath={location.pathname} />
 
           {/* Tags Section */}
           <div className="mt-8">

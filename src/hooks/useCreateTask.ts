@@ -7,6 +7,7 @@ type CreateTaskParams = {
     projectId: string
     userId: string
     parentId?: string | null
+    sectionId?: string | null
 }
 
 /**
@@ -17,14 +18,15 @@ export function useCreateTask() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async ({ title, projectId, userId, parentId }: CreateTaskParams) => {
+        mutationFn: async ({ title, projectId, userId, parentId, sectionId }: CreateTaskParams) => {
             const { data, error } = await supabase
                 .from('tasks')
                 .insert({
                     title,
                     project_id: projectId,
                     user_id: userId,
-                    parent_id: parentId || null
+                    parent_id: parentId || null,
+                    section_id: sectionId || null
                 })
                 .select()
                 .single()

@@ -5,7 +5,7 @@ import type { Project } from '@/types/database'
 type CreateProjectParams = {
     name: string
     userId: string
-    parentId?: string
+    groupId?: string
 }
 
 /**
@@ -16,21 +16,28 @@ export function useCreateProject() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async ({ name, userId }: CreateProjectParams) => {
-            // Note: parentId is unused for now as it's not in the base type definition
+        mutationFn: async ({ name, userId, groupId }: CreateProjectParams) => {
             const { data, error } = await supabase
                 .from('projects')
-                .insert({
+                .insert([{
                     name,
-                    user_id: userId
-                })
+                    user_id: userId,
+                    group_id: groupId || null
+                }])
                 .select()
                 .single()
 
             if (error) throw error
             return data as Project
         },
-        onSuccess: () => {
+        onSuccess: async (data) => {
+            const projectId = data.id
+            // Auto-create default sections
+            await supabase.from('sections').insert([
+                { project_id: projectId, name: 'Future' },
+                { project_id: projectId, name: 'Ideas' }
+            ])
+
             queryClient.invalidateQueries({ queryKey: ['projects'] })
         },
     })

@@ -4,6 +4,22 @@ export type Project = {
     name: string
     description: string | null
     user_id: string
+    group_id: string | null
+}
+
+export type ProjectGroup = {
+    id: string
+    created_at: string
+    name: string
+    user_id: string
+}
+
+export type Section = {
+    id: string
+    project_id: string
+    name: string
+    order_index: number
+    created_at: string
 }
 
 export type Task = {
@@ -19,6 +35,7 @@ export type Task = {
     parent_id: string | null
     start_time: string | null
     end_time: string | null
+    section_id: string | null
 }
 
 export type Tag = {

@@ -5,9 +5,11 @@ import { Loader2, Plus } from 'lucide-react'
 
 type CreateTaskInputProps = {
     projectId: string
+    sectionId?: string | null
+    placeholder?: string
 }
 
-export function CreateTaskInput({ projectId }: CreateTaskInputProps) {
+export function CreateTaskInput({ projectId, sectionId, placeholder = "New task" }: CreateTaskInputProps) {
     const [title, setTitle] = useState('')
     const { mutate, isPending } = useCreateTask()
 
@@ -23,7 +25,7 @@ export function CreateTaskInput({ projectId }: CreateTaskInputProps) {
         }
 
         mutate(
-            { title: title.trim(), projectId, userId: user.id },
+            { title: title.trim(), projectId, userId: user.id, sectionId: sectionId },
             {
                 onSuccess: () => {
                     setTitle('')
@@ -46,7 +48,7 @@ export function CreateTaskInput({ projectId }: CreateTaskInputProps) {
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="New task"
+                    placeholder={placeholder}
                     disabled={isPending}
                     className="w-full py-3 pl-10 pr-4 bg-gray-50 border border-transparent rounded-lg focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-gray-400"
                 />
