@@ -22,9 +22,7 @@ export function useCreateTask() {
                 .insert({
                     title,
                     project_id: projectId,
-                    user_id: userId,
-                    status: 'todo',
-                    priority: 'medium'
+                    user_id: userId
                 })
                 .select()
                 .single()

@@ -1,16 +1,25 @@
 
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
-import { Calendar, CheckSquare, LayoutDashboard, Menu, Folder, AlertCircle, LogOut } from "lucide-react"
+import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
+import { Calendar, CheckSquare, LayoutDashboard, Menu, Folder, AlertCircle, LogOut, Plus, Loader2 } from "lucide-react"
 import { useState } from "react"
 import clsx from "clsx"
 import { useProjects } from "@/hooks/useProjects"
 import { supabase } from "@/lib/supabase"
+import { useCreateProject } from "@/hooks/useCreateProject"
+import { TaskDetail } from "@/features/tasks/TaskDetail"
 
 export function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isCreatingProject, setIsCreatingProject] = useState(false)
+  const [newProjectName, setNewProjectName] = useState("")
+
   const location = useLocation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const taskId = searchParams.get('task')
+
   const { data: projects, isLoading, isError } = useProjects()
+  const { mutate: createProject, isPending: isCreating } = useCreateProject()
 
   const navItems = [
     { label: "Dashboard", path: "/", icon: LayoutDashboard },
@@ -21,6 +30,22 @@ export function Layout() {
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/login')
+  }
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newProjectName.trim()) return
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    createProject({ name: newProjectName, userId: user.id }, {
+      onSuccess: (project) => {
+        setIsCreatingProject(false)
+        setNewProjectName("")
+        navigate(`/projects/${project.id}`)
+      }
+    })
   }
 
   return (
@@ -56,9 +81,40 @@ export function Layout() {
           })}
 
           <div className="mt-8">
-            <div className="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Projects
+            <div className="px-3 mb-2 flex items-center justify-between group">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Projects
+              </span>
+              <button
+                onClick={() => setIsCreatingProject(true)}
+                className="text-gray-400 hover:text-blue-600 transition-colors opacity-0 group-hover:opacity-100 p-1"
+                title="Create Project"
+              >
+                <Plus size={16} />
+              </button>
             </div>
+
+            {isCreatingProject && (
+              <form onSubmit={handleCreateProject} className="px-3 mb-2">
+                <div className="relative">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onBlur={() => !newProjectName && setIsCreatingProject(false)}
+                    placeholder="Project Name..."
+                    disabled={isCreating}
+                    className="w-full py-1.5 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
+                  />
+                  {isCreating && (
+                    <div className="absolute right-2 top-1.5 text-blue-500">
+                      <Loader2 size={14} className="animate-spin" />
+                    </div>
+                  )}
+                </div>
+              </form>
+            )}
 
             {isLoading ? (
               <div className="px-3 space-y-2">
@@ -114,11 +170,15 @@ export function Layout() {
         <Outlet />
       </section>
 
-      {/* Column C: Detail View (Placeholder) */}
+      {/* Column C: Detail View */}
       <section className="border-r border-gray-200 bg-white overflow-y-auto">
-        <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-          Select a task to view details
-        </div>
+        {taskId ? (
+          <TaskDetail taskId={taskId} />
+        ) : (
+          <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+            Select a task to view details
+          </div>
+        )}
       </section>
 
       {/* Column D: Calendar (Placeholder) */}

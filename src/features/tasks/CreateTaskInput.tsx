@@ -30,7 +30,7 @@ export function CreateTaskInput({ projectId }: CreateTaskInputProps) {
                 },
                 onError: (error) => {
                     console.error('Failed to create task:', error)
-                    alert('Failed to create task')
+                    alert(`Failed to create task: ${error.message}`)
                 }
             }
         )

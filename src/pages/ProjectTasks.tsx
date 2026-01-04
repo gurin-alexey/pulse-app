@@ -1,11 +1,19 @@
-import { useParams } from "react-router-dom"
+import { useParams, useSearchParams } from "react-router-dom"
 import { useTasks } from "@/hooks/useTasks"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { CreateTaskInput } from "@/features/tasks/CreateTaskInput"
+import clsx from "clsx"
 
 export function ProjectTasks() {
     const { projectId } = useParams<{ projectId: string }>()
+    const [searchParams, setSearchParams] = useSearchParams()
     const { data: tasks, isLoading, isError } = useTasks(projectId)
+
+    const activeTaskId = searchParams.get('task')
+
+    const handleTaskClick = (taskId: string) => {
+        setSearchParams({ task: taskId })
+    }
 
     if (isLoading) {
         return (
@@ -43,14 +51,23 @@ export function ProjectTasks() {
                         {tasks?.map((task) => (
                             <div
                                 key={task.id}
-                                className="flex items-center p-3 bg-white border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors group cursor-pointer"
+                                onClick={() => handleTaskClick(task.id)}
+                                className={clsx(
+                                    "flex items-center p-3 border rounded-lg transition-colors group cursor-pointer",
+                                    activeTaskId === task.id
+                                        ? "bg-blue-50 border-blue-200"
+                                        : "bg-white border-gray-100 hover:bg-gray-50"
+                                )}
                             >
                                 <input
                                     type="checkbox"
-                                    disabled
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-3"
+                                    checked={task.status === 'done'}
+                                    readOnly
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-3 cursor-pointer"
                                 />
-                                <span className="text-gray-700 font-medium">{task.title}</span>
+                                <span className={clsx("font-medium", task.status === 'done' ? "text-gray-400 line-through" : "text-gray-700")}>
+                                    {task.title}
+                                </span>
                             </div>
                         ))}
                     </div>
