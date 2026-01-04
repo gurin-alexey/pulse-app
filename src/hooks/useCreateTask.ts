@@ -4,29 +4,35 @@ import type { Task } from '@/types/database'
 
 type CreateTaskParams = {
     title: string
-    projectId: string
+    projectId: string | null
     userId: string
     parentId?: string | null
     sectionId?: string | null
+    due_date?: string | null
+    start_time?: string | null
+    end_time?: string | null
 }
 
 /**
  * Mutation hook to create a new task.
- * Automatically invalidates the 'tasks' query query to refresh the list.
+ * Automatically invalidates the 'tasks' query to refresh the list.
  */
 export function useCreateTask() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async ({ title, projectId, userId, parentId, sectionId }: CreateTaskParams) => {
+        mutationFn: async ({ title, projectId, userId, parentId, sectionId, due_date, start_time, end_time }: CreateTaskParams) => {
             const { data, error } = await supabase
                 .from('tasks')
                 .insert({
                     title,
-                    project_id: projectId,
+                    project_id: projectId || null,
                     user_id: userId,
                     parent_id: parentId || null,
-                    section_id: sectionId || null
+                    section_id: sectionId || null,
+                    due_date: due_date || null,
+                    start_time: start_time || null,
+                    end_time: end_time || null
                 })
                 .select()
                 .single()
@@ -34,8 +40,9 @@ export function useCreateTask() {
             if (error) throw error
             return data as Task
         },
-        onSuccess: (data, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['tasks', variables.projectId] })
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['all-tasks'] })
             if (variables.parentId) {
                 queryClient.invalidateQueries({ queryKey: ['subtasks', variables.parentId] })
             }

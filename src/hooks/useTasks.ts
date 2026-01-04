@@ -6,18 +6,31 @@ export type TaskWithTags = Task & {
     tags: Tag[]
 }
 
-export function useTasks(projectId: string | undefined) {
-    return useQuery({
-        queryKey: ['tasks', projectId],
-        queryFn: async () => {
-            if (!projectId) return []
+export type TaskFilter =
+    | { type: 'project', projectId: string }
+    | { type: 'inbox' }
+    | { type: 'today' }
 
-            const { data, error } = await supabase
+export function useTasks(filter: TaskFilter) {
+    return useQuery({
+        queryKey: ['tasks', filter],
+        queryFn: async () => {
+            let query = supabase
                 .from('tasks')
                 .select('*, task_tags(tags(*))')
-                .eq('project_id', projectId)
                 .is('parent_id', null)
                 .order('created_at', { ascending: false })
+
+            if (filter.type === 'project') {
+                query = query.eq('project_id', filter.projectId)
+            } else if (filter.type === 'inbox') {
+                query = query.is('project_id', null)
+            } else if (filter.type === 'today') {
+                const today = new Date().toISOString().split('T')[0]
+                query = query.eq('due_date', today)
+            }
+
+            const { data, error } = await query
 
             if (error) throw error
 
@@ -27,6 +40,6 @@ export function useTasks(projectId: string | undefined) {
                 tags: task.task_tags.map((tt: any) => tt.tags)
             })) as TaskWithTags[]
         },
-        enabled: !!projectId
+        enabled: true // Always enabled for these generic filters
     })
 }

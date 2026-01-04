@@ -1,10 +1,14 @@
-import { useRef } from 'react'
+import { } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { useAllTasks } from '@/hooks/useAllTasks'
 import { Loader2 } from 'lucide-react'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
+import { useCreateTask } from '@/hooks/useCreateTask'
+import { useSearchParams } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+import type { DateSelectArg } from "@fullcalendar/core"
 
 // Manually define the type if it's missing or named differently in this version
 interface EventDropArg {
@@ -16,6 +20,8 @@ import './calendar.css' // We'll create this for custom styling if needed
 export function DailyPlanner() {
     const { data: tasks, isLoading } = useAllTasks()
     const { mutate: updateTask } = useUpdateTask()
+    const { mutate: createTask } = useCreateTask()
+    const [_, setSearchParams] = useSearchParams()
 
     if (isLoading) {
         return (
@@ -31,25 +37,54 @@ export function DailyPlanner() {
         let start = task.start_time || task.due_date
         let end = task.end_time
 
-        // Treat as All Day if explicitly stored as date-only OR if missing explicit time
-        const isAllDay = (!task.start_time && !!task.due_date && task.due_date.length <= 10)
-            || (task.start_time ? false : true) && !!task.due_date
-
-        // Better logic: if start_time exists, it's NOT all day unless explicitly set (but we don't have is_all_day column yet)
-        // So we assume if start_time is present, it's a timed event. 
-        // If only due_date is present (and it's YYYY-MM-DD), it's all day.
-
         return {
             id: task.id,
             title: task.title,
             start: start || undefined,
             end: end || undefined,
             allDay: !task.start_time, // Simple heuristic for now: no start_time = all day
-            backgroundColor: task.status === 'done' ? '#e5e7eb' : '#3b82f6',
-            borderColor: task.status === 'done' ? '#d1d5db' : '#2563eb',
-            textColor: task.status === 'done' ? '#9ca3af' : '#ffffff',
+            backgroundColor: task.is_completed ? '#e5e7eb' : '#3b82f6',
+            borderColor: task.is_completed ? '#d1d5db' : '#2563eb',
+            textColor: task.is_completed ? '#9ca3af' : '#ffffff',
         }
     }) || []
+
+    const handleDateSelect = async (selectInfo: DateSelectArg) => {
+        const calendarApi = selectInfo.view.calendar
+        calendarApi.unselect()
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const isAllDay = selectInfo.allDay
+        let updates: any = {
+            title: 'New Task',
+            projectId: null,
+            userId: user.id
+        }
+
+        if (isAllDay) {
+            const d = selectInfo.start
+            const year = d.getFullYear()
+            const month = String(d.getMonth() + 1).padStart(2, '0')
+            const day = String(d.getDate()).padStart(2, '0')
+            updates.due_date = `${year}-${month}-${day}`
+        } else {
+            updates.start_time = selectInfo.startStr
+            updates.end_time = selectInfo.endStr
+            updates.due_date = selectInfo.startStr.split('T')[0]
+        }
+
+        createTask(updates, {
+            onSuccess: (newTask) => {
+                setSearchParams({ task: newTask.id })
+            }
+        })
+    }
+
+    const handleEventClick = (info: any) => {
+        setSearchParams({ task: info.event.id })
+    }
 
     const handleEventDrop = (info: EventDropArg) => {
         const taskId = info.event.id
@@ -112,6 +147,10 @@ export function DailyPlanner() {
                     slotDuration="00:30:00"
                     slotLabelInterval="01:00"
                     editable={true}
+                    selectable={true}
+                    selectMirror={true}
+                    select={handleDateSelect}
+                    eventClick={handleEventClick}
                     height="100%"
                     events={events}
                     eventDrop={handleEventDrop}

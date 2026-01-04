@@ -43,13 +43,28 @@ function DroppableContainer({ id, children, className }: { id: string, children:
 }
 
 
-export function ProjectTasks() {
+import type { TaskFilter } from "@/hooks/useTasks"
+
+// ... imports remain the same ...
+
+export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     const { projectId } = useParams<{ projectId: string }>()
     const [searchParams, setSearchParams] = useSearchParams()
 
+    // Determine filter
+    const filter: TaskFilter = mode === 'inbox'
+        ? { type: 'inbox' }
+        : mode === 'today'
+            ? { type: 'today' }
+            : { type: 'project', projectId: projectId! }
+
     // Data Hooks
-    const { data: tasks, isLoading: tasksLoading, isError: tasksError } = useTasks(projectId)
+    const { data: tasks, isLoading: tasksLoading, isError: tasksError } = useTasks(filter)
     const { data: sections, isLoading: sectionsLoading } = useSections(projectId)
+
+    // Derived State
+    const pageTitle = mode === 'inbox' ? 'Inbox' : mode === 'today' ? 'Today' : 'Tasks'
+    const showSections = !mode // Only show sections for specific projects
 
     // Mutation Hooks
     const { mutate: updateTask } = useUpdateTask()
@@ -191,7 +206,7 @@ export function ProjectTasks() {
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <div className="h-full flex flex-col">
                 <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
-                    <h2 className="font-bold text-lg text-gray-800">Tasks</h2>
+                    <h2 className="font-bold text-lg text-gray-800">{pageTitle}</h2>
                     <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} showCompleted={showCompleted} setShowCompleted={setShowCompleted} />
                 </div>
 
@@ -199,7 +214,9 @@ export function ProjectTasks() {
                     {renderMode === 'groups' ? (
                         // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
                         <div className="mt-4">
-                            {projectId && <div className="mb-6"><CreateTaskInput projectId={projectId} /></div>}
+                            {/* Allow creating tasks in Inbox/Today even without projectId */}
+                            <div className="mb-6"><CreateTaskInput projectId={projectId || null} /></div>
+
                             {Object.entries(tasksForView).map(([groupName, groupTasks]) => (
                                 <div key={groupName} className="mb-8">
                                     <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">{groupName} ({groupTasks.length})</h3>
@@ -213,7 +230,13 @@ export function ProjectTasks() {
                         <div className="space-y-8">
                             {/* 1. Main List (Uncategorized) */}
                             <DroppableContainer id="main-list" className="min-h-[100px]">
-                                {projectId && <CreateTaskInput projectId={projectId} sectionId={null} />}
+                                {projectId ? (
+                                    <CreateTaskInput projectId={projectId} sectionId={null} />
+                                ) : (
+                                    // For Inbox/Today, we don't need projectId if we handle it in API or pass null
+                                    <CreateTaskInput projectId={projectId || null} sectionId={null} />
+                                )}
+
                                 <div className="mt-4 space-y-2">
                                     {tasks?.filter(t => !t.section_id && (!showCompleted ? !t.is_completed : true))
                                         .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Simple sort
@@ -222,62 +245,66 @@ export function ProjectTasks() {
                                 </div>
                             </DroppableContainer>
 
-                            {/* 2. Accordion Sections */}
-                            <div className="space-y-4">
-                                {sections?.map(section => {
-                                    const sectionTasks = tasks?.filter(t => t.section_id === section.id && (!showCompleted ? !t.is_completed : true))
-                                    const isCollapsed = collapsedSections[section.id]
+                            {/* 2. Accordion Sections - ONLY SHOW IF showSections is TRUE */}
+                            {showSections && (
+                                <div className="space-y-4">
+                                    {sections?.map(section => {
+                                        const sectionTasks = tasks?.filter(t => t.section_id === section.id && (!showCompleted ? !t.is_completed : true))
+                                        const isCollapsed = collapsedSections[section.id]
 
-                                    return (
-                                        <DroppableContainer key={section.id} id={section.id} className="group/section border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
-                                            {/* Header */}
-                                            <div
-                                                className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer select-none border-b border-gray-100"
-                                                onClick={() => toggleSection(section.id)}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <ChevronRight size={16} className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")} />
-                                                    {editingSectionId === section.id ? (
-                                                        <form onSubmit={(e) => handleRenameSection(e, section.id)} onClick={e => e.stopPropagation()}>
-                                                            <input autoFocus type="text" value={editingSectionName} onChange={e => setEditingSectionName(e.target.value)} onBlur={() => setEditingSectionId(null)} className="font-bold text-sm text-gray-800 bg-white px-1 rounded outline-none border border-blue-200" />
-                                                        </form>
-                                                    ) : (
-                                                        <h3 className="font-bold text-sm text-gray-800">{section.name} <span className="text-gray-400 font-normal ml-1">({sectionTasks?.length})</span></h3>
-                                                    )}
+                                        return (
+                                            <DroppableContainer key={section.id} id={section.id} className="group/section border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+                                                {/* Header */}
+                                                <div
+                                                    className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer select-none border-b border-gray-100"
+                                                    onClick={() => toggleSection(section.id)}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <ChevronRight size={16} className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")} />
+                                                        {editingSectionId === section.id ? (
+                                                            <form onSubmit={(e) => handleRenameSection(e, section.id)} onClick={e => e.stopPropagation()}>
+                                                                <input autoFocus type="text" value={editingSectionName} onChange={e => setEditingSectionName(e.target.value)} onBlur={() => setEditingSectionId(null)} className="font-bold text-sm text-gray-800 bg-white px-1 rounded outline-none border border-blue-200" />
+                                                            </form>
+                                                        ) : (
+                                                            <h3 className="font-bold text-sm text-gray-800">{section.name} <span className="text-gray-400 font-normal ml-1">({sectionTasks?.length})</span></h3>
+                                                        )}
+                                                    </div>
+                                                    <div className="relative" onClick={e => e.stopPropagation()}>
+                                                        <button onClick={() => setSectionMenuOpen(sectionMenuOpen === section.id ? null : section.id)} className="p-1 hover:bg-gray-200 rounded text-gray-400"><MoreHorizontal size={16} /></button>
+                                                        {sectionMenuOpen === section.id && (
+                                                            <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
+                                                                <button onClick={() => { setEditingSectionId(section.id); setEditingSectionName(section.name); setSectionMenuOpen(null) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"><Pencil size={14} /> Rename</button>
+                                                                <button onClick={() => { if (confirm('Delete?')) deleteSection(section.id) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={14} /> Delete</button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="relative" onClick={e => e.stopPropagation()}>
-                                                    <button onClick={() => setSectionMenuOpen(sectionMenuOpen === section.id ? null : section.id)} className="p-1 hover:bg-gray-200 rounded text-gray-400"><MoreHorizontal size={16} /></button>
-                                                    {sectionMenuOpen === section.id && (
-                                                        <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
-                                                            <button onClick={() => { setEditingSectionId(section.id); setEditingSectionName(section.name); setSectionMenuOpen(null) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"><Pencil size={14} /> Rename</button>
-                                                            <button onClick={() => { if (confirm('Delete?')) deleteSection(section.id) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={14} /> Delete</button>
+
+                                                {/* Content */}
+                                                {!isCollapsed && (
+                                                    <div className="p-3 bg-gray-50/30">
+                                                        <div className="space-y-0.5 min-h-[50px]">
+                                                            {sectionTasks?.map(renderTaskItem)}
+                                                            {sectionTasks?.length === 0 && <div className="text-xs text-gray-300 p-2 text-center">Drop tasks here</div>}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Content */}
-                                            {!isCollapsed && (
-                                                <div className="p-3 bg-gray-50/30">
-                                                    <div className="space-y-0.5 min-h-[50px]">
-                                                        {sectionTasks?.map(renderTaskItem)}
-                                                        {sectionTasks?.length === 0 && <div className="text-xs text-gray-300 p-2 text-center">Drop tasks here</div>}
+                                                        <div className="mt-3">
+                                                            {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." />}
+                                                        </div>
                                                     </div>
-                                                    <div className="mt-3">
-                                                        {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." />}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </DroppableContainer>
-                                    )
-                                })}
-                            </div>
+                                                )}
+                                            </DroppableContainer>
+                                        )
+                                    })}
+                                </div>
+                            )}
 
-                            {/* 3. Add Section */}
-                            {isAddingSection ? (
-                                <form onSubmit={handleCreateSection} className="mt-4"><input autoFocus type="text" value={newSectionName} onChange={e => setNewSectionName(e.target.value)} onBlur={() => { if (!newSectionName) setIsAddingSection(false) }} placeholder="Section Name..." className="font-bold text-sm text-gray-800 bg-white border border-blue-200 rounded px-3 py-2 w-full outline-none" /></form>
-                            ) : (
-                                <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 text-gray-400 hover:text-blue-600 font-semibold text-sm mt-8 transition-colors"><Plus size={16} /> Add Section</button>
+                            {/* 3. Add Section - ONLY SHOW IF showSections is TRUE */}
+                            {showSections && (
+                                isAddingSection ? (
+                                    <form onSubmit={handleCreateSection} className="mt-4"><input autoFocus type="text" value={newSectionName} onChange={e => setNewSectionName(e.target.value)} onBlur={() => { if (!newSectionName) setIsAddingSection(false) }} placeholder="Section Name..." className="font-bold text-sm text-gray-800 bg-white border border-blue-200 rounded px-3 py-2 w-full outline-none" /></form>
+                                ) : (
+                                    <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 text-gray-400 hover:text-blue-600 font-semibold text-sm mt-8 transition-colors"><Plus size={16} /> Add Section</button>
+                                )
                             )}
                         </div>
                     )}

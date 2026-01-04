@@ -1,5 +1,8 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun } from "lucide-react"
+
+// ... existing code ...
+
 import { useState, useRef, useEffect } from "react"
 import clsx from "clsx"
 import { useProjects } from "@/hooks/useProjects"
@@ -187,6 +190,8 @@ export function Sidebar({ activePath }: SidebarProps) {
 
     const navItems = [
         { label: "Dashboard", path: "/", icon: LayoutDashboard },
+        { label: "Inbox", path: "/inbox", icon: Inbox },
+        { label: "Today", path: "/today", icon: Sun },
         { label: "Tasks", path: "/tasks", icon: CheckSquare },
         { label: "Calendar", path: "/calendar", icon: Calendar },
     ]

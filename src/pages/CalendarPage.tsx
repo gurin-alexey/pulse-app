@@ -1,5 +1,6 @@
 import { useAllTasks } from "@/hooks/useAllTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
+import { useCreateTask } from "@/hooks/useCreateTask"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
@@ -7,11 +8,50 @@ import interactionPlugin from "@fullcalendar/interaction"
 import multiMonthPlugin from "@fullcalendar/multimonth"
 import { useSearchParams } from "react-router-dom"
 import { Loader2 } from "lucide-react"
+import type { DateSelectArg } from "@fullcalendar/core"
+import { supabase } from "@/lib/supabase"
 
 export function CalendarPage() {
     const { data: tasks, isLoading } = useAllTasks()
     const { mutate: updateTask } = useUpdateTask()
+    const { mutate: createTask } = useCreateTask()
     const [_, setSearchParams] = useSearchParams()
+
+    const handleDateSelect = async (selectInfo: DateSelectArg) => {
+        const calendarApi = selectInfo.view.calendar
+        calendarApi.unselect()
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const isAllDay = selectInfo.allDay
+        let updates: any = {
+            title: 'New Task',
+            projectId: null,
+            userId: user.id
+        }
+
+        if (isAllDay) {
+            // All-day: use local date string
+            const d = selectInfo.start
+            const year = d.getFullYear()
+            const month = String(d.getMonth() + 1).padStart(2, '0')
+            const day = String(d.getDate()).padStart(2, '0')
+            updates.due_date = `${year}-${month}-${day}`
+        } else {
+            // Timed: use ISO strings
+            updates.start_time = selectInfo.startStr
+            updates.end_time = selectInfo.endStr
+            updates.due_date = selectInfo.startStr.split('T')[0]
+        }
+
+        createTask(updates, {
+            onSuccess: (newTask) => {
+                // Automatically open the detail modal for the new task
+                setSearchParams({ task: newTask.id })
+            }
+        })
+    }
 
     if (isLoading) {
         return (
@@ -105,13 +145,14 @@ export function CalendarPage() {
                 headerToolbar={{
                     left: 'timeGridDay,timeGridWeek,dayGridMonth,multiMonthYear',
                     center: 'title',
-                    right: 'prev,next today'
+                    right: 'prev,today,next'
                 }}
                 initialView="timeGridWeek"
                 firstDay={1}
                 editable={true}
                 selectable={true}
                 selectMirror={true}
+                select={handleDateSelect}
                 dayMaxEvents={true}
                 height="100%"
                 events={events}

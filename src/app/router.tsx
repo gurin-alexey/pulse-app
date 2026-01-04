@@ -35,6 +35,14 @@ export const router = createBrowserRouter([
             element: <CalendarPage />,
           },
           {
+            path: "inbox",
+            element: <ProjectTasks mode="inbox" />,
+          },
+          {
+            path: "today",
+            element: <ProjectTasks mode="today" />,
+          },
+          {
             path: "projects/:projectId",
             element: <ProjectTasks />,
           },

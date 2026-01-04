@@ -4,7 +4,7 @@ import { useCreateTask } from '@/hooks/useCreateTask'
 import { Loader2, Plus } from 'lucide-react'
 
 type CreateTaskInputProps = {
-    projectId: string
+    projectId: string | null
     sectionId?: string | null
     placeholder?: string
 }
