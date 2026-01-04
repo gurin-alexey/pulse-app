@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
-import { X, Loader2, CheckCircle2, Circle } from 'lucide-react'
+import { useDeleteTask } from '@/hooks/useDeleteTask'
+import { X, Loader2, CheckCircle2, Circle, Trash2, Calendar as CalendarIcon } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 
@@ -13,6 +14,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const [searchParams, setSearchParams] = useSearchParams()
     const { data: task, isLoading } = useTask(taskId)
     const { mutate: updateTask } = useUpdateTask()
+    const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask()
 
     // Local state for auto-save inputs
     const [title, setTitle] = useState('')
@@ -44,10 +46,21 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         }
     }
 
+    const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const date = e.target.value || null
+        updateTask({ taskId, updates: { due_date: date } })
+    }
+
     const toggleStatus = () => {
         if (!task) return
         const newStatus = task.status === 'done' ? 'todo' : 'done'
         updateTask({ taskId, updates: { status: newStatus } })
+    }
+
+    const handleDelete = () => {
+        if (window.confirm("Are you sure you want to delete this task?")) {
+            deleteTask(taskId)
+        }
     }
 
     if (isLoading) {
@@ -85,14 +98,24 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     </span>
                 </div>
 
-                <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-50">
-                    <X size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                        title="Delete task"
+                    >
+                        {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+                    </button>
+                    <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-50">
+                        <X size={20} />
+                    </button>
+                </div>
             </div>
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto p-6">
-                <div className="mb-6">
+                <div className="mb-6 space-y-4">
                     <input
                         type="text"
                         value={title}
@@ -101,6 +124,19 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                         className="w-full text-2xl font-bold border-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300"
                         placeholder="Task title"
                     />
+
+                    {/* Meta Controls */}
+                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
+                            <CalendarIcon size={16} className="text-gray-400" />
+                            <input
+                                type="date"
+                                value={task.due_date ? task.due_date.split('T')[0] : ''}
+                                onChange={handleDateChange}
+                                className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <div className="h-full">
@@ -108,7 +144,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         onBlur={handleDescriptionBlur}
-                        className="w-full h-[calc(100%-100px)] resize-none text-gray-600 border-none focus:ring-0 p-0 text-base leading-relaxed placeholder:text-gray-300"
+                        className="w-full h-[calc(100%-150px)] resize-none text-gray-600 border-none focus:ring-0 p-0 text-base leading-relaxed placeholder:text-gray-300"
                         placeholder="Add a description..."
                     />
                 </div>

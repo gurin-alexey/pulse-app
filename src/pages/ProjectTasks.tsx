@@ -65,9 +65,19 @@ export function ProjectTasks() {
                                     readOnly
                                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-3 cursor-pointer"
                                 />
-                                <span className={clsx("font-medium", task.status === 'done' ? "text-gray-400 line-through" : "text-gray-700")}>
-                                    {task.title}
-                                </span>
+                                <div className="flex-1 min-w-0">
+                                    <div className={clsx("font-medium truncate", task.status === 'done' ? "text-gray-400 line-through" : "text-gray-700")}>
+                                        {task.title}
+                                    </div>
+                                    {task.due_date && (
+                                        <div className={clsx(
+                                            "text-xs mt-0.5",
+                                            new Date(task.due_date) < new Date() && task.status !== 'done' ? "text-red-500 font-medium" : "text-gray-400"
+                                        )}>
+                                            {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
