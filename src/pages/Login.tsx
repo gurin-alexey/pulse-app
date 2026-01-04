@@ -38,6 +38,7 @@ export function Login() {
                     appearance={{ theme: ThemeSupa }}
                     providers={[]}
                     theme="light"
+                    redirectTo={`${window.location.origin}`}
                 />
             </div>
         </div>
