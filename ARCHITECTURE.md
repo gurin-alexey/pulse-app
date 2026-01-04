@@ -11,6 +11,7 @@ Current core technologies used in the project:
 - **State Management & Data Fetching:** TanStack Query (React Query)
 - **Navigation:** React Router 6 (URL-driven UI state)
 - **Calendar Engine:** **FullCalendar** (`@fullcalendar/react`, `daygrid`, `timegrid`, `interaction`, `multimonth`)
+- **Native Runtime:** **Capacitor** (iOS/Android)
 - **Drag-and-Drop:** **dnd-kit** (`@dnd-kit/core`, `@dnd-kit/sortable`) - used for categorizing tasks into sections and organizing projects.
 - **Icons:** Lucide React
 
@@ -62,3 +63,41 @@ Virtual filters based on task properties:
 
 ### Project Sections
 Tasks inside projects can be organized into named sections (rendered as Accordions). Tasks without a `section_id` appear in the "Uncategorized" top-level list.
+
+## 5. Mobile First Adaptation (Native Support)
+The application has been extensively adapted for mobile devices, preparing for native builds via Capacitor.
+
+### Mobile UI & Navigation
+- **Responsive Sidebar (Drawer)**:
+  - **Desktop**: Static sidebar (`min-w-64`).
+  - **Mobile**: Fixed drawer with backdrop overlay, controlled by a "Hamburger" menu in a top header.
+  - Sidebar automatically closes on navigation.
+- **Task Detail as Bottom Sheet**:
+  - On mobile, `TaskDetailModal` renders as a swipeable "Bottom Sheet" specific to touch usage (85% height, rounded top, drag handle).
+  - Desktop retains the centered modal experience.
+
+### Mobile Calendar Experience
+- **Custom Mobile Header**: Replaces standard FullCalendar toolbar on `< 768px`.
+  - Simplified navigation (1D / 3D / 7D view switcher).
+  - "No Year" compact date format.
+  - Click-on-date returns to "Today".
+- **Adaptive Views**: 
+  - Automatically switches to `timeGridDay` on mobile vs `dayGridMonth` on desktop.
+  - Mobile custom `threeDay` view.
+- **Event Interaction**: Long-press to drag events on touch devices.
+
+### Mobile Gestures (Swipe Actions)
+Powered by `react-swipeable-list`, tasks in lists support advanced gestures:
+- **Swipe Right (Leading)**:
+  - **Quick Tags**: Direct access to top 2 used tags.
+  - **Tag Manager**: Opens full tag selection.
+- **Swipe Left (Trailing)**:
+  - **Planning**: Quick preset "Today" / "Tomorrow".
+  - **Pick Date**: Opens native date picker via hidden input trigger.
+- **Conflict Resolution**: A dedicated drag handle (6-dots icon) ensures swipe gestures don't conflict with Drag-and-Drop resorting using `dnd-kit`.
+
+## 6. Native Build Infrastructure
+- **Platform**: Android (added via Capacitor).
+- **Core Config**: `capacitor.config.ts` setup.
+- **Assets**: Native splash screens and icons generated for Android res folders.
+
