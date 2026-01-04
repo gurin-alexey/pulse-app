@@ -10,9 +10,10 @@ import { useSections, useCreateSection, useDeleteSection, useUpdateSection } fro
 import clsx from "clsx"
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
+import { TaskItem } from "@/features/tasks/TaskItem"
 
 // Draggable Task Item Wrapper
-function DraggableTaskItem({ task, children }: { task: any, children: React.ReactNode }) {
+function DraggableTaskItem({ task, children }: { task: any, children: (props: { listeners: any, attributes: any }) => React.ReactNode }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: task.id,
         data: { task }
@@ -21,12 +22,11 @@ function DraggableTaskItem({ task, children }: { task: any, children: React.Reac
     const style = {
         transform: CSS.Translate.toString(transform),
         opacity: isDragging ? 0.5 : 1,
-        touchAction: 'none' // Required for pointer events
     }
 
     return (
-        <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
-            {children}
+        <div ref={setNodeRef} style={style}>
+            {children({ listeners, attributes })}
         </div>
     )
 }
@@ -154,48 +154,14 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     // Helper to render a single task item
     const renderTaskItem = (task: any) => (
         <DraggableTaskItem key={task.id} task={task}>
-            <div
-                onClick={() => handleTaskClick(task.id)}
-                className={clsx(
-                    "flex items-center p-3 border rounded-lg transition-colors group cursor-pointer mb-2 bg-white",
-                    activeTaskId === task.id ? "bg-blue-50 border-blue-200" : "border-gray-100 hover:bg-gray-50"
-                )}
-            >
-                <input
-                    type="checkbox"
-                    checked={task.is_completed}
-                    onChange={() => { }}
-                    onClick={(e) => toggleStatus(e, task)}
-                    onPointerDown={(e) => e.stopPropagation()} // Prevent drag
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-3 cursor-pointer"
+            {({ listeners, attributes }) => (
+                <TaskItem
+                    task={task}
+                    isActive={activeTaskId === task.id}
+                    listeners={listeners}
+                    attributes={attributes}
                 />
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                        <div className={clsx("font-medium truncate", task.is_completed ? "text-gray-400 line-through" : "text-gray-700")}>
-                            {task.title}
-                        </div>
-                        <div className="flex items-center gap-1">
-                            {task.tags?.map((tag: any) => (
-                                <div key={tag.id} className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} title={tag.name} />
-                            ))}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs mt-0.5">
-                        {task.due_date && (
-                            <span className={clsx(
-                                new Date(task.due_date) < new Date() && !task.is_completed ? "text-red-500 font-medium" : "text-gray-400"
-                            )}>
-                                {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                            </span>
-                        )}
-                        {task.start_time && (
-                            <span className="text-gray-400">
-                                {new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </div>
+            )}
         </DraggableTaskItem>
     )
 
@@ -303,7 +269,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                                 isAddingSection ? (
                                     <form onSubmit={handleCreateSection} className="mt-4"><input autoFocus type="text" value={newSectionName} onChange={e => setNewSectionName(e.target.value)} onBlur={() => { if (!newSectionName) setIsAddingSection(false) }} placeholder="Section Name..." className="font-bold text-sm text-gray-800 bg-white border border-blue-200 rounded px-3 py-2 w-full outline-none" /></form>
                                 ) : (
-                                    <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 text-gray-400 hover:text-blue-600 font-semibold text-sm mt-8 transition-colors"><Plus size={16} /> Add Section</button>
+                                    <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 text-gray-400 hover:text-blue-600 font-semibold text-sm mt-8 transition-colors p-2 -ml-2"><Plus size={16} /> Add Section</button>
                                 )
                             )}
                         </div>

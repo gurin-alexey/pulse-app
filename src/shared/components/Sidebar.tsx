@@ -15,6 +15,7 @@ import { CSS } from '@dnd-kit/utilities'
 
 type SidebarProps = {
     activePath: string
+    onItemClick?: () => void
 }
 
 // --- DND Components ---
@@ -50,7 +51,7 @@ function DroppableZone({ id, children, className }: { id: string, children?: Rea
 
 // --- Main Sidebar Component ---
 
-export function Sidebar({ activePath }: SidebarProps) {
+export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const { data: projects } = useProjects()
     const { data: groups } = useProjectGroups()
     const { mutate: createGroup } = useCreateProjectGroup()
@@ -174,6 +175,7 @@ export function Sidebar({ activePath }: SidebarProps) {
             <div className="relative group/project mb-1">
                 <Link
                     to={`/projects/${project.id}`}
+                    onClick={onItemClick}
                     className={clsx(
                         "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm text-gray-600 hover:bg-gray-100",
                         activePath === `/projects/${project.id}` && "bg-blue-50 text-blue-600"
@@ -208,6 +210,7 @@ export function Sidebar({ activePath }: SidebarProps) {
                             <Link
                                 key={item.path}
                                 to={item.path}
+                                onClick={onItemClick}
                                 className={clsx(
                                     "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
                                     isActive ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100"

@@ -10,12 +10,38 @@ import { useSearchParams } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
+import { useState, useEffect, useRef } from "react"
 
 export function CalendarPage() {
     const { data: tasks, isLoading } = useAllTasks()
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const [_, setSearchParams] = useSearchParams()
+    const calendarRef = useRef<FullCalendar>(null)
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+    const [currentTitle, setCurrentTitle] = useState('')
+    const [currentViewType, setCurrentViewType] = useState('timeGridDay')
+
+    useEffect(() => {
+        const handleResize = () => {
+            const mobile = window.innerWidth < 768
+            setIsMobile(mobile)
+        }
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
+    // Sync view when isMobile changes
+    useEffect(() => {
+        const calendarApi = calendarRef.current?.getApi()
+        if (calendarApi) {
+            if (isMobile) {
+                calendarApi.changeView('timeGridDay')
+            } else {
+                calendarApi.changeView('dayGridMonth')
+            }
+        }
+    }, [isMobile])
 
     const handleDateSelect = async (selectInfo: DateSelectArg) => {
         const calendarApi = selectInfo.view.calendar
@@ -32,14 +58,12 @@ export function CalendarPage() {
         }
 
         if (isAllDay) {
-            // All-day: use local date string
             const d = selectInfo.start
             const year = d.getFullYear()
             const month = String(d.getMonth() + 1).padStart(2, '0')
             const day = String(d.getDate()).padStart(2, '0')
             updates.due_date = `${year}-${month}-${day}`
         } else {
-            // Timed: use ISO strings
             updates.start_time = selectInfo.startStr
             updates.end_time = selectInfo.endStr
             updates.due_date = selectInfo.startStr.split('T')[0]
@@ -47,7 +71,6 @@ export function CalendarPage() {
 
         createTask(updates, {
             onSuccess: (newTask) => {
-                // Automatically open the detail modal for the new task
                 setSearchParams({ task: newTask.id })
             }
         })
@@ -72,7 +95,6 @@ export function CalendarPage() {
             start: start || undefined,
             end: end || undefined,
             allDay: !task.start_time,
-            // Logic for color could be improved if project data was joined or available
             backgroundColor: task.is_completed ? '#e5e7eb' : '#3b82f6',
             borderColor: task.is_completed ? '#d1d5db' : '#2563eb',
             textColor: task.is_completed ? '#9ca3af' : '#ffffff',
@@ -89,7 +111,6 @@ export function CalendarPage() {
         const isAllDay = info.event.allDay
 
         if (isAllDay && info.event.start) {
-            // FORCE local YYYY-MM-DD to avoid UTC shift for all-day events
             const d = info.event.start
             const year = d.getFullYear()
             const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -105,7 +126,6 @@ export function CalendarPage() {
                 }
             })
         } else {
-            // Dropped into TimeGrid or DayGrid (as timed event)
             const newStart = info.event.start?.toISOString() || null
             const newEnd = info.event.end?.toISOString() || null
 
@@ -114,7 +134,7 @@ export function CalendarPage() {
                 updates: {
                     start_time: newStart,
                     end_time: newEnd,
-                    due_date: newStart // Sync due_date with start time
+                    due_date: newStart
                 }
             })
         }
@@ -138,21 +158,75 @@ export function CalendarPage() {
         setSearchParams({ task: info.event.id })
     }
 
+    // Custom Mobile Header Handlers
+    const headerGoPrev = () => calendarRef.current?.getApi().prev()
+    const headerGoNext = () => calendarRef.current?.getApi().next()
+    const headerGoToday = () => calendarRef.current?.getApi().today()
+    const headerChangeView = (view: string) => calendarRef.current?.getApi().changeView(view)
+
     return (
-        <div className="h-full flex flex-col bg-white p-4">
+        <div className="h-full flex flex-col bg-white p-0 md:p-4 relative">
+
+            {/* Custom Mobile Header */}
+            {isMobile && (
+                <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-100 shrink-0 z-10">
+                    <div className="flex items-center gap-2">
+                        <button onClick={headerGoPrev} className="p-1 text-gray-400 hover:bg-gray-50 rounded"><span className="sr-only">Prev</span>←</button>
+                        <button onClick={headerGoToday} className="text-lg font-bold text-gray-800 active:opacity-50 transition-opacity">
+                            {currentTitle || 'Calendar'}
+                        </button>
+                        <button onClick={headerGoNext} className="p-1 text-gray-400 hover:bg-gray-50 rounded"><span className="sr-only">Next</span>→</button>
+                    </div>
+
+                    <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                        <button
+                            onClick={() => headerChangeView('timeGridDay')}
+                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${currentViewType === 'timeGridDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                        >1D</button>
+                        <button
+                            onClick={() => headerChangeView('threeDay')}
+                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${currentViewType === 'threeDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                        >3D</button>
+                        <button
+                            onClick={() => headerChangeView('timeGridWeek')}
+                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${currentViewType === 'timeGridWeek' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                        >7D</button>
+                    </div>
+                </div>
+            )}
+
             <FullCalendar
+                ref={calendarRef}
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin]}
-                headerToolbar={{
-                    left: 'timeGridDay,timeGridWeek,dayGridMonth,multiMonthYear',
+                headerToolbar={isMobile ? false : {
+                    left: 'prev,next today',
                     center: 'title',
-                    right: 'prev,today,next'
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
                 }}
-                initialView="timeGridWeek"
+                views={{
+                    threeDay: {
+                        type: 'timeGrid',
+                        duration: { days: 3 },
+                        buttonText: '3 Days',
+                        titleFormat: { month: 'short', day: 'numeric' } // No Year
+                    },
+                    timeGridDay: {
+                        titleFormat: { month: 'short', day: 'numeric' } // No Year on Mobile
+                    },
+                    timeGridWeek: {
+                        titleFormat: { month: 'short', day: 'numeric' }
+                    }
+                }}
+                initialView={isMobile ? "timeGridDay" : "dayGridMonth"}
                 firstDay={1}
                 editable={true}
                 selectable={true}
                 selectMirror={true}
                 select={handleDateSelect}
+                datesSet={(arg) => {
+                    setCurrentTitle(arg.view.title)
+                    setCurrentViewType(arg.view.type)
+                }}
                 dayMaxEvents={true}
                 height="100%"
                 events={events}
