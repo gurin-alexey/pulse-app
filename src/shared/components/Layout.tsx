@@ -1,10 +1,11 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { Calendar, CheckSquare, LayoutDashboard, Menu, LogOut, ChevronRight } from "lucide-react"
+import { Menu, LogOut, ChevronRight } from "lucide-react"
 import { useState } from "react"
 import clsx from "clsx"
 import { useTags } from "@/hooks/useTags"
 import { supabase } from "@/lib/supabase"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
+import { TaskDetailModal } from "@/features/tasks/TaskDetailModal"
 import { DailyPlanner } from "@/features/calendar/DailyPlanner"
 import { Sidebar } from "@/shared/components/Sidebar"
 
@@ -14,24 +15,32 @@ export function Layout() {
 
   const location = useLocation()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const taskId = searchParams.get('task')
 
   const { data: tags, isLoading: tagsLoading } = useTags()
-
-  const navItems = [
-    { label: "Dashboard", path: "/", icon: LayoutDashboard },
-    { label: "Tasks", path: "/tasks", icon: CheckSquare },
-    { label: "Calendar", path: "/calendar", icon: Calendar },
-  ]
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/login')
   }
 
+  const isCalendarPage = location.pathname.startsWith('/calendar')
+
+  const closeModal = () => {
+    const newParams = new URLSearchParams(searchParams)
+    newParams.delete('task')
+    setSearchParams(newParams)
+  }
+
   return (
-    <div className="grid grid-cols-[260px_minmax(350px,1fr)_minmax(450px,1fr)_350px] h-screen overflow-hidden bg-gray-50">
+    <div className={clsx(
+      "grid h-screen overflow-hidden bg-gray-50",
+      isCalendarPage
+        ? "grid-cols-[260px_1fr]" // Calendar mode: Sidebar + Main Content
+        : "grid-cols-[260px_minmax(350px,1fr)_minmax(450px,1fr)_350px]" // Standard mode: 4 columns
+    )}>
+
       {/* Column A: Sidebar */}
       <aside className="bg-white border-r border-gray-200 flex flex-col overflow-y-auto">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
@@ -42,26 +51,6 @@ export function Layout() {
         </div>
 
         <nav className="flex-1 p-2 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const isActive = location.pathname === item.path
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={clsx(
-                  "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
-                  isActive ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100"
-                )}
-              >
-                <Icon size={20} />
-                <span className="whitespace-nowrap">
-                  {item.label}
-                </span>
-              </Link>
-            )
-          })}
-
           <Sidebar activePath={location.pathname} />
 
           {/* Tags Section */}
@@ -120,26 +109,36 @@ export function Layout() {
         </div>
       </aside>
 
-      {/* Column B: Task List */}
-      <section className="border-r border-gray-200 bg-white overflow-y-auto">
+      {/* Column B: Content Area (Task List OR Calendar) */}
+      <section className={clsx("bg-white overflow-y-auto", !isCalendarPage && "border-r border-gray-200")}>
         <Outlet />
       </section>
 
-      {/* Column C: Detail View */}
-      <section className="border-r border-gray-200 bg-white overflow-y-auto">
-        {taskId ? (
-          <TaskDetail taskId={taskId} />
-        ) : (
-          <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-            Select a task to view details
-          </div>
-        )}
-      </section>
+      {/* Column C: Detail View (Only if NOT calendar page) */}
+      {!isCalendarPage && (
+        <section className="border-r border-gray-200 bg-white overflow-y-auto">
+          {taskId ? (
+            <TaskDetail taskId={taskId} />
+          ) : (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+              Select a task to view details
+            </div>
+          )}
+        </section>
+      )}
 
-      {/* Column D: Calendar */}
-      <section className="bg-white overflow-hidden border-l border-gray-200">
-        <DailyPlanner />
-      </section>
+      {/* Column D: Daily Planner (Only if NOT calendar page) */}
+      {!isCalendarPage && (
+        <section className="bg-white overflow-hidden border-l border-gray-200">
+          <DailyPlanner />
+        </section>
+      )}
+
+      {/* Modal for Calendar Page */}
+      {isCalendarPage && taskId && (
+        <TaskDetailModal taskId={taskId} onClose={closeModal} />
+      )}
+
     </div>
   )
 }

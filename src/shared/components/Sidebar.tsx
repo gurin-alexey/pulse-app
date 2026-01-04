@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import clsx from "clsx"
 import { useProjects } from "@/hooks/useProjects"
@@ -185,129 +185,160 @@ export function Sidebar({ activePath }: SidebarProps) {
         </DraggableProject>
     )
 
+    const navItems = [
+        { label: "Dashboard", path: "/", icon: LayoutDashboard },
+        { label: "Tasks", path: "/tasks", icon: CheckSquare },
+        { label: "Calendar", path: "/calendar", icon: Calendar },
+    ]
+
     return (
         <DndContext sensors={sensors} onDragStart={({ active }) => setActiveDragId(active.id as string)} onDragEnd={handleDragEnd}>
-            <div className="mt-6 space-y-6">
-
-                {/* Header with Actions */}
-                <div className="px-3 flex items-center justify-between group/main-header">
-                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        Projects
-                    </span>
-                    <div className="flex items-center gap-1 opacity-100 transition-opacity">
-                        <button
-                            onClick={() => startCreatingProject('ungrouped')}
-                            className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-gray-100 transition-colors"
-                            title="New Project"
-                        >
-                            <Plus size={16} />
-                        </button>
-                        <button
-                            onClick={handleCreateGroup}
-                            className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-gray-100 transition-colors"
-                            title="New Folder"
-                        >
-                            <FolderPlus size={16} />
-                        </button>
-                    </div>
-                </div>
-
-
-                {/* Content List */}
-                <div className="space-y-4">
-                    {/* 1. Groups */}
-                    {groups?.map(group => {
-                        const groupProjects = projects?.filter(p => p.group_id === group.id)
-                        const isCollapsed = collapsedGroups[group.id]
-
+            <div className="space-y-6">
+                {/* Main Navigation */}
+                <div className="space-y-1">
+                    {navItems.map((item) => {
+                        const Icon = item.icon
+                        const isActive = activePath === item.path
                         return (
-                            <DroppableZone key={group.id} id={group.id} className="transition-all">
-                                <div className="group/header relative">
-                                    <div className="px-3 mb-1 flex items-center justify-between group/title">
-                                        <button
-                                            onClick={() => toggleGroup(group.id)}
-                                            className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 outline-none flex-1 truncate"
-                                        >
-                                            <ChevronRight
-                                                size={16}
-                                                className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")}
-                                            />
-                                            <span className="truncate">{group.name}</span>
-                                            <span className="text-xs text-gray-400 font-normal">({groupProjects?.length})</span>
-                                        </button>
-
-                                        {/* Group Actions */}
-                                        <div className="opacity-0 group-hover/title:opacity-100 flex items-center gap-1 transition-opacity">
-                                            <button
-                                                onClick={() => startCreatingProject(group.id)}
-                                                className="p-1 hover:bg-blue-50 text-blue-500 rounded"
-                                                title="Add Project to Folder"
-                                            >
-                                                <Plus size={12} />
-                                            </button>
-                                            <button onClick={() => handleRenameGroup(group)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><Edit2 size={12} /></button>
-                                            <button onClick={() => handleDeleteGroup(group.id)} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 size={12} /></button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {!isCollapsed && (
-                                    <div className="pl-2 space-y-0.5 min-h-[10px]">
-                                        {isCreatingProjectIn === group.id && (
-                                            <form onSubmit={(e) => handleCreateProjectSubmit(e, group.id)} className="px-3 py-1 mb-1">
-                                                <input
-                                                    autoFocus
-                                                    type="text"
-                                                    value={newProjectName}
-                                                    onChange={(e) => setNewProjectName(e.target.value)}
-                                                    onBlur={() => !newProjectName && setIsCreatingProjectIn(null)}
-                                                    placeholder="Project Name..."
-                                                    disabled={isCreatingProject}
-                                                    className="w-full py-1 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
-                                                />
-                                            </form>
-                                        )}
-
-                                        {groupProjects?.map(renderProjectItem)}
-                                        {groupProjects?.length === 0 && !isCreatingProjectIn && (
-                                            <div className="px-3 py-2 text-xs text-gray-300 italic text-center border-2 border-dashed border-gray-100 rounded-lg mx-2">
-                                                Drop projects here
-                                            </div>
-                                        )}
-                                    </div>
+                            <Link
+                                key={item.path}
+                                to={item.path}
+                                className={clsx(
+                                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
+                                    isActive ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100"
                                 )}
-                            </DroppableZone>
+                            >
+                                <Icon size={20} />
+                                <span className="whitespace-nowrap font-medium">
+                                    {item.label}
+                                </span>
+                            </Link>
                         )
                     })}
-
-                    {/* 2. Ungrouped (Root) Projects */}
-                    <DroppableZone id="inbox" className="space-y-0.5 min-h-[50px]">
-                        {isCreatingProjectIn === 'ungrouped' && (
-                            <form onSubmit={(e) => handleCreateProjectSubmit(e, undefined)} className="px-3 py-1 mb-1">
-                                <input
-                                    autoFocus
-                                    type="text"
-                                    value={newProjectName}
-                                    onChange={(e) => setNewProjectName(e.target.value)}
-                                    onBlur={() => !newProjectName && setIsCreatingProjectIn(null)}
-                                    placeholder="Project Name..."
-                                    disabled={isCreatingProject}
-                                    className="w-full py-1 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
-                                />
-                            </form>
-                        )}
-
-                        {projects?.filter(p => !p.group_id).map(renderProjectItem)}
-
-                        {/* Empty state hint only if absolutely nothing exists */}
-                        {projects?.length === 0 && groups?.length === 0 && !isCreatingProjectIn && (
-                            <div className="px-3 py-4 text-xs text-gray-300 italic text-center">
-                                Create a project or folder
-                            </div>
-                        )}
-                    </DroppableZone>
                 </div>
 
+                <div className="mt-6 space-y-6">
+
+                    {/* Header with Actions */}
+                    <div className="px-3 flex items-center justify-between group/main-header">
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                            Projects
+                        </span>
+                        <div className="flex items-center gap-1 opacity-100 transition-opacity">
+                            <button
+                                onClick={() => startCreatingProject('ungrouped')}
+                                className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                                title="New Project"
+                            >
+                                <Plus size={16} />
+                            </button>
+                            <button
+                                onClick={handleCreateGroup}
+                                className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                                title="New Folder"
+                            >
+                                <FolderPlus size={16} />
+                            </button>
+                        </div>
+                    </div>
+
+
+                    {/* Content List */}
+                    <div className="space-y-4">
+                        {/* 1. Groups */}
+                        {groups?.map(group => {
+                            const groupProjects = projects?.filter(p => p.group_id === group.id)
+                            const isCollapsed = collapsedGroups[group.id]
+
+                            return (
+                                <DroppableZone key={group.id} id={group.id} className="transition-all">
+                                    <div className="group/header relative">
+                                        <div className="px-3 mb-1 flex items-center justify-between group/title">
+                                            <button
+                                                onClick={() => toggleGroup(group.id)}
+                                                className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 outline-none flex-1 truncate"
+                                            >
+                                                <ChevronRight
+                                                    size={16}
+                                                    className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")}
+                                                />
+                                                <span className="truncate">{group.name}</span>
+                                                <span className="text-xs text-gray-400 font-normal">({groupProjects?.length})</span>
+                                            </button>
+
+                                            {/* Group Actions */}
+                                            <div className="opacity-0 group-hover/title:opacity-100 flex items-center gap-1 transition-opacity">
+                                                <button
+                                                    onClick={() => startCreatingProject(group.id)}
+                                                    className="p-1 hover:bg-blue-50 text-blue-500 rounded"
+                                                    title="Add Project to Folder"
+                                                >
+                                                    <Plus size={12} />
+                                                </button>
+                                                <button onClick={() => handleRenameGroup(group)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><Edit2 size={12} /></button>
+                                                <button onClick={() => handleDeleteGroup(group.id)} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 size={12} /></button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {!isCollapsed && (
+                                        <div className="pl-2 space-y-0.5 min-h-[10px]">
+                                            {isCreatingProjectIn === group.id && (
+                                                <form onSubmit={(e) => handleCreateProjectSubmit(e, group.id)} className="px-3 py-1 mb-1">
+                                                    <input
+                                                        autoFocus
+                                                        type="text"
+                                                        value={newProjectName}
+                                                        onChange={(e) => setNewProjectName(e.target.value)}
+                                                        onBlur={() => !newProjectName && setIsCreatingProjectIn(null)}
+                                                        placeholder="Project Name..."
+                                                        disabled={isCreatingProject}
+                                                        className="w-full py-1 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
+                                                    />
+                                                </form>
+                                            )}
+
+                                            {groupProjects?.map(renderProjectItem)}
+                                            {groupProjects?.length === 0 && !isCreatingProjectIn && (
+                                                <div className="px-3 py-2 text-xs text-gray-300 italic text-center border-2 border-dashed border-gray-100 rounded-lg mx-2">
+                                                    Drop projects here
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </DroppableZone>
+                            )
+                        })}
+
+                        {/* 2. Ungrouped (Root) Projects */}
+                        <DroppableZone id="inbox" className="space-y-0.5 min-h-[50px]">
+                            {isCreatingProjectIn === 'ungrouped' && (
+                                <form onSubmit={(e) => handleCreateProjectSubmit(e, undefined)} className="px-3 py-1 mb-1">
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        value={newProjectName}
+                                        onChange={(e) => setNewProjectName(e.target.value)}
+                                        onBlur={() => !newProjectName && setIsCreatingProjectIn(null)}
+                                        placeholder="Project Name..."
+                                        disabled={isCreatingProject}
+                                        className="w-full py-1 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
+                                    />
+                                </form>
+                            )}
+
+                            {projects?.filter(p => !p.group_id).map(renderProjectItem)}
+
+                            {/* Empty state hint only if absolutely nothing exists */}
+                            {projects?.length === 0 && groups?.length === 0 && !isCreatingProjectIn && (
+                                <div className="px-3 py-4 text-xs text-gray-300 italic text-center">
+                                    Create a project or folder
+                                </div>
+                            )}
+                        </DroppableZone>
+                    </div>
+
+                </div>
             </div>
         </DndContext>
     )

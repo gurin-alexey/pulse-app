@@ -1,8 +1,127 @@
+import { useAllTasks } from "@/hooks/useAllTasks"
+import { useUpdateTask } from "@/hooks/useUpdateTask"
+import FullCalendar from "@fullcalendar/react"
+import dayGridPlugin from "@fullcalendar/daygrid"
+import timeGridPlugin from "@fullcalendar/timegrid"
+import interactionPlugin from "@fullcalendar/interaction"
+import multiMonthPlugin from "@fullcalendar/multimonth"
+import { useSearchParams } from "react-router-dom"
+import { Loader2 } from "lucide-react"
+
 export function CalendarPage() {
+    const { data: tasks, isLoading } = useAllTasks()
+    const { mutate: updateTask } = useUpdateTask()
+    const [_, setSearchParams] = useSearchParams()
+
+    if (isLoading) {
+        return (
+            <div className="h-full flex items-center justify-center text-gray-400">
+                <Loader2 className="animate-spin mr-2" />
+                Loading calendar...
+            </div>
+        )
+    }
+
+    const events = tasks?.map(task => {
+        let start = task.start_time || task.due_date
+        let end = task.end_time
+
+        return {
+            id: task.id,
+            title: task.title,
+            start: start || undefined,
+            end: end || undefined,
+            allDay: !task.start_time,
+            // Logic for color could be improved if project data was joined or available
+            backgroundColor: task.is_completed ? '#e5e7eb' : '#3b82f6',
+            borderColor: task.is_completed ? '#d1d5db' : '#2563eb',
+            textColor: task.is_completed ? '#9ca3af' : '#ffffff',
+            extendedProps: {
+                projectId: task.project_id,
+                description: task.description,
+                isCompleted: task.is_completed
+            }
+        }
+    }) || []
+
+    const handleEventDrop = (info: any) => {
+        const taskId = info.event.id
+        const isAllDay = info.event.allDay
+
+        if (isAllDay && info.event.start) {
+            // FORCE local YYYY-MM-DD to avoid UTC shift for all-day events
+            const d = info.event.start
+            const year = d.getFullYear()
+            const month = String(d.getMonth() + 1).padStart(2, '0')
+            const day = String(d.getDate()).padStart(2, '0')
+            const dateStr = `${year}-${month}-${day}`
+
+            updateTask({
+                taskId,
+                updates: {
+                    start_time: null,
+                    end_time: null,
+                    due_date: dateStr
+                }
+            })
+        } else {
+            // Dropped into TimeGrid or DayGrid (as timed event)
+            const newStart = info.event.start?.toISOString() || null
+            const newEnd = info.event.end?.toISOString() || null
+
+            updateTask({
+                taskId,
+                updates: {
+                    start_time: newStart,
+                    end_time: newEnd,
+                    due_date: newStart // Sync due_date with start time
+                }
+            })
+        }
+    }
+
+    const handleEventResize = (info: any) => {
+        const taskId = info.event.id
+        const newStart = info.event.start?.toISOString() || null
+        const newEnd = info.event.end?.toISOString() || null
+
+        updateTask({
+            taskId,
+            updates: {
+                start_time: newStart,
+                end_time: newEnd
+            }
+        })
+    }
+
+    const handleEventClick = (info: any) => {
+        setSearchParams({ task: info.event.id })
+    }
+
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-4">Calendar</h1>
-            <p className="text-gray-600">View your schedule.</p>
+        <div className="h-full flex flex-col bg-white p-4">
+            <FullCalendar
+                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin]}
+                headerToolbar={{
+                    left: 'timeGridDay,timeGridWeek,dayGridMonth,multiMonthYear',
+                    center: 'title',
+                    right: 'prev,next today'
+                }}
+                initialView="timeGridWeek"
+                firstDay={1}
+                editable={true}
+                selectable={true}
+                selectMirror={true}
+                dayMaxEvents={true}
+                height="100%"
+                events={events}
+                eventDrop={handleEventDrop}
+                eventResize={handleEventResize}
+                eventClick={handleEventClick}
+                nowIndicator={true}
+                slotDuration="00:30:00"
+                scrollTime="08:00:00"
+            />
         </div>
     )
 }
