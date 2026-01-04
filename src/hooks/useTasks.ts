@@ -16,6 +16,7 @@ export function useTasks(projectId: string | undefined) {
                 .from('tasks')
                 .select('*')
                 .eq('project_id', projectId)
+                .is('parent_id', null)
                 .order('created_at', { ascending: false })
 
             if (error) throw error

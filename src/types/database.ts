@@ -11,7 +11,7 @@ export type Task = {
     created_at: string
     title: string
     description: string | null
-    status: 'todo' | 'in_progress' | 'done'
+    is_completed: boolean
     priority: 'low' | 'medium' | 'high'
     due_date: string | null
     project_id: string

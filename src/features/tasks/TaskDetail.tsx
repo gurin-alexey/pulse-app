@@ -5,6 +5,7 @@ import { useDeleteTask } from '@/hooks/useDeleteTask'
 import { X, Loader2, CheckCircle2, Circle, Trash2, Calendar as CalendarIcon } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
+import { SubtaskList } from './SubtaskList'
 
 type TaskDetailProps = {
     taskId: string
@@ -53,8 +54,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
     const toggleStatus = () => {
         if (!task) return
-        const newStatus = task.status === 'done' ? 'todo' : 'done'
-        updateTask({ taskId, updates: { status: newStatus } })
+        updateTask({ taskId, updates: { is_completed: !task.is_completed } })
     }
 
     const handleDelete = () => {
@@ -88,13 +88,13 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     {/* Checkbox / Status toggle */}
                     <button
                         onClick={toggleStatus}
-                        className={clsx("transition-colors", task.status === 'done' ? "text-green-500" : "text-gray-400 hover:text-gray-600")}
+                        className={clsx("transition-colors", task.is_completed ? "text-green-500" : "text-gray-400 hover:text-gray-600")}
                     >
-                        {task.status === 'done' ? <CheckCircle2 size={24} /> : <Circle size={24} />}
+                        {task.is_completed ? <CheckCircle2 size={24} /> : <Circle size={24} />}
                     </button>
 
                     <span className="text-xs text-gray-400 uppercase font-semibold">
-                        {task.status === 'done' ? 'Completed' : 'Open'}
+                        {task.is_completed ? 'Completed' : 'Open'}
                     </span>
                 </div>
 
@@ -126,28 +126,103 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     />
 
                     {/* Meta Controls */}
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
                             <CalendarIcon size={16} className="text-gray-400" />
                             <input
                                 type="date"
                                 value={task.due_date ? task.due_date.split('T')[0] : ''}
                                 onChange={handleDateChange}
-                                className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer"
+                                className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm"
                             />
                         </div>
+
+                        {/* Time Picker */}
+                        {task.due_date && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
+                                <input
+                                    type="time"
+                                    value={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
+                                    onChange={(e) => {
+                                        const time = e.target.value
+                                        if (!time) return // Handle clear?
+
+                                        const datePart = task.due_date ? task.due_date.split('T')[0] : null
+                                        if (!datePart) return
+
+                                        const newStart = `${datePart}T${time}:00`
+                                        const startDate = new Date(newStart)
+
+                                        // Default end time is +1 hour if not set, or preserve duration/end?
+                                        // For simplicity: if end_time exists, keep it unless it's before new start? 
+                                        // Let's stick to the previous logic: update start, ensuring end is valid.
+                                        // But actually, UX-wise:
+                                        // 1. If start is moved, and end exists -> maybe just update start? 
+                                        // Let's just ensure we have a valid end time.
+                                        // If no end time set yet (first pick), start + 1h.
+                                        let endDateStr = task.end_time
+                                        if (!endDateStr) {
+                                            endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
+                                        } else {
+                                            // Ensure end is not before start?
+                                            const currentEnd = new Date(endDateStr)
+                                            if (currentEnd <= startDate) {
+                                                endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
+                                            }
+                                        }
+
+                                        updateTask({
+                                            taskId,
+                                            updates: {
+                                                start_time: startDate.toISOString(),
+                                                end_time: endDateStr
+                                            }
+                                        })
+                                    }}
+                                    className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm w-[46px]"
+                                />
+                                {task.start_time && (
+                                    <>
+                                        <span className="text-gray-400">-</span>
+                                        <input
+                                            type="time"
+                                            value={task.end_time ? new Date(task.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
+                                            onChange={(e) => {
+                                                const time = e.target.value
+                                                if (!time) return
+
+                                                const datePart = task.due_date ? task.due_date.split('T')[0] : null
+                                                if (!datePart) return
+
+                                                const newEnd = `${datePart}T${time}:00`
+                                                // Validate that end is after start? 
+                                                // For now just update.
+                                                updateTask({
+                                                    taskId,
+                                                    updates: {
+                                                        end_time: new Date(newEnd).toISOString()
+                                                    }
+                                                })
+                                            }}
+                                            className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm w-[46px]"
+                                        />
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                <div className="h-full">
-                    <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        onBlur={handleDescriptionBlur}
-                        className="w-full h-[calc(100%-150px)] resize-none text-gray-600 border-none focus:ring-0 p-0 text-base leading-relaxed placeholder:text-gray-300"
-                        placeholder="Add a description..."
-                    />
-                </div>
+                <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    onBlur={handleDescriptionBlur}
+                    className="w-full min-h-[120px] resize-none text-gray-600 border-none focus:ring-0 p-0 text-base leading-relaxed placeholder:text-gray-300"
+                    placeholder="Add a description..."
+                />
+
+                {/* Subtasks */}
+                <SubtaskList taskId={task.id} projectId={task.project_id} />
             </div>
         </div>
     )

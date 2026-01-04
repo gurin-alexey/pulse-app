@@ -1,5 +1,6 @@
 import { useParams, useSearchParams } from "react-router-dom"
 import { useTasks } from "@/hooks/useTasks"
+import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { CreateTaskInput } from "@/features/tasks/CreateTaskInput"
 import clsx from "clsx"
@@ -8,12 +9,27 @@ export function ProjectTasks() {
     const { projectId } = useParams<{ projectId: string }>()
     const [searchParams, setSearchParams] = useSearchParams()
     const { data: tasks, isLoading, isError } = useTasks(projectId)
+    const { mutate: updateTask } = useUpdateTask()
 
     const activeTaskId = searchParams.get('task')
 
     const handleTaskClick = (taskId: string) => {
         setSearchParams({ task: taskId })
     }
+
+    const toggleStatus = (e: React.MouseEvent, task: any) => {
+        e.stopPropagation()
+        updateTask({
+            taskId: task.id,
+            updates: { is_completed: !task.is_completed }
+        })
+    }
+
+    const sortedTasks = tasks ? [...tasks].sort((a, b) => {
+        if (a.is_completed && !b.is_completed) return 1
+        if (!a.is_completed && b.is_completed) return -1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }) : []
 
     if (isLoading) {
         return (
@@ -42,13 +58,13 @@ export function ProjectTasks() {
             <div className="flex-1 p-4 overflow-y-auto">
                 {projectId && <CreateTaskInput projectId={projectId} />}
 
-                {tasks?.length === 0 ? (
+                {sortedTasks?.length === 0 ? (
                     <div className="text-gray-400 text-center mt-10">
                         No tasks yet
                     </div>
                 ) : (
                     <div className="space-y-2">
-                        {tasks?.map((task) => (
+                        {sortedTasks?.map((task) => (
                             <div
                                 key={task.id}
                                 onClick={() => handleTaskClick(task.id)}
@@ -61,22 +77,29 @@ export function ProjectTasks() {
                             >
                                 <input
                                     type="checkbox"
-                                    checked={task.status === 'done'}
-                                    readOnly
+                                    checked={task.is_completed}
+                                    onChange={() => { }}
+                                    onClick={(e) => toggleStatus(e, task)}
                                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-3 cursor-pointer"
                                 />
                                 <div className="flex-1 min-w-0">
-                                    <div className={clsx("font-medium truncate", task.status === 'done' ? "text-gray-400 line-through" : "text-gray-700")}>
+                                    <div className={clsx("font-medium truncate", task.is_completed ? "text-gray-400 line-through" : "text-gray-700")}>
                                         {task.title}
                                     </div>
-                                    {task.due_date && (
-                                        <div className={clsx(
-                                            "text-xs mt-0.5",
-                                            new Date(task.due_date) < new Date() && task.status !== 'done' ? "text-red-500 font-medium" : "text-gray-400"
-                                        )}>
-                                            {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                        </div>
-                                    )}
+                                    <div className="flex items-center gap-2 text-xs mt-0.5">
+                                        {task.due_date && (
+                                            <span className={clsx(
+                                                new Date(task.due_date) < new Date() && !task.is_completed ? "text-red-500 font-medium" : "text-gray-400"
+                                            )}>
+                                                {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                            </span>
+                                        )}
+                                        {task.start_time && (
+                                            <span className="text-gray-400">
+                                                {new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}
