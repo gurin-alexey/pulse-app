@@ -1,17 +1,19 @@
 import { useParams, useSearchParams } from "react-router-dom"
-import { useTasks } from "@/hooks/useTasks"
+import { useTagTasks } from "@/hooks/useTagTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { AlertCircle, Loader2 } from "lucide-react"
-import { CreateTaskInput } from "@/features/tasks/CreateTaskInput"
+import { useTags } from "@/hooks/useTags"
+import { AlertCircle, Loader2, Tag as TagIcon } from "lucide-react"
 import clsx from "clsx"
 
-export function ProjectTasks() {
-    const { projectId } = useParams<{ projectId: string }>()
+export function TagTasks() {
+    const { tagId } = useParams<{ tagId: string }>()
     const [searchParams, setSearchParams] = useSearchParams()
-    const { data: tasks, isLoading, isError } = useTasks(projectId)
+    const { data: tasks, isLoading, isError } = useTagTasks(tagId)
+    const { data: tags } = useTags()
     const { mutate: updateTask } = useUpdateTask()
 
     const activeTaskId = searchParams.get('task')
+    const currentTag = tags?.find(t => t.id === tagId)
 
     const handleTaskClick = (taskId: string) => {
         setSearchParams({ task: taskId })
@@ -51,16 +53,20 @@ export function ProjectTasks() {
 
     return (
         <div className="h-full flex flex-col">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
-                <h2 className="font-bold text-lg text-gray-800">Tasks</h2>
+            <div className="p-4 border-b border-gray-100 flex items-center gap-3 h-16 shrink-0 sticky top-0 bg-white z-10">
+                <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: currentTag?.color || '#ccc' }}
+                />
+                <h2 className="font-bold text-lg text-gray-800">
+                    {currentTag?.name || 'Tag Tasks'}
+                </h2>
             </div>
 
             <div className="flex-1 p-4 overflow-y-auto">
-                {projectId && <CreateTaskInput projectId={projectId} />}
-
                 {sortedTasks?.length === 0 ? (
                     <div className="text-gray-400 text-center mt-10">
-                        No tasks yet
+                        No tasks with this tag
                     </div>
                 ) : (
                     <div className="space-y-2">
@@ -89,7 +95,7 @@ export function ProjectTasks() {
                                         </div>
                                         {/* Tags */}
                                         <div className="flex items-center gap-1">
-                                            {(task as any).tags?.map((tag: any) => (
+                                            {task.tags?.map((tag) => (
                                                 <div
                                                     key={tag.id}
                                                     className="w-2 h-2 rounded-full"

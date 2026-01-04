@@ -1,9 +1,9 @@
-
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { Calendar, CheckSquare, LayoutDashboard, Menu, Folder, AlertCircle, LogOut, Plus, Loader2 } from "lucide-react"
+import { Calendar, CheckSquare, LayoutDashboard, Menu, Folder, AlertCircle, LogOut, Plus, Loader2, ChevronRight } from "lucide-react"
 import { useState } from "react"
 import clsx from "clsx"
 import { useProjects } from "@/hooks/useProjects"
+import { useTags } from "@/hooks/useTags"
 import { supabase } from "@/lib/supabase"
 import { useCreateProject } from "@/hooks/useCreateProject"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
@@ -11,6 +11,7 @@ import { DailyPlanner } from "@/features/calendar/DailyPlanner"
 
 export function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isTagsOpen, setIsTagsOpen] = useState(false)
   const [isCreatingProject, setIsCreatingProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
 
@@ -20,6 +21,7 @@ export function Layout() {
   const taskId = searchParams.get('task')
 
   const { data: projects, isLoading, isError } = useProjects()
+  const { data: tags, isLoading: tagsLoading } = useTags()
   const { mutate: createProject, isPending: isCreating } = useCreateProject()
 
   const navItems = [
@@ -153,6 +155,50 @@ export function Layout() {
               </div>
             )}
           </div>
+
+          {/* Tags Section */}
+          <div className="mt-8">
+            <button
+              onClick={() => setIsTagsOpen(!isTagsOpen)}
+              className="w-full px-3 mb-2 flex items-center justify-between group hover:text-gray-600 outline-none"
+            >
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-hover:text-gray-500 transition-colors">
+                Tags
+              </span>
+              <ChevronRight
+                size={16}
+                className={clsx("text-gray-400 transition-transform duration-200", isTagsOpen && "rotate-90")}
+              />
+            </button>
+
+            {isTagsOpen && (
+              <div className="space-y-1">
+                {tagsLoading ? (
+                  <div className="px-3 space-y-2">
+                    {[1, 2].map(i => <div key={i} className="h-6 bg-gray-100 rounded animate-pulse" />)}
+                  </div>
+                ) : tags?.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-gray-400">
+                    No tags yet
+                  </div>
+                ) : (
+                  tags?.map(tag => (
+                    <Link
+                      key={tag.id}
+                      to={`/tags/${tag.id}`}
+                      className={clsx(
+                        "flex items-center gap-3 px-3 py-1.5 rounded-lg transition-colors text-sm text-gray-600 hover:bg-gray-100",
+                        location.pathname === `/tags/${tag.id}` && "bg-blue-50 text-blue-600"
+                      )}
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                      <span className="truncate">{tag.name}</span>
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </nav>
 
         <div className="p-4 border-t border-gray-100 mt-auto">
@@ -182,8 +228,6 @@ export function Layout() {
         )}
       </section>
 
-
-
       {/* Column D: Calendar */}
       <section className="bg-white overflow-hidden border-l border-gray-200">
         <DailyPlanner />
@@ -191,4 +235,3 @@ export function Layout() {
     </div>
   )
 }
-

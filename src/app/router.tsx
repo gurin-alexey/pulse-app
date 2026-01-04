@@ -5,6 +5,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { TasksPage } from "@/pages/TasksPage";
 import { CalendarPage } from "@/pages/CalendarPage";
 import { ProjectTasks } from "@/pages/ProjectTasks";
+import { TagTasks } from "@/pages/TagTasks";
 
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { Login } from "@/pages/Login";
@@ -36,6 +37,10 @@ export const router = createBrowserRouter([
           {
             path: "projects/:projectId",
             element: <ProjectTasks />,
+          },
+          {
+            path: "tags/:tagId",
+            element: <TagTasks />,
           },
         ],
       },

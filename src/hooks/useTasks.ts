@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import type { Task } from '@/types/database'
+import type { Task, Tag } from '@/types/database'
 
-/**
- * Fetches tasks for a specific project.
- * @param projectId - The UUID of the project to fetch tasks for.
- */
+export type TaskWithTags = Task & {
+    tags: Tag[]
+}
+
 export function useTasks(projectId: string | undefined) {
     return useQuery({
         queryKey: ['tasks', projectId],
@@ -14,13 +14,18 @@ export function useTasks(projectId: string | undefined) {
 
             const { data, error } = await supabase
                 .from('tasks')
-                .select('*')
+                .select('*, task_tags(tags(*))')
                 .eq('project_id', projectId)
                 .is('parent_id', null)
                 .order('created_at', { ascending: false })
 
             if (error) throw error
-            return data as Task[]
+
+            // Transform to flat structure
+            return (data as any[]).map(task => ({
+                ...task,
+                tags: task.task_tags.map((tt: any) => tt.tags)
+            })) as TaskWithTags[]
         },
         enabled: !!projectId
     })

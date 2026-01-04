@@ -20,3 +20,17 @@ export type Task = {
     start_time: string | null
     end_time: string | null
 }
+
+export type Tag = {
+    id: string
+    created_at: string
+    name: string
+    color: string
+    user_id: string
+}
+
+export type TaskTag = {
+    task_id: string
+    tag_id: string
+    created_at: string
+}

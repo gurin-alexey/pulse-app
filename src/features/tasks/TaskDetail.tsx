@@ -6,6 +6,7 @@ import { X, Loader2, CheckCircle2, Circle, Trash2, Calendar as CalendarIcon } fr
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { SubtaskList } from './SubtaskList'
+import { TagManager } from '../tags/TagManager'
 
 type TaskDetailProps = {
     taskId: string
@@ -126,7 +127,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     />
 
                     {/* Meta Controls */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-4">
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
                             <CalendarIcon size={16} className="text-gray-400" />
                             <input
@@ -145,7 +146,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                     value={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
                                     onChange={(e) => {
                                         const time = e.target.value
-                                        if (!time) return // Handle clear?
+                                        if (!time) return
 
                                         const datePart = task.due_date ? task.due_date.split('T')[0] : null
                                         if (!datePart) return
@@ -153,18 +154,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                         const newStart = `${datePart}T${time}:00`
                                         const startDate = new Date(newStart)
 
-                                        // Default end time is +1 hour if not set, or preserve duration/end?
-                                        // For simplicity: if end_time exists, keep it unless it's before new start? 
-                                        // Let's stick to the previous logic: update start, ensuring end is valid.
-                                        // But actually, UX-wise:
-                                        // 1. If start is moved, and end exists -> maybe just update start? 
-                                        // Let's just ensure we have a valid end time.
-                                        // If no end time set yet (first pick), start + 1h.
                                         let endDateStr = task.end_time
                                         if (!endDateStr) {
                                             endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
                                         } else {
-                                            // Ensure end is not before start?
                                             const currentEnd = new Date(endDateStr)
                                             if (currentEnd <= startDate) {
                                                 endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
@@ -195,8 +188,6 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                                 if (!datePart) return
 
                                                 const newEnd = `${datePart}T${time}:00`
-                                                // Validate that end is after start? 
-                                                // For now just update.
                                                 updateTask({
                                                     taskId,
                                                     updates: {
@@ -210,6 +201,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                 )}
                             </div>
                         )}
+
+                        {/* Tag Manager */}
+                        <TagManager taskId={task.id} />
                     </div>
                 </div>
 
@@ -217,7 +211,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     onBlur={handleDescriptionBlur}
-                    className="w-full min-h-[120px] resize-none text-gray-600 border-none focus:ring-0 p-0 text-base leading-relaxed placeholder:text-gray-300"
+                    className="w-full min-h-[120px] resize-none text-gray-600 border-none focus:ring-0 p-0 text-base leading-relaxed placeholder:text-gray-300 mt-4"
                     placeholder="Add a description..."
                 />
 
