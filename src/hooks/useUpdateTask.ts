@@ -25,11 +25,13 @@ export function useUpdateTask() {
         onMutate: async ({ taskId, updates }) => {
             // Cancel outgoing refetches
             await queryClient.cancelQueries({ queryKey: ['task', taskId] })
+            await queryClient.cancelQueries({ queryKey: ['all-tasks'] })
 
             // Snapshot the previous value
             const previousTask = queryClient.getQueryData<Task>(['task', taskId])
+            const previousAllTasks = queryClient.getQueryData<Task[]>(['all-tasks'])
 
-            // Optimistically update the task
+            // Optimistically update the single task
             if (previousTask) {
                 queryClient.setQueryData<Task>(['task', taskId], {
                     ...previousTask,
@@ -37,20 +39,29 @@ export function useUpdateTask() {
                 })
             }
 
-            // Also update the list if project_id is available (approximate)
-            // Note: We might miss updating the list if we don't know the query key exactly, 
-            // but invalidation onSettled will fix it eventually.
+            // Optimistically update the calendar list
+            if (previousAllTasks) {
+                queryClient.setQueryData<Task[]>(['all-tasks'], (old) =>
+                    old?.map(task =>
+                        task.id === taskId ? { ...task, ...updates } : task
+                    ) || []
+                )
+            }
 
-            return { previousTask }
+            return { previousTask, previousAllTasks }
         },
         onError: (_err, { taskId }, context) => {
             if (context?.previousTask) {
                 queryClient.setQueryData(['task', taskId], context.previousTask)
             }
+            if (context?.previousAllTasks) {
+                queryClient.setQueryData(['all-tasks'], context.previousAllTasks)
+            }
         },
         onSettled: (_data, _error, { taskId }, context) => {
             queryClient.invalidateQueries({ queryKey: ['task', taskId] })
             queryClient.invalidateQueries({ queryKey: ['tasks'] }) // Invalidate all lists to be safe
+            queryClient.invalidateQueries({ queryKey: ['all-tasks'] }) // Invalidate calendar view
         },
     })
 }

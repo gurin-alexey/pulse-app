@@ -1,0 +1,47 @@
+.daily-planner-wrapper .fc {
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+
+.daily-planner-wrapper .fc-theme-standard td, 
+.daily-planner-wrapper .fc-theme-standard th {
+    border-color: #f3f4f6;
+}
+
+.daily-planner-wrapper .fc-timegrid-slot {
+    height: 3rem; /* Taller slots for better readability */
+}
+
+/* Hide the "today" highlight to make it look cleaner */
+.daily-planner-wrapper .fc-day-today {
+    background: transparent !important;
+}
+
+/* Custom scrollbar for the calendar */
+.daily-planner-wrapper .fc-scroller::-webkit-scrollbar {
+    width: 6px;
+}
+.daily-planner-wrapper .fc-scroller::-webkit-scrollbar-track {
+    background: transparent;
+}
+.daily-planner-wrapper .fc-scroller::-webkit-scrollbar-thumb {
+    background-color: #e5e7eb;
+    border-radius: 20px;
+}
+
+/* Style events */
+.daily-planner-wrapper .fc-event {
+    border: none;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.daily-planner-wrapper .fc-v-event {
+    background-color: #eff6ff;
+    border-left: 3px solid #3b82f6;
+    color: #1e40af;
+    padding: 2px 4px;
+}
+
+.daily-planner-wrapper .fc-timegrid-event .fc-event-time {
+    font-weight: 600;
+}

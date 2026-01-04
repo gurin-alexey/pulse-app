@@ -7,6 +7,7 @@ import { useProjects } from "@/hooks/useProjects"
 import { supabase } from "@/lib/supabase"
 import { useCreateProject } from "@/hooks/useCreateProject"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
+import { DailyPlanner } from "@/features/calendar/DailyPlanner"
 
 export function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -181,11 +182,11 @@ export function Layout() {
         )}
       </section>
 
-      {/* Column D: Calendar (Placeholder) */}
-      <section className="bg-gray-50 overflow-y-auto">
-        <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-          Calendar view
-        </div>
+
+
+      {/* Column D: Calendar */}
+      <section className="bg-white overflow-hidden border-l border-gray-200">
+        <DailyPlanner />
       </section>
     </div>
   )

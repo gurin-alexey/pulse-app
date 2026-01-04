@@ -17,4 +17,6 @@ export type Task = {
     project_id: string
     user_id: string
     parent_id: string | null
+    start_time: string | null
+    end_time: string | null
 }
