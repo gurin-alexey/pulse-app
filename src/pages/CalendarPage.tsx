@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
 import { useState, useEffect, useRef } from "react"
+import { generateRecurringInstances } from "@/utils/recurrence"
 
 export function CalendarPage() {
     const { data: tasks, isLoading } = useAllTasks()
@@ -21,6 +22,11 @@ export function CalendarPage() {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
     const [currentTitle, setCurrentTitle] = useState('')
     const [currentViewType, setCurrentViewType] = useState('timeGridDay')
+
+    // Refetch events when tasks data changes
+    useEffect(() => {
+        calendarRef.current?.getApi().refetchEvents()
+    }, [tasks])
 
     useEffect(() => {
         const handleResize = () => {
@@ -86,13 +92,13 @@ export function CalendarPage() {
         )
     }
 
-    const events = tasks?.map(task => {
+    const mapTaskToEvent = (task: any) => {
         let start = task.start_time || task.due_date
         let end = task.end_time
 
         return {
             id: task.id,
-            title: task.title,
+            title: task.title || 'Untitled Task',
             start: start || undefined,
             end: end || undefined,
             allDay: !task.start_time,
@@ -102,12 +108,49 @@ export function CalendarPage() {
             extendedProps: {
                 projectId: task.project_id,
                 description: task.description,
-                isCompleted: task.is_completed
+                isCompleted: task.is_completed,
+                originalId: task.original_id || task.id,
+                isVirtual: task.is_virtual || false
             }
         }
-    }).sort((a, b) => Number(a.extendedProps.isCompleted) - Number(b.extendedProps.isCompleted)) || []
+    }
+
+    const handleFetchEvents = (fetchInfo: any, successCallback: any) => {
+        if (!tasks) return successCallback([])
+
+        const start = fetchInfo.start
+        const end = fetchInfo.end
+
+        const allEvents: any[] = []
+
+        tasks.forEach(task => {
+            if (task.recurrence_rule) {
+                const instances = generateRecurringInstances(task, start, end)
+                instances.forEach(instance => {
+                    allEvents.push(mapTaskToEvent(instance))
+                })
+            } else {
+                allEvents.push(mapTaskToEvent(task))
+            }
+        })
+
+        // Sort: incomplete first
+        allEvents.sort((a, b) => Number(a.extendedProps.isCompleted) - Number(b.extendedProps.isCompleted))
+
+        successCallback(allEvents)
+    }
 
     const handleEventDrop = (info: any) => {
+        // If virtual, we probably want to update the master task's recurrence or move THIS specific instance.
+        // Moving a specific instance of a recurring task usually requires creating an "exception".
+        // For MVP, we'll inhibit moving virtual instances or just move the master (which moves ALL future ones).
+        // Best for now: open detail view.
+        if (info.event.extendedProps.isVirtual) {
+            info.revert()
+            setSearchParams({ task: info.event.extendedProps.originalId })
+            return
+        }
+
         const taskId = info.event.id
         const isAllDay = info.event.allDay
 
@@ -152,6 +195,12 @@ export function CalendarPage() {
     }
 
     const handleEventResize = (info: any) => {
+        if (info.event.extendedProps.isVirtual) {
+            info.revert()
+            setSearchParams({ task: info.event.extendedProps.originalId })
+            return
+        }
+
         const taskId = info.event.id
         const newStart = info.event.start?.toISOString() || null
         const newEnd = info.event.end?.toISOString() || null
@@ -176,7 +225,7 @@ export function CalendarPage() {
                 (popover as HTMLElement).remove() // Fallback
             }
         }
-        setSearchParams({ task: info.event.id })
+        setSearchParams({ task: info.event.extendedProps.originalId })
     }
 
     // Custom Mobile Header Handlers
@@ -250,7 +299,7 @@ export function CalendarPage() {
                 }}
                 eventOrder="extendedProps.isCompleted,start,-duration,allDay,title"
                 height="100%"
-                events={events}
+                events={handleFetchEvents}
                 eventDrop={handleEventDrop}
                 eventResize={handleEventResize}
                 eventClick={handleEventClick}
