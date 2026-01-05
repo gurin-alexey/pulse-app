@@ -3,7 +3,7 @@ import TextareaAutosize from 'react-textarea-autosize'
 import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
-import { X, Loader2, CheckCircle2, Circle, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp } from 'lucide-react'
+import { X, Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { SubtaskList } from './SubtaskList'
@@ -246,7 +246,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             onClick={toggleStatus}
                             className={clsx("mt-1.5 transition-colors shrink-0", task.is_completed ? "text-green-500" : "text-gray-300 hover:text-gray-500")}
                         >
-                            {task.is_completed ? <CheckCircle2 size={24} /> : <Circle size={24} />}
+                            {task.is_completed ? <CheckSquare size={24} /> : <Square size={24} />}
                         </button>
 
                         <TextareaAutosize

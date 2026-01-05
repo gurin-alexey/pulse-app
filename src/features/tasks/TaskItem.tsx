@@ -2,7 +2,7 @@ import TextareaAutosize from 'react-textarea-autosize'
 import { useState, useRef, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { CheckCircle2, Circle, GripVertical } from "lucide-react"
+import { CheckSquare, Square, GripVertical } from "lucide-react"
 import { useTags, useToggleTaskTag, useTaskTags } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion } from "framer-motion"
@@ -95,7 +95,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: T
                     onClick={(e) => toggleStatus(e)}
                     className={clsx("mt-0.5 mr-3 transition-colors", task.is_completed ? "text-green-500" : "text-gray-300 hover:text-gray-500")}
                 >
-                    {task.is_completed ? <CheckCircle2 size={22} /> : <Circle size={22} />}
+                    {task.is_completed ? <CheckSquare size={22} /> : <Square size={22} />}
                 </button>
 
                 {/* Content */}
