@@ -6,6 +6,8 @@ import { CheckSquare, Square, GripVertical } from "lucide-react"
 import { useTags, useToggleTaskTag, useTaskTags } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion } from "framer-motion"
+import { addDays, nextMonday, format, startOfToday } from "date-fns"
+import { toast } from "sonner"
 
 interface TaskItemProps {
     task: any
@@ -54,6 +56,44 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: T
         if (e.key === 'Enter') {
             e.preventDefault();
             (e.currentTarget as HTMLTextAreaElement).blur() // Triggers onBlur -> saveTitle
+        }
+
+        // Date Shortcuts: Alt + 1, 2, 3, 0
+        if (e.altKey) {
+            let newDate: Date | null = null
+            let toastMessage = ""
+
+            switch (e.key) {
+                case '1': // Today
+                    newDate = startOfToday()
+                    toastMessage = "📅 Set to Today"
+                    break
+                case '2': // Tomorrow
+                    newDate = addDays(startOfToday(), 1)
+                    toastMessage = "📅 Set to Tomorrow"
+                    break
+                case '3': // Next Week
+                    newDate = nextMonday(startOfToday())
+                    toastMessage = "📅 Set to Next Week"
+                    break
+                case '0': // Clear
+                    newDate = null
+                    toastMessage = "📅 Date Cleared"
+                    break
+                default:
+                    return
+            }
+
+            e.preventDefault()
+
+            const dateStr = newDate ? format(newDate, 'yyyy-MM-dd') : null
+
+            updateTask({
+                taskId: task.id,
+                updates: { due_date: dateStr }
+            })
+
+            toast.success(toastMessage, { duration: 1500 })
         }
     }
 

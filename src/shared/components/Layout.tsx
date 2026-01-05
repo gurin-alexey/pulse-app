@@ -20,6 +20,8 @@ import { createPortal } from "react-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, type DragEndEvent, closestCorners, closestCenter, pointerWithin, rectIntersection, DragOverlay } from '@dnd-kit/core'
 
+import { Toaster } from "sonner"
+
 export function Layout() {
   const isDesktop = useMediaQuery("(min-width: 768px)")
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -322,6 +324,8 @@ export function Layout() {
         )}
 
       </div>
+
+      <Toaster position="bottom-center" richColors />
 
       {/* Global Drag Overlay */}
       {createPortal(
