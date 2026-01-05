@@ -77,7 +77,7 @@ function DroppableZone({ id, data, children, className }: { id: string, data?: a
     )
 }
 
-function DroppableNavItem({ label, children }: { label: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
+export function DroppableNavItem({ label, children }: { label: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
     const { setNodeRef, isOver } = useDroppable({
         id: `nav-${label.toLowerCase()}`,
         data: { type: 'Nav', label }
@@ -233,9 +233,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         { label: "Dashboard", path: "/", icon: LayoutDashboard },
         { label: "Inbox", path: "/inbox", icon: Inbox },
         { label: "Today", path: "/today", icon: Sun },
-        { label: "Tasks", path: "/tasks", icon: CheckSquare },
         { label: "Calendar", path: "/calendar", icon: Calendar },
-        { label: "Trash", path: "/trash", icon: Trash2 },
     ]
 
     return (

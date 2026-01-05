@@ -7,12 +7,13 @@ import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import multiMonthPlugin from "@fullcalendar/multimonth"
 import { useSearchParams } from "react-router-dom"
-import { Loader2 } from "lucide-react"
+import { Loader2, Settings } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Fragment } from "react"
 import { generateRecurringInstances, addExDateToRRule, addUntilToRRule, updateDTStartInRRule } from "@/utils/recurrence"
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
+import { Menu, Transition } from "@headlessui/react"
 import { format } from "date-fns"
 
 export function CalendarPage() {
@@ -25,7 +26,6 @@ export function CalendarPage() {
     const [currentTitle, setCurrentTitle] = useState('')
     const [currentViewType, setCurrentViewType] = useState('timeGridDay')
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
-    const lastClickRef = useRef<{ id: string | null; time: number }>({ id: null, time: 0 })
 
     // Recurrence Edit Modal State
     const [recurrenceModal, setRecurrenceModal] = useState<{
@@ -33,10 +33,12 @@ export function CalendarPage() {
         info: any;
     }>({ isOpen: false, info: null })
 
+    const [showCompleted, setShowCompleted] = useState(true)
+
     // Refetch events when tasks data changes
     useEffect(() => {
         calendarRef.current?.getApi().refetchEvents()
-    }, [tasks])
+    }, [tasks, showCompleted])
 
     useEffect(() => {
         const handleResize = () => {
@@ -156,9 +158,12 @@ export function CalendarPage() {
         const allEvents: any[] = []
 
         tasks.forEach(task => {
+            if (!showCompleted && task.is_completed) return
+
             if (task.recurrence_rule) {
                 const instances = generateRecurringInstances(task, start, end)
                 instances.forEach(instance => {
+                    if (!showCompleted && instance.is_completed) return
                     allEvents.push(mapTaskToEvent(instance))
                 })
             } else {
@@ -245,7 +250,6 @@ export function CalendarPage() {
         const dateStr = newStart ? format(newStart, 'yyyy-MM-dd') : null
 
         if (mode === 'single') {
-            // Materialize single instance
             const newRule = addExDateToRRule(originalTask.recurrence_rule || '', new Date(occurrenceDate))
             updateTask({ taskId: originalId, updates: { recurrence_rule: newRule } })
 
@@ -261,14 +265,10 @@ export function CalendarPage() {
             })
         }
         else if (mode === 'following') {
-            // Split series
-            // 1. End the old series
             const prevDay = new Date(new Date(occurrenceDate).getTime() - 86400000)
             const oldRuleEnd = addUntilToRRule(originalTask.recurrence_rule || '', prevDay)
             updateTask({ taskId: originalId, updates: { recurrence_rule: oldRuleEnd } })
 
-            // 2. Start new series from new position
-            // We need to update DTSTART in the rule to skip to the new position
             const newRule = updateDTStartInRRule(originalTask.recurrence_rule || '', newStart || new Date())
 
             createTask({
@@ -284,10 +284,6 @@ export function CalendarPage() {
             })
         }
         else if (mode === 'all') {
-            // Update whole pattern
-            // Calculate delta? No, just update properties and DTSTART.
-            // But wait, if they moved IT to a different day, the series should shift.
-            // For now, let's keep it simple: update Start/End and DTSTART.
             const newRule = updateDTStartInRRule(originalTask.recurrence_rule || '', newStart || new Date())
 
             updateTask({
@@ -338,75 +334,135 @@ export function CalendarPage() {
                 onConfirm={handleRecurrenceConfirm}
             />
 
-            {isMobile && (
-                <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-100 shrink-0 z-10">
-                    <div className="flex items-center gap-2">
-                        <button onClick={headerGoPrev} className="p-1 text-gray-400 hover:bg-gray-50 rounded"><span className="sr-only">Prev</span>←</button>
-                        <button onClick={headerGoToday} className="text-lg font-bold text-gray-800 active:opacity-50 transition-opacity">
-                            {currentTitle || 'Calendar'}
+            {/* Unified Custom Header (Desktop + Mobile) */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 shrink-0 px-4 md:px-0">
+                {/* Left: Navigation & Title */}
+                <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
+                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                        <button onClick={headerGoPrev} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
+                            <span className="sr-only">Prev</span>←
                         </button>
-                        <button onClick={headerGoNext} className="p-1 text-gray-400 hover:bg-gray-50 rounded"><span className="sr-only">Next</span>→</button>
+                        <button onClick={headerGoToday} className="px-3 py-1 text-sm font-semibold hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-700">
+                            Today
+                        </button>
+                        <button onClick={headerGoNext} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
+                            <span className="sr-only">Next</span>→
+                        </button>
                     </div>
 
-                    <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                    <h2 className="text-xl font-bold text-gray-800 truncate">
+                        {currentTitle || (
+                            <span className="inline-block w-32 h-6 bg-gray-100 rounded animate-pulse" />
+                        )}
+                    </h2>
+                </div>
+
+                {/* Right: View Switcher & Settings */}
+                <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                    <div className="flex items-center bg-gray-100 p-1 rounded-lg">
                         <button
-                            onClick={() => headerChangeView('timeGridDay')}
-                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${currentViewType === 'timeGridDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
-                        >1D</button>
-                        <button
-                            onClick={() => headerChangeView('threeDay')}
-                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${currentViewType === 'threeDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
-                        >3D</button>
+                            onClick={() => headerChangeView('dayGridMonth')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'dayGridMonth' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                        >
+                            Month
+                        </button>
                         <button
                             onClick={() => headerChangeView('timeGridWeek')}
-                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${currentViewType === 'timeGridWeek' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
-                        >7D</button>
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridWeek' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                        >
+                            Week
+                        </button>
+                        <button
+                            onClick={() => headerChangeView('timeGridDay')}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                        >
+                            Day
+                        </button>
                     </div>
-                </div>
-            )}
 
-            <FullCalendar
-                ref={calendarRef}
-                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin]}
-                headerToolbar={isMobile ? false : {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                }}
-                views={{
-                    threeDay: {
-                        type: 'timeGrid',
-                        duration: { days: 3 },
-                        buttonText: '3 Days',
-                        titleFormat: { month: 'short', day: 'numeric' }
-                    },
-                    timeGridDay: {
-                        titleFormat: { month: 'short', day: 'numeric' }
-                    },
-                    timeGridWeek: {
-                        titleFormat: { month: 'short', day: 'numeric' }
-                    }
-                }}
-                initialView={isMobile ? "timeGridDay" : "timeGridWeek"}
-                firstDay={1}
-                editable={true}
-                selectable={true}
-                selectMirror={true}
-                select={handleDateSelect}
-                datesSet={(arg) => {
-                    setCurrentTitle(arg.view.title)
-                    setCurrentViewType(arg.view.type)
-                }}
-                eventOrder="extendedProps.isCompleted,start,-duration,allDay,title"
-                height="100%"
-                events={handleFetchEvents}
-                eventDrop={handleEventDrop}
-                eventResize={handleEventResize}
-                eventClick={handleEventClick}
-                nowIndicator={true}
-                slotDuration="00:30:00"
-                scrollTime="08:00:00"
-            />
+                    {/* Settings Menu */}
+                    <Menu as="div" className="relative inline-block text-left">
+                        <Menu.Button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200">
+                            <Settings size={20} />
+                        </Menu.Button>
+                        <Transition
+                            as={Fragment}
+                            enter="transition ease-out duration-100"
+                            enterFrom="transform opacity-0 scale-95"
+                            enterTo="transform opacity-100 scale-100"
+                            leave="transition ease-in duration-75"
+                            leaveFrom="transform opacity-100 scale-100"
+                            leaveTo="transform opacity-0 scale-95"
+                        >
+                            <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-xl ring-1 ring-black/5 focus:outline-none z-50">
+                                <div className="px-4 py-3 border-b border-gray-50">
+                                    <p className="text-sm font-semibold text-gray-900">View Settings</p>
+                                </div>
+                                <div className="p-2">
+                                    <Menu.Item>
+                                        {({ active }) => (
+                                            <button
+                                                onClick={() => setShowCompleted(!showCompleted)}
+                                                className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition-colors ${active ? 'bg-gray-50' : ''}`}
+                                            >
+                                                <span className="text-gray-700">Show completed</span>
+                                                <div className={`w-9 h-5 rounded-full relative transition-colors ${showCompleted ? 'bg-blue-500' : 'bg-gray-200'}`}>
+                                                    <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${showCompleted ? 'translate-x-4' : ''}`} />
+                                                </div>
+                                            </button>
+                                        )}
+                                    </Menu.Item>
+                                </div>
+                            </Menu.Items>
+                        </Transition>
+                    </Menu>
+                </div>
+            </div>
+
+            <div className="flex-1 min-h-0 relative">
+                <FullCalendar
+                    ref={calendarRef}
+                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin]}
+                    headerToolbar={false}
+                    views={{
+                        // ... existing views ...
+                        dayGridMonth: { // Ensure this exists for the separate button
+                            titleFormat: { month: 'long', year: 'numeric' }
+                        },
+                        threeDay: {
+                            type: 'timeGrid',
+                            duration: { days: 3 },
+                            buttonText: '3 Days',
+                            titleFormat: { month: 'short', day: 'numeric' }
+                        },
+                        timeGridDay: {
+                            titleFormat: { month: 'long', day: 'numeric' }
+                        },
+                        timeGridWeek: {
+                            titleFormat: { month: 'short', day: 'numeric' }
+                        }
+                    }}
+                    initialView={isMobile ? "timeGridDay" : "timeGridWeek"}
+                    firstDay={1}
+                    editable={true}
+                    selectable={true}
+                    selectMirror={true}
+                    select={handleDateSelect}
+                    datesSet={(arg) => {
+                        setCurrentTitle(arg.view.title)
+                        setCurrentViewType(arg.view.type)
+                    }}
+                    eventOrder="extendedProps.isCompleted,start,-duration,allDay,title"
+                    height="100%"
+                    events={handleFetchEvents}
+                    eventDrop={handleEventDrop}
+                    eventResize={handleEventResize}
+                    eventClick={handleEventClick}
+                    nowIndicator={true}
+                    slotDuration="00:30:00"
+                    scrollTime="08:00:00"
+                />
+            </div>
         </div>
     )
 }

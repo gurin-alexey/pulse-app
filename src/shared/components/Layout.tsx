@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { Menu, LogOut, ChevronRight } from "lucide-react"
+import { Menu, LogOut, ChevronRight, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
 import { TaskDetailModal } from "@/features/tasks/TaskDetailModal"
 import { DailyPlanner } from "@/features/calendar/DailyPlanner"
-import { Sidebar } from "@/shared/components/Sidebar"
+import { Sidebar, DroppableNavItem } from "@/shared/components/Sidebar"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useProjects } from "@/hooks/useProjects"
 import { useProjectGroups } from "@/hooks/useProjectGroups"
@@ -18,7 +18,8 @@ import { TaskItem } from "@/features/tasks/TaskItem"
 import { createPortal } from "react-dom"
 
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, type DragEndEvent, closestCorners, closestCenter, pointerWithin, rectIntersection, DragOverlay } from '@dnd-kit/core'
+import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, KeyboardSensor, type DragEndEvent, closestCorners, closestCenter, pointerWithin, rectIntersection, DragOverlay } from '@dnd-kit/core'
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 
 import { Toaster } from "sonner"
 
@@ -82,6 +83,7 @@ export function Layout() {
   }, []) // Run once on mount (when layout loads)
 
   const isCalendarPage = location.pathname.startsWith('/calendar')
+  const isDashboardPage = location.pathname === '/'
 
   const closeModal = () => {
     const newParams = new URLSearchParams(searchParams)
@@ -92,7 +94,8 @@ export function Layout() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
 
@@ -240,6 +243,23 @@ export function Layout() {
           <nav className="flex-1 space-y-1">
             <Sidebar activePath={location.pathname} />
             {renderTags()}
+            <div className="mt-auto pt-4 pb-2">
+              <DroppableNavItem label="Trash">
+                {(isOver) => (
+                  <Link
+                    to="/trash"
+                    onClick={() => setIsSidebarOpen(false)}
+                    className={clsx(
+                      "flex items-center gap-3 px-5 py-2.5 transition-colors",
+                      isOver ? "text-white bg-red-500" : (location.pathname === '/trash' ? "text-red-600 bg-red-50" : "text-gray-500 hover:text-red-600 hover:bg-red-50")
+                    )}
+                  >
+                    <Trash2 size={20} />
+                    <span className="whitespace-nowrap font-semibold">Trash</span>
+                  </Link>
+                )}
+              </DroppableNavItem>
+            </div>
           </nav>
           {renderLogout()}
         </aside>
@@ -267,22 +287,43 @@ export function Layout() {
                   onItemClick={() => setIsSidebarOpen(false)}
                 />
                 {renderTags()}
+                <div className="mt-auto pt-4 pb-2">
+                  <DroppableNavItem label="Trash">
+                    {(isOver) => (
+                      <Link
+                        to="/trash"
+                        onClick={() => setIsSidebarOpen(false)}
+                        className={clsx(
+                          "flex items-center gap-3 px-5 py-2.5 transition-colors",
+                          isOver ? "text-white bg-red-500" : (location.pathname === '/trash' ? "text-red-600 bg-red-50" : "text-gray-500 hover:text-red-600 hover:bg-red-50")
+                        )}
+                      >
+                        <Trash2 size={20} />
+                        <span className="whitespace-nowrap font-semibold">Trash</span>
+                      </Link>
+                    )}
+                  </DroppableNavItem>
+                </div>
               </nav>
               {renderLogout()}
             </aside>
           </>
         )}
 
-        {/* Main Content Area */}
+
         <main className={clsx(
           "flex-1 flex overflow-hidden",
-          isCalendarPage ? "" : "lg:grid lg:grid-cols-[minmax(350px,1fr)_minmax(450px,1fr)_350px]"
+          isCalendarPage ? "" :
+            isDashboardPage ? "lg:grid lg:grid-cols-[1fr_350px]" : // Dashboard: 2 cols (Wide Content + Planner)
+              "lg:grid lg:grid-cols-[minmax(350px,1fr)_minmax(450px,1fr)_350px]" // Standard: 3 cols
         )}>
 
-          {/* List Column */}
+          {/* List Column (Takes up first slot. If Dashboard, takes up slot 1 which is 1fr wide) */}
           <section className={clsx(
             "bg-white overflow-y-auto border-r border-gray-200 h-full",
-            isCalendarPage ? "w-full" : "flex-1 lg:flex-none"
+            isCalendarPage ? "w-full" :
+              isDashboardPage ? "col-span-1" :
+                "flex-1 lg:flex-none"
           )}>
             <motion.div
               key={location.pathname}
@@ -296,7 +337,8 @@ export function Layout() {
           </section>
 
           {/* Detail Column (Desktop Only as a col, unless task is selected) */}
-          {!isCalendarPage && (
+          {/* HIDE this column on Dashboard Page since Dashboard takes that space */}
+          {(!isCalendarPage && !isDashboardPage) && (
             <section className={clsx(
               "border-r border-gray-200 bg-white overflow-y-auto h-full hidden lg:block"
             )}>
@@ -329,7 +371,7 @@ export function Layout() {
 
       {/* Global Drag Overlay */}
       {createPortal(
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeTask ? (
             <div className="opacity-90 rotate-2 cursor-grabbing pointer-events-none">
               <TaskItem task={activeTask} isActive={true} />

@@ -16,13 +16,7 @@ import {
     type DragOverEvent,
     type DragStartEvent,
     useDndMonitor,
-    DragOverlay,
     defaultDropAnimationSideEffects,
-    DndContext,
-    useSensor,
-    useSensors,
-    PointerSensor,
-    KeyboardSensor,
     closestCorners
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
@@ -243,219 +237,211 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
         updateTask({ taskId: task.id, updates: { is_completed: !task.is_completed } })
     }
 
-    // Sensors
-    const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
-    )
+    // Sensors - Removed (Using Global Layout Context)
 
-    const handleDragStart = (event: DragStartEvent) => {
-        setDragOverSectionId(null)
-        if (event.active.data.current?.type === 'Task') {
-            const t = event.active.data.current.task
-            setActiveDragItem(t)
-            setCurrentDragDepth(t.depth) // Start with current depth
-        }
-    }
-    const handleDragOver = (event: DragOverEvent) => {
-        const { active, over, delta } = event
-        if (!over) {
+    useDndMonitor({
+        onDragStart: (event) => {
             setDragOverSectionId(null)
-            return
-        }
-
-        const activeTask = active.data.current?.task
-        if (!activeTask) return
-
-        // ... (keep existing section logic) ...
-        let potentialSectionId: string | null = null
-        if (over.id === 'main-list' || sections?.some(s => s.id === over.id)) {
-            potentialSectionId = over.id as string
-        } else if (over.data.current?.type === 'Task') {
-            const task = over.data.current.task
-            potentialSectionId = task.section_id || 'main-list'
-        }
-
-        const currentSectionId = activeTask.section_id || 'main-list'
-
-        if (potentialSectionId && potentialSectionId !== currentSectionId) {
-            setDragOverSectionId(potentialSectionId)
-        } else {
-            setDragOverSectionId(null)
-        }
-
-        // Calculate Visual Depth for indentation feedback
-        if (activeTask && over.data.current?.type === 'Task') {
-            const items = getFlattenedTasks(activeTask.section_id)
-            const activeIndex = items.findIndex(t => t.id === active.id)
-
-            if (activeIndex !== -1) {
-                const projectedDepth = Math.max(0, (items[activeIndex].depth) + Math.round(delta.x / 24))
-                setCurrentDragDepth(projectedDepth)
+            if (event.active.data.current?.type === 'Task') {
+                const t = event.active.data.current.task
+                setActiveDragItem(t)
+                setCurrentDragDepth(t.depth) // Start with current depth
             }
-        }
-    }
-    const handleDragEnd = (event: DragEndEvent) => {
-        setActiveDragItem(null)
-        setDragOverSectionId(null) // Reset highlight
-        const { active, over, delta } = event
-        if (!over) return
-
-        const activeId = active.id as string
-        const activeTask = active.data.current?.task
-        const overId = over.id as string
-
-        // 1. Handle Section Moving (Dropping on Container)
-        const isSectionDrop = overId === 'main-list' || sections?.some(s => s.id === overId)
-
-        if (activeTask && isSectionDrop) {
-            const newSectionId = overId === 'main-list' ? null : overId
-            // Only update if actually changing sections
-            if (activeTask.section_id !== newSectionId) {
-                updateTask({
-                    taskId: activeId,
-                    updates: {
-                        section_id: newSectionId,
-                        parent_id: null, // Reset hierarchy when moving sections
-                        sort_order: -new Date().getTime() // Move to top roughly
-                    }
-                })
-            }
-            return
-        }
-
-        // 2. Handle Reordering / Reparenting (Task over Task)
-        if (activeTask && over.data.current?.type === 'Task') {
-            const overTask = over.data.current.task
-
-            // Case A: Cross-Section Drop (Task -> Task in different section)
-            if (activeTask.section_id !== overTask.section_id) {
-                // Reset to root (parent_id: null) as requested
-                let newSortOrder = overTask.sort_order - 1 // Insert above by default
-
-                updateTask({
-                    taskId: activeId,
-                    updates: {
-                        section_id: overTask.section_id,
-                        parent_id: null, // FORCE ROOT
-                        sort_order: newSortOrder
-                    }
-                })
+        },
+        onDragOver: (event) => {
+            const { active, over, delta } = event
+            if (!over) {
+                setDragOverSectionId(null)
                 return
             }
 
-            // Case B: Same Section Reordering
-            if (activeId === overId && Math.abs(delta.x) < 10) return
+            const activeTask = active.data.current?.task
+            if (!activeTask) return
 
-            // Determine Container
-            const currentSectionId = activeTask.section_id
-            const items = getFlattenedTasks(currentSectionId)
+            // ... (keep existing section logic) ...
+            let potentialSectionId: string | null = null
+            if (over.id === 'main-list' || sections?.some(s => s.id === over.id)) {
+                potentialSectionId = over.id as string
+            } else if (over.data.current?.type === 'Task') {
+                const task = over.data.current.task
+                potentialSectionId = task.section_id || 'main-list'
+            }
 
-            const activeIndex = items.findIndex(t => t.id === activeId)
-            const overIndex = items.findIndex(t => t.id === overId)
+            const currentSectionId = activeTask.section_id || 'main-list'
 
-            if (activeIndex === -1 || overIndex === -1) return
-
-            // Calculate Visual Depth
-            const projectedDepth = Math.max(0, (items[activeIndex].depth) + Math.round(delta.x / 24))
-
-            // Simulate the move in the list
-            const projectedList = [...items]
-            const [movedItem] = projectedList.splice(activeIndex, 1)
-            projectedList.splice(overIndex, 0, movedItem)
-
-            // Analyze Context at New Position
-            const prevItem = projectedList[overIndex - 1]
-            const nextItem = projectedList[overIndex + 1]
-
-            // Determine Parent based on Depth Constraints
-            // Max depth: cannot be deeper than prevItem.depth + 1
-            const maxDepth = prevItem ? prevItem.depth + 1 : 0
-            const finalDepth = Math.min(projectedDepth, maxDepth)
-
-            let newParentId: string | null = null
-
-            if (prevItem) {
-                if (finalDepth === prevItem.depth + 1) {
-                    // Nest under prevItem
-                    newParentId = prevItem.id
-                } else if (finalDepth === prevItem.depth) {
-                    // Sibling of prevItem
-                    newParentId = prevItem.parent_id
-                } else {
-                    // Outdenting: Ascend ancestors to find one with depth === finalDepth - 1
-                    // We scan backwards from prevItem
-                    const ancestor = projectedList.slice(0, overIndex).reverse().find(t => t.depth === finalDepth - 1)
-                    newParentId = ancestor ? ancestor.id : null
-                }
+            if (potentialSectionId && potentialSectionId !== currentSectionId) {
+                setDragOverSectionId(potentialSectionId)
             } else {
-                // Top of list
-                newParentId = null
+                setDragOverSectionId(null)
             }
 
-            // Resolve Sort Order
-            // Find nearest siblings in the projected list to interpolate sort_order
-            let prevSiblingOrder: number | null = null
-            let nextSiblingOrder: number | null = null
+            // Calculate Visual Depth for indentation feedback
+            if (activeTask && over.data.current?.type === 'Task') {
+                const items = getFlattenedTasks(activeTask.section_id)
+                const activeIndex = items.findIndex(t => t.id === active.id)
 
-            // Scan backwards for prev sibling (same parent)
-            for (let i = overIndex - 1; i >= 0; i--) {
-                const t = projectedList[i]
-                // If we hit the parent itself, we stop (we are first child)
-                if (t.id === newParentId) break
-
-                // If we hit a sibling
-                if (t.depth === finalDepth) {
-                    prevSiblingOrder = t.sort_order ?? 0
-                    break
+                if (activeIndex !== -1) {
+                    const projectedDepth = Math.max(0, (items[activeIndex].depth) + Math.round(delta.x / 24))
+                    setCurrentDragDepth(projectedDepth)
                 }
-                // If we hit an item with LOWER depth, it's an ancestor (stop)
-                if (t.depth < finalDepth) break
             }
+        },
+        onDragEnd: (event) => {
+            setActiveDragItem(null)
+            setDragOverSectionId(null) // Reset highlight
+            const { active, over, delta } = event
+            if (!over) return
 
-            // Scan forwards for next sibling
-            for (let i = overIndex + 1; i < projectedList.length; i++) {
-                const t = projectedList[i]
-                if (t.depth === finalDepth) {
-                    nextSiblingOrder = t.sort_order ?? 0
-                    break
+            const activeId = active.id as string
+            const activeTask = active.data.current?.task
+            const overId = over.id as string
+
+            // 1. Handle Section Moving (Dropping on Container)
+            const isSectionDrop = overId === 'main-list' || sections?.some(s => s.id === overId)
+
+            if (activeTask && isSectionDrop) {
+                const newSectionId = overId === 'main-list' ? null : overId
+                // Only update if actually changing sections
+                if (activeTask.section_id !== newSectionId) {
+                    updateTask({
+                        taskId: activeId,
+                        updates: {
+                            section_id: newSectionId,
+                            parent_id: null, // Reset hierarchy when moving sections
+                            sort_order: -new Date().getTime() // Move to top roughly
+                        }
+                    })
                 }
-                if (t.depth < finalDepth) break // End of scope
+                return
             }
 
-            // Calculate new order
-            let newSortOrder = 0
-            if (prevSiblingOrder !== null && nextSiblingOrder !== null) {
-                if (prevSiblingOrder === nextSiblingOrder) {
-                    newSortOrder = prevSiblingOrder + 100 // Collision fix
+            // 2. Handle Reordering / Reparenting (Task over Task)
+            if (activeTask && over.data.current?.type === 'Task') {
+                const overTask = over.data.current.task
+
+                // Case A: Cross-Section Drop (Task -> Task in different section)
+                if (activeTask.section_id !== overTask.section_id) {
+                    // Reset to root (parent_id: null) as requested
+                    let newSortOrder = overTask.sort_order - 1 // Insert above by default
+
+                    updateTask({
+                        taskId: activeId,
+                        updates: {
+                            section_id: overTask.section_id,
+                            parent_id: null, // FORCE ROOT
+                            sort_order: newSortOrder
+                        }
+                    })
+                    return
+                }
+
+                // Case B: Same Section Reordering
+                if (activeId === overId && Math.abs(delta.x) < 10) return
+
+                // Determine Container
+                const currentSectionId = activeTask.section_id
+                const items = getFlattenedTasks(currentSectionId)
+
+                const activeIndex = items.findIndex(t => t.id === activeId)
+                const overIndex = items.findIndex(t => t.id === overId)
+
+                if (activeIndex === -1 || overIndex === -1) return
+
+                // Calculate Visual Depth
+                const projectedDepth = Math.max(0, (items[activeIndex].depth) + Math.round(delta.x / 24))
+
+                // Simulate the move in the list
+                const projectedList = [...items]
+                const [movedItem] = projectedList.splice(activeIndex, 1)
+                projectedList.splice(overIndex, 0, movedItem)
+
+                // Analyze Context at New Position
+                const prevItem = projectedList[overIndex - 1]
+                const nextItem = projectedList[overIndex + 1]
+
+                // Determine Parent based on Depth Constraints
+                // Max depth: cannot be deeper than prevItem.depth + 1
+                const maxDepth = prevItem ? prevItem.depth + 1 : 0
+                const finalDepth = Math.min(projectedDepth, maxDepth)
+
+                let newParentId: string | null = null
+
+                if (prevItem) {
+                    if (finalDepth === prevItem.depth + 1) {
+                        // Nest under prevItem
+                        newParentId = prevItem.id
+                    } else if (finalDepth === prevItem.depth) {
+                        // Sibling of prevItem
+                        newParentId = prevItem.parent_id
+                    } else {
+                        // Outdenting: Ascend ancestors to find one with depth === finalDepth - 1
+                        // We scan backwards from prevItem
+                        const ancestor = projectedList.slice(0, overIndex).reverse().find(t => t.depth === finalDepth - 1)
+                        newParentId = ancestor ? ancestor.id : null
+                    }
                 } else {
-                    newSortOrder = (prevSiblingOrder + nextSiblingOrder) / 2
+                    // Top of list
+                    newParentId = null
                 }
-            } else if (prevSiblingOrder !== null) {
-                newSortOrder = prevSiblingOrder + 65535.0 // Large step
-            } else if (nextSiblingOrder !== null) {
-                newSortOrder = nextSiblingOrder - 65535.0
-            } else {
-                newSortOrder = new Date().getTime() // Default fallback, though usually we want specific order.
-                // If first item in list, maybe 0?
-            }
 
-            // Update
-            updateTask({
-                taskId: activeId,
-                updates: {
-                    parent_id: newParentId,
-                    sort_order: newSortOrder
+                // Resolve Sort Order
+                // Find nearest siblings in the projected list to interpolate sort_order
+                let prevSiblingOrder: number | null = null
+                let nextSiblingOrder: number | null = null
+
+                // Scan backwards for prev sibling (same parent)
+                for (let i = overIndex - 1; i >= 0; i--) {
+                    const t = projectedList[i]
+                    // If we hit the parent itself, we stop (we are first child)
+                    if (t.id === newParentId) break
+
+                    // If we hit a sibling
+                    if (t.depth === finalDepth) {
+                        prevSiblingOrder = t.sort_order ?? 0
+                        break
+                    }
+                    // If we hit an item with LOWER depth, it's an ancestor (stop)
+                    if (t.depth < finalDepth) break
                 }
-            })
+
+                // Scan forwards for next sibling
+                for (let i = overIndex + 1; i < projectedList.length; i++) {
+                    const t = projectedList[i]
+                    if (t.depth === finalDepth) {
+                        nextSiblingOrder = t.sort_order ?? 0
+                        break
+                    }
+                    if (t.depth < finalDepth) break // End of scope
+                }
+
+                // Calculate new order
+                let newSortOrder = 0
+                if (prevSiblingOrder !== null && nextSiblingOrder !== null) {
+                    if (prevSiblingOrder === nextSiblingOrder) {
+                        newSortOrder = prevSiblingOrder + 100 // Collision fix
+                    } else {
+                        newSortOrder = (prevSiblingOrder + nextSiblingOrder) / 2
+                    }
+                } else if (prevSiblingOrder !== null) {
+                    newSortOrder = prevSiblingOrder + 65535.0 // Large step
+                } else if (nextSiblingOrder !== null) {
+                    newSortOrder = nextSiblingOrder - 65535.0
+                } else {
+                    newSortOrder = new Date().getTime() // Default fallback, though usually we want specific order.
+                    // If first item in list, maybe 0?
+                }
+
+                // Update
+                updateTask({
+                    taskId: activeId,
+                    updates: {
+                        parent_id: newParentId,
+                        sort_order: newSortOrder
+                    }
+                })
+            }
         }
-    }
+    })
 
 
     const toggleSection = (sectionId: string) => {
@@ -499,39 +485,34 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     if (tasksLoading || sectionsLoading) return <div className="flex items-center justify-center h-full text-gray-400"><Loader2 className="animate-spin mr-2" />Loading...</div>
     if (tasksError) return <div className="flex items-center justify-center h-full text-red-500"><AlertCircle className="mr-2" />Error loading tasks</div>
 
+    // Simplified Render: No DndContext, just children content. The Layout DndContext provides the context.
     return (
-        <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-        >
-            <div className="h-full flex flex-col">
-                <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
-                    <h2 className="font-bold text-lg text-gray-800">{pageTitle}</h2>
-                    <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />
-                </div>
+        <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
+                <h2 className="font-bold text-lg text-gray-800">{pageTitle}</h2>
+                <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />
+            </div>
 
-                <div className="flex-1 p-4 overflow-y-auto pb-20">
-                    {renderMode === 'groups' ? (
-                        // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
-                        <div className="mt-4">
-                            {/* Allow creating tasks in Inbox/Today even without projectId */}
-                            <div className="mb-6"><CreateTaskInput projectId={projectId || null} /></div>
+            <div className="flex-1 p-4 overflow-y-auto pb-20">
+                {renderMode === 'groups' ? (
+                    // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
+                    <div className="mt-4">
+                        {/* Allow creating tasks in Inbox/Today even without projectId */}
+                        <div className="mb-6"><CreateTaskInput projectId={projectId || null} /></div>
 
-                            {Object.entries(tasksForView).map(([groupName, groupTasks]) => (
-                                <div key={groupName} className="mb-8">
-                                    <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">{groupName} ({groupTasks.length})</h3>
-                                    {groupTasks.map(renderTaskItem)}
-                                </div>
-                            ))}
-                            {Object.keys(tasksForView).length === 0 && <div className="text-gray-400 text-center mt-10">No active tasks</div>}
-                        </div>
-                    ) : (
-                        // SECTIONS VIEW with Drag & Drop
-                        <div className="space-y-8">
-                            {/* 1. Main List (Uncategorized) */}
+                        {Object.entries(tasksForView).map(([groupName, groupTasks]) => (
+                            <div key={groupName} className="mb-8">
+                                <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">{groupName} ({groupTasks.length})</h3>
+                                {groupTasks.map(renderTaskItem)}
+                            </div>
+                        ))}
+                        {Object.keys(tasksForView).length === 0 && <div className="text-gray-400 text-center mt-10">No active tasks</div>}
+                    </div>
+                ) : (
+                    // SECTIONS VIEW with Drag & Drop
+                    <div className="flex flex-col min-h-full">
+                        {/* 1. Main List (Uncategorized) - Grows to fill space */}
+                        <div className="flex-1 mb-8">
                             <DroppableContainer
                                 id="main-list"
                                 className={clsx(
@@ -551,131 +532,118 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                                     </div>
                                 </SortableContext>
                             </DroppableContainer>
+                        </div>
 
-                            {/* 2. Accordion Sections - ONLY SHOW IF showSections is TRUE */}
-                            {showSections && (
-                                <div className="space-y-4">
-                                    {sections?.map(section => {
-                                        const sectionTasks = activeTasks.filter(t => t.section_id === section.id)
-                                        // Also sort these
-                                        const sortedSectionTasks = [...sectionTasks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-                                        const isCollapsed = collapsedSections[section.id]
+                        {/* 2. Accordion Sections & Add Button - Pushed to Bottom */}
+                        {showSections && (
+                            <div className="mt-auto space-y-4 pt-10">
+                                {sections?.map(section => {
+                                    const sectionTasks = activeTasks.filter(t => t.section_id === section.id)
+                                    // Also sort these
+                                    const sortedSectionTasks = [...sectionTasks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                                    const isCollapsed = collapsedSections[section.id]
 
-                                        return (
-                                            <DroppableContainer
-                                                key={section.id}
-                                                id={section.id}
-                                                className={clsx(
-                                                    "group/section rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all border border-transparent",
-                                                    dragOverSectionId === section.id && "ring-2 ring-blue-400 shadow-lg bg-blue-50/30"
-                                                )}
+                                    return (
+                                        <DroppableContainer
+                                            key={section.id}
+                                            id={section.id}
+                                            className={clsx(
+                                                "group/section rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all border border-transparent",
+                                                dragOverSectionId === section.id && "ring-2 ring-blue-400 shadow-lg bg-blue-50/30"
+                                            )}
+                                        >
+                                            {/* Header */}
+                                            <div
+                                                className="flex items-center justify-between p-3 bg-gray-50/50 hover:bg-gray-100/50 cursor-pointer select-none border-b border-gray-100"
+                                                onClick={() => toggleSection(section.id)}
                                             >
-                                                {/* Header */}
-                                                <div
-                                                    className="flex items-center justify-between p-3 bg-gray-50/50 hover:bg-gray-100/50 cursor-pointer select-none border-b border-gray-100"
-                                                    onClick={() => toggleSection(section.id)}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <ChevronRight size={16} className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")} />
-                                                        {editingSectionId === section.id ? (
-                                                            <form onSubmit={(e) => handleRenameSection(e, section.id)} onClick={e => e.stopPropagation()}>
-                                                                <input autoFocus type="text" value={editingSectionName} onChange={e => setEditingSectionName(e.target.value)} onBlur={() => setEditingSectionId(null)} className="font-bold text-sm text-gray-800 bg-white px-1 rounded outline-none border border-blue-200" />
-                                                            </form>
-                                                        ) : (
-                                                            <h3 className="font-bold text-sm text-gray-800">{section.name} <span className="text-gray-400 font-normal ml-1">({sectionTasks?.length})</span></h3>
-                                                        )}
-                                                    </div>
-                                                    <div className="relative" onClick={e => e.stopPropagation()}>
-                                                        <button onClick={() => setSectionMenuOpen(sectionMenuOpen === section.id ? null : section.id)} className="p-1 hover:bg-gray-200 rounded text-gray-400"><MoreHorizontal size={16} /></button>
-                                                        {sectionMenuOpen === section.id && (
-                                                            <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
-                                                                <button onClick={() => { setEditingSectionId(section.id); setEditingSectionName(section.name); setSectionMenuOpen(null) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"><Pencil size={14} /> Rename</button>
-                                                                <button onClick={() => { if (confirm('Delete?')) deleteSection(section.id) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={14} /> Delete</button>
-                                                            </div>
-                                                        )}
+                                                <div className="flex items-center gap-2">
+                                                    <ChevronRight size={16} className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")} />
+                                                    {editingSectionId === section.id ? (
+                                                        <form onSubmit={(e) => handleRenameSection(e, section.id)} onClick={e => e.stopPropagation()}>
+                                                            <input autoFocus type="text" value={editingSectionName} onChange={e => setEditingSectionName(e.target.value)} onBlur={() => setEditingSectionId(null)} className="font-bold text-sm text-gray-800 bg-white px-1 rounded outline-none border border-blue-200" />
+                                                        </form>
+                                                    ) : (
+                                                        <h3 className="font-bold text-sm text-gray-800">{section.name} <span className="text-gray-400 font-normal ml-1">({sectionTasks?.length})</span></h3>
+                                                    )}
+                                                </div>
+                                                <div className="relative" onClick={e => e.stopPropagation()}>
+                                                    <button onClick={() => setSectionMenuOpen(sectionMenuOpen === section.id ? null : section.id)} className="p-1 hover:bg-gray-200 rounded text-gray-400"><MoreHorizontal size={16} /></button>
+                                                    {sectionMenuOpen === section.id && (
+                                                        <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
+                                                            <button onClick={() => { setEditingSectionId(section.id); setEditingSectionName(section.name); setSectionMenuOpen(null) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"><Pencil size={14} /> Rename</button>
+                                                            <button onClick={() => { if (confirm('Delete?')) deleteSection(section.id) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={14} /> Delete</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Content */}
+                                            {!isCollapsed && (
+                                                <div className="p-3 bg-gray-50/30">
+                                                    <SortableContext items={getFlattenedTasks(section.id).map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                                        <div className="space-y-0.5 min-h-[50px]">
+                                                            {getFlattenedTasks(section.id).map(renderTaskItem)}
+                                                            {getFlattenedTasks(section.id).length === 0 && <div className="text-xs text-gray-300 p-2 text-center">Drop tasks here</div>}
+                                                        </div>
+                                                    </SortableContext>
+                                                    <div className="mt-3">
+                                                        {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." />}
                                                     </div>
                                                 </div>
+                                            )}
+                                        </DroppableContainer>
+                                    )
+                                })}
 
-                                                {/* Content */}
-                                                {!isCollapsed && (
-                                                    <div className="p-3 bg-gray-50/30">
-                                                        <SortableContext items={getFlattenedTasks(section.id).map(t => t.id)} strategy={verticalListSortingStrategy}>
-                                                            <div className="space-y-0.5 min-h-[50px]">
-                                                                {getFlattenedTasks(section.id).map(renderTaskItem)}
-                                                                {getFlattenedTasks(section.id).length === 0 && <div className="text-xs text-gray-300 p-2 text-center">Drop tasks here</div>}
-                                                            </div>
-                                                        </SortableContext>
-                                                        <div className="mt-3">
-                                                            {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." />}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </DroppableContainer>
-                                        )
-                                    })}
-                                </div>
-                            )}
-
-                            {/* 3. Add Section - ONLY SHOW IF showSections is TRUE */}
-                            {showSections && (
-                                isAddingSection ? (
+                                {/* Add Section Button */}
+                                {isAddingSection ? (
                                     <form onSubmit={handleCreateSection} className="mt-4"><input autoFocus type="text" value={newSectionName} onChange={e => setNewSectionName(e.target.value)} onBlur={() => { if (!newSectionName) setIsAddingSection(false) }} placeholder="Section Name..." className="font-bold text-sm text-gray-800 bg-white border border-blue-200 rounded px-3 py-2 w-full outline-none" /></form>
                                 ) : (
-                                    <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 text-gray-400 hover:text-blue-600 font-semibold text-sm mt-8 transition-colors p-2 -ml-2"><Plus size={16} /> Add Section</button>
-                                )
-                            )}
-                        </div>
-                    )}
-
-                    {/* COMPLETED ACCORDION */}
-                    {completedTasks.length > 0 && (
-                        <div className="mt-12 border-t border-gray-100 pt-6">
-                            <button
-                                onClick={() => setCompletedAccordionOpen(!completedAccordionOpen)}
-                                className="flex items-center gap-2 text-gray-500 font-semibold text-sm hover:text-gray-700 transition-colors mb-4"
-                            >
-                                <ChevronRight size={16} className={clsx("transition-transform", completedAccordionOpen && "rotate-90")} />
-                                Completed ({completedTasks.length})
-                            </button>
-
-                            <AnimatePresence>
-                                {completedAccordionOpen && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="space-y-1 opacity-60">
-                                            {completedTasks.map(task => (
-                                                <TaskItem
-                                                    key={task.id}
-                                                    task={task}
-                                                    isActive={activeTaskId === task.id}
-                                                />
-                                            ))}
-                                        </div>
-                                    </motion.div>
+                                    <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 text-gray-400 hover:text-blue-600 font-semibold text-sm transition-colors p-2 -ml-2"><Plus size={16} /> Add Section</button>
                                 )}
-                            </AnimatePresence>
-                        </div>
-                    )}
+                            </div>
+                        )}
+                    </div>
+                )}
 
-                </div>
-                {/* Portal Overlay for smooth dragging across containers */}
-                <DragOverlay dropAnimation={null}>
-                    {activeDragItem ? (
-                        <div className="opacity-90 scale-105 cursor-grabbing pointer-events-none">
-                            <TaskItem
-                                task={activeDragItem}
-                                depth={activeDragItem.depth}
-                                isActive={true}
-                                disableAnimation={true}
-                            />
-                        </div>
-                    ) : null}
-                </DragOverlay>
+                {/* COMPLETED ACCORDION */}
+                {completedTasks.length > 0 && (
+                    <div className="mt-12 border-t border-gray-100 pt-6">
+                        <button
+                            onClick={() => setCompletedAccordionOpen(!completedAccordionOpen)}
+                            className="flex items-center gap-2 text-gray-500 font-semibold text-sm hover:text-gray-700 transition-colors mb-4"
+                        >
+                            <ChevronRight size={16} className={clsx("transition-transform", completedAccordionOpen && "rotate-90")} />
+                            Completed ({completedTasks.length})
+                        </button>
+
+                        <AnimatePresence>
+                            {completedAccordionOpen && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="space-y-1 opacity-60">
+                                        {completedTasks.map(task => (
+                                            <TaskItem
+                                                key={task.id}
+                                                task={task}
+                                                isActive={activeTaskId === task.id}
+                                            />
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                )}
+
             </div>
-        </DndContext>
+            {/* Portal Overlay for smooth dragging across containers */}
+
+        </div>
     )
 }

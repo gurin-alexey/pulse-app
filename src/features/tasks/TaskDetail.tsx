@@ -187,18 +187,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 pt-3 pb-24">
                 <div className="mb-2 space-y-2">
-                    {/* Breadcrumbs */}
-                    <div>
-                        {t.parent_id && parentTask && (
-                            <div
-                                onClick={handleBreadcrumbClick}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 hover:text-blue-600 cursor-pointer w-fit transition-all group"
-                            >
-                                <ArrowUp size={16} className="text-gray-500 group-hover:text-blue-500" />
-                                <span className="font-medium text-sm truncate max-w-[300px]">{parentTask.title}</span>
-                            </div>
-                        )}
-                    </div>
+
 
                     {/* Occurrence Detach Banner */}
                     {occurrence && t.recurrence_rule && (
@@ -345,6 +334,19 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             </Menu>
                         </div>
 
+                        {/* Breadcrumbs (Moved here) */}
+                        {t.parent_id && parentTask && (
+                            <div className="mb-3 pl-0">
+                                <div
+                                    onClick={handleBreadcrumbClick}
+                                    className="flex items-center gap-2 px-2 py-1 -ml-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-blue-600 cursor-pointer w-fit transition-all group"
+                                >
+                                    <ArrowUp size={14} className="text-gray-400 group-hover:text-blue-500" />
+                                    <span className="font-medium text-xs truncate max-w-[300px]">Return to {parentTask.title}</span>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Title Row */}
                         <div>
                             <TextareaAutosize
@@ -369,7 +371,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         onBlur={handleDescriptionBlur}
-                        className="w-full min-h-[120px] resize-none text-gray-600 border-none focus:ring-0 p-1 text-base leading-relaxed placeholder:text-gray-300 ml-9"
+                        className="w-full min-h-[120px] resize-none text-gray-600 border-none focus:ring-0 outline-none p-1 text-base leading-relaxed placeholder:text-gray-300 mt-2"
                         placeholder="Add a description..."
                     />
 
