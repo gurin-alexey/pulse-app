@@ -2,7 +2,7 @@ import TextareaAutosize from 'react-textarea-autosize'
 import { useState, useRef, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { CheckSquare, Square, GripVertical } from "lucide-react"
+import { CheckSquare, Square, GripVertical, Calendar } from "lucide-react"
 import { useTags, useToggleTaskTag, useTaskTags } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion } from "framer-motion"
@@ -168,11 +168,19 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: T
                             {/* Meta Info */}
                             <div className="flex items-center gap-3 text-xs">
                                 {task.due_date && (
-                                    <span className={clsx(
-                                        new Date(task.due_date) < new Date() && !task.is_completed ? "text-red-500 font-medium" : "text-gray-400"
-                                    )}>
-                                        {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                    </span>
+                                    <div
+                                        className="flex items-center gap-1 cursor-help"
+                                        title="Tip: Alt+1 (Today), Alt+2 (Tomorrow), Alt+3 (Next Week)"
+                                    >
+                                        <Calendar size={12} className={clsx(
+                                            new Date(task.due_date) < new Date() && !task.is_completed ? "text-red-500" : "text-gray-400"
+                                        )} />
+                                        <span className={clsx(
+                                            new Date(task.due_date) < new Date() && !task.is_completed ? "text-red-500 font-medium" : "text-gray-400"
+                                        )}>
+                                            {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        </span>
+                                    </div>
                                 )}
                                 {task.start_time && (
                                     <span className="text-gray-400">

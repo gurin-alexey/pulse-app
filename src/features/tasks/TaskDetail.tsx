@@ -10,6 +10,7 @@ import { SubtaskList } from './SubtaskList'
 import { TagManager } from '../tags/TagManager'
 import { useProjects } from '@/hooks/useProjects'
 import { Folder } from 'lucide-react'
+import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 
 type TaskDetailProps = {
     taskId: string
@@ -21,6 +22,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask()
     const { data: projects } = useProjects()
+
+    // Enable hotkeys for this active task
+    useTaskDateHotkeys(taskId, !!task)
 
     // Local state for auto-save inputs
     const [title, setTitle] = useState('')
@@ -164,7 +168,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
                         {/* Date & Time (moved from footer) */}
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
+                            <div
+                                className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors cursor-help"
+                                title="Tip: Alt+1 (Today), Alt+2 (Tomorrow), Alt+3 (Next Week)"
+                            >
                                 <CalendarIcon size={16} className="text-gray-400" />
                                 <input
                                     type="date"
