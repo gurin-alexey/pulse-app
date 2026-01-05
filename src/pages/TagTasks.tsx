@@ -127,7 +127,6 @@ export function TagTasks() {
                 <ViewOptions
                     sortBy={sortBy} setSortBy={setSortBy}
                     groupBy={groupBy} setGroupBy={setGroupBy}
-                    showCompleted={showCompleted} setShowCompleted={setShowCompleted}
                 />
             </div>
 

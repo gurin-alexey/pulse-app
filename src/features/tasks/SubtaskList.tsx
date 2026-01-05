@@ -7,7 +7,7 @@ import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 
-export function SubtaskList({ taskId, projectId }: { taskId: string; projectId: string }) {
+export function SubtaskList({ taskId, projectId }: { taskId: string; projectId: string | null }) {
     const { data: subtasks, isLoading } = useSubtasks(taskId)
     const { mutate: createTask } = useCreateTask()
     const { mutate: updateTask } = useUpdateTask()
@@ -38,7 +38,7 @@ export function SubtaskList({ taskId, projectId }: { taskId: string; projectId: 
     const toggleSubtask = (subtask: any) => {
         updateTask({
             taskId: subtask.id,
-            updates: { is_completed: !subtask.is_completed }
+            updates: { is_completed: !subtask.is_completed } as any
         })
     }
 

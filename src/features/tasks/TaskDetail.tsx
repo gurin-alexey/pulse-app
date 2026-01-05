@@ -256,7 +256,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                 onChange={(e) => {
                                     const pid = e.target.value || null
                                     if (pid !== task.project_id) {
-                                        updateTask({ taskId, updates: { project_id: pid, section_id: null as any } })
+                                        updateTask({ taskId, updates: { project_id: pid ?? undefined, section_id: null as any } })
                                     }
                                 }}
                                 className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm appearance-none pr-4 min-w-[60px]"
