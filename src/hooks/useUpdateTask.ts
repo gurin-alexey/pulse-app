@@ -46,7 +46,7 @@ export function useUpdateTask() {
 
             // 4. Waterfall Cascade to descendants
             // Fields that MUST follow the parent to keep the branch together
-            const cascadeFields = ['project_id', 'section_id', 'due_date', 'deleted_at'] as const
+            const cascadeFields = ['project_id', 'section_id', 'deleted_at'] as const
             const cascadeUpdates: any = {}
             let needsCascade = false
 
@@ -142,13 +142,13 @@ export function useUpdateTask() {
             const descendantIds = getDescendantIds(taskId, allCachedTasks)
 
             // 3. Separate updates
-            // Positional fields should ONLY apply to the primary task
-            const positionalFields = ['parent_id', 'sort_order', 'title', 'is_completed']
+            // Positional/Individual fields should ONLY apply to the primary task
+            const individualFields = ['parent_id', 'sort_order', 'title', 'is_completed', 'due_date']
             const positionalUpdates: any = {}
             const contextualUpdates: any = {}
 
             Object.entries(updates).forEach(([key, value]) => {
-                if (positionalFields.includes(key)) {
+                if (individualFields.includes(key)) {
                     positionalUpdates[key] = value
                 } else {
                     contextualUpdates[key] = value
