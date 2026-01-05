@@ -40,6 +40,7 @@ export type Task = {
     deleted_at: string | null
     completed_at: string | null
     sort_order: number
+    is_project: boolean
 }
 
 export type Tag = {

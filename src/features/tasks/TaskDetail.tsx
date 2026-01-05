@@ -272,6 +272,25 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
                         {/* Tag Manager */}
                         <TagManager taskId={task.id} />
+
+                        {/* Project Type Toggle (GTD logic) */}
+                        <div className="flex items-center gap-2 border-l border-gray-100 pl-4 py-1">
+                            <button
+                                onClick={() => updateTask({ taskId, updates: { is_project: !task.is_project } as any })}
+                                className={clsx(
+                                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
+                                    task.is_project
+                                        ? "bg-blue-600 text-white shadow-sm"
+                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                )}
+                                title="Mark as Project"
+                            >
+                                {task.is_project ? "PROJECT" : "Task"}
+                            </button>
+                            <span className="text-[10px] text-gray-400 font-medium leading-none hidden sm:inline">
+                                {task.is_project ? "Multi-step" : "Single-step"}
+                            </span>
+                        </div>
                     </div>
                 </div>
 

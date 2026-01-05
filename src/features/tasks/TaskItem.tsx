@@ -73,7 +73,11 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: T
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                        <div className={clsx("font-medium truncate", task.is_completed ? "text-gray-400 line-through" : "text-gray-700")}>
+                        <div className={clsx(
+                            "font-medium truncate",
+                            task.is_completed ? "text-gray-400 line-through" : "text-gray-700",
+                            task.is_project && "uppercase tracking-wide font-bold"
+                        )}>
                             {task.title}
                         </div>
                         <div className="flex items-center gap-1">

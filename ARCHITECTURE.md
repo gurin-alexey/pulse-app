@@ -12,7 +12,7 @@ Current core technologies used in the project:
 - **Navigation:** React Router 6 (URL-driven UI state)
 - **Calendar Engine:** **FullCalendar** (`@fullcalendar/react`, `daygrid`, `timegrid`, `interaction`, `multimonth`)
 - **Native Runtime:** **Capacitor** (iOS/Android)
-- **Drag-and-Drop:** **dnd-kit** (`@dnd-kit/core`, `@dnd-kit/sortable`) - used for categorizing tasks into sections and organizing projects.
+- **Drag-and-Drop:** **dnd-kit** (`@dnd-kit/core`, `@dnd-kit/sortable`). Features a custom **Magnetic Sidebar** logic (exclusive collision zones) for intuitive project/smart-list organization.
 - **Icons:** Lucide React
 
 ## 2. Database Schema (Supabase)
@@ -98,15 +98,11 @@ The application has been extensively adapted for mobile devices, preparing for n
   - Mobile custom `threeDay` view.
 - **Event Interaction**: Long-press to drag events on touch devices.
 
-### Mobile Gestures (Swipe Actions)
-Powered by `react-swipeable-list`, tasks in lists support advanced gestures:
-- **Swipe Right (Leading)**:
-  - **Quick Tags**: Direct access to top 2 used tags.
-  - **Tag Manager**: Opens full tag selection.
-- **Swipe Left (Trailing)**:
-  - **Planning**: Quick preset "Today" / "Tomorrow".
-  - **Pick Date**: Opens native date picker via hidden input trigger.
-- **Conflict Resolution**: A dedicated drag handle (6-dots icon) ensures swipe gestures don't conflict with Drag-and-Drop resorting using `dnd-kit`.
+### Mobile Gestures & Drag Interaction
+- **Magnetic Sidebar Collision**: Implemented an exclusive collision zone (X < 270px) that prioritizes sidebar targets (Inbox, Today, Projects) and ignores the background task list during drag. This eliminates target conflict in multi-pane layouts.
+- **Visual Feedback**: Used high-contrast highlights (Solid Blue / White Text) for active drop targets to provide clear state indication.
+- **Drag Handle Design**: A dedicated drag handle (`GripVertical`) with `cursor: move` ensures cross-browser compatibility and respects system cursor color settings, avoiding the hardcoded white "grab" cursor issue.
+- **Conflict Resolution**: Drag-and-Drop resorting using `dnd-kit` is scoped via collision detection strategies (closestCenter for sidebar, closestCorners for lists) to ensure deterministic behavior. Swipes were removed in favor of a cleaner DnD-first UX.
 
 ## 6. Native Build Infrastructure
 - **Platform**: Android (added via Capacitor).
