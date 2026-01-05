@@ -162,12 +162,11 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
             <div className="flex-1 overflow-y-auto p-6">
                 <div className="mb-6 space-y-4">
                     <input
-                        autoFocus
+                        autoFocus={searchParams.get('isNew') === 'true'}
                         type="text"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         onBlur={handleTitleBlur}
-                        onFocus={(e) => e.target.select()}
                         className="w-full text-2xl font-bold border-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300"
                         placeholder="Task title"
                     />

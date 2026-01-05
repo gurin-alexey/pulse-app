@@ -2,6 +2,7 @@ import React from 'react'
 import { TaskDetail } from "@/features/tasks/TaskDetail"
 import clsx from "clsx"
 import { Drawer } from "vaul"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 
 export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: () => void }) {
     // Simple media query for mobile check
@@ -33,7 +34,7 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
         <Drawer.Root open={true} onOpenChange={(open) => !open && onClose()}>
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" />
-                <Drawer.Content className="bg-white flex flex-col rounded-t-[10px] h-[90vh] mt-24 fixed bottom-0 left-0 right-0 z-50 focus:outline-none">
+                <Drawer.Content className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 top-[10vh] z-50 focus:outline-none">
                     {/* Drag Handle */}
                     <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-2" />
 
@@ -46,17 +47,5 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
     )
 }
 
-// Minimal hook inside for portable simplified usage if file missing
-function useMediaQuery(query: string) {
-    const [matches, setMatches] = React.useState(window.matchMedia(query).matches)
-    React.useEffect(() => {
-        const matchQueryList = window.matchMedia(query)
-        function handleChange(e: MediaQueryListEvent) {
-            setMatches(e.matches)
-        }
-        matchQueryList.addEventListener("change", handleChange)
-        return () => matchQueryList.removeEventListener("change", handleChange)
-    }, [query])
-    return matches
-}
+
 

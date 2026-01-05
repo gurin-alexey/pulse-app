@@ -1,9 +1,8 @@
-
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { Menu, LogOut, ChevronRight } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { AnimatePresence, motion } from "framer-motion"
+import { motion } from "framer-motion"
 import clsx from "clsx"
 import { useTags } from "@/hooks/useTags"
 import { supabase } from "@/lib/supabase"
@@ -11,8 +10,10 @@ import { TaskDetail } from "@/features/tasks/TaskDetail"
 import { TaskDetailModal } from "@/features/tasks/TaskDetailModal"
 import { DailyPlanner } from "@/features/calendar/DailyPlanner"
 import { Sidebar } from "@/shared/components/Sidebar"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 
 export function Layout() {
+  const isDesktop = useMediaQuery("(min-width: 1024px)")
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isTagsOpen, setIsTagsOpen] = useState(false)
 
@@ -140,7 +141,6 @@ export function Layout() {
         isCalendarPage ? "" : "lg:grid lg:grid-cols-[minmax(350px,1fr)_minmax(450px,1fr)_350px]"
       )}>
 
-
         {/* List Column */}
         <section className={clsx(
           "bg-white overflow-y-auto border-r border-gray-200 h-full",
@@ -160,10 +160,7 @@ export function Layout() {
         {/* Detail Column (Desktop Only as a col, unless task is selected) */}
         {!isCalendarPage && (
           <section className={clsx(
-            "border-r border-gray-200 bg-white overflow-y-auto h-full hidden lg:block",
-            taskId && "!block fixed inset-0 z-40 lg:static lg:z-auto" // Show on mobile if taskId present? Wait, user wants modal for calendar, but what about list? 
-            // In Pulse 1.0/2.0 List Detail was a column. On mobile it should probably be a separate screen or a sheet.
-            // For now, let's keep it consistent.
+            "border-r border-gray-200 bg-white overflow-y-auto h-full hidden lg:block"
           )}>
             {taskId ? (
               <TaskDetail taskId={taskId} />
@@ -183,8 +180,8 @@ export function Layout() {
         )}
       </main>
 
-      {/* Modal for Calendar Page */}
-      {isCalendarPage && taskId && (
+      {/* Modal for Calendar Page OR Mobile List View */}
+      {taskId && (isCalendarPage || !isDesktop) && (
         <TaskDetailModal taskId={taskId} onClose={closeModal} />
       )}
 

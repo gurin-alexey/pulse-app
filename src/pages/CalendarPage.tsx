@@ -156,6 +156,16 @@ export function CalendarPage() {
     }
 
     const handleEventClick = (info: any) => {
+        // Close "more" popover if open
+        const popover = document.querySelector('.fc-popover')
+        if (popover) {
+            const closeBtn = popover.querySelector('.fc-popover-close')
+            if (closeBtn instanceof HTMLElement) {
+                closeBtn.click()
+            } else {
+                (popover as HTMLElement).remove() // Fallback
+            }
+        }
         setSearchParams({ task: info.event.id })
     }
 
