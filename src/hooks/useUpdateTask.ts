@@ -12,11 +12,13 @@ export function useUpdateTask() {
 
     return useMutation({
         mutationFn: async ({ taskId, updates }: UpdateTaskParams) => {
+            // 1. Completion logic
             if (updates.is_completed !== undefined) {
                 updates.completed_at = updates.is_completed ? new Date().toISOString() : null
             }
 
-            // 1. If parent_id is changing to a non-null value, inherit parent's context
+            // 2. Context Inheritance (when nesting)
+            // If moving under a new parent, inherit its project/section/date
             if (updates.parent_id) {
                 const { data: parentTask } = await supabase
                     .from('tasks')
@@ -27,59 +29,66 @@ export function useUpdateTask() {
                 if (parentTask) {
                     updates.project_id = parentTask.project_id
                     updates.section_id = parentTask.section_id
-                    // We don't overwrite due_date here as it might be specific, 
-                    // but we do inherit the project "location".
+                    // We don't force due_date inheritance to allow sub-scheduling,
+                    // but we do ensure the task is in the same project container.
                 }
             }
 
-            // 2. Perform the primary update
-            const { data, error } = await supabase
+            // 3. Perform the primary update
+            const { data: primaryTask, error: primaryError } = await supabase
                 .from('tasks')
                 .update(updates)
                 .eq('id', taskId)
                 .select()
                 .single()
 
-            if (error) throw error
+            if (primaryError) throw primaryError
 
-            // 3. Cascade critical fields to descendants
-            // We cascade: project_id, section_id, due_date, deleted_at
-            const fieldsToCascade = ['project_id', 'section_id', 'due_date', 'deleted_at'] as const
+            // 4. Waterfall Cascade to descendants
+            // Fields that MUST follow the parent to keep the branch together
+            const cascadeFields = ['project_id', 'section_id', 'due_date', 'deleted_at'] as const
             const cascadeUpdates: any = {}
-            let shouldCascade = false
+            let needsCascade = false
 
-            fieldsToCascade.forEach(field => {
+            cascadeFields.forEach(field => {
                 if (updates[field] !== undefined) {
                     cascadeUpdates[field] = updates[field]
-                    shouldCascade = true
+                    needsCascade = true
                 }
             })
 
-            if (shouldCascade) {
-                const updateDescendants = async (parentId: string) => {
-                    const { data: children } = await supabase
+            if (needsCascade) {
+                // Recursive function to update all children of a parent
+                const cascadeToDescendants = async (parentId: string) => {
+                    const { data: children, error: fetchError } = await supabase
                         .from('tasks')
                         .select('id')
                         .eq('parent_id', parentId)
 
+                    if (fetchError) throw fetchError
+
                     if (children && children.length > 0) {
                         const childIds = children.map(c => c.id)
-                        await supabase
+
+                        // Update this level
+                        const { error: updateError } = await supabase
                             .from('tasks')
                             .update(cascadeUpdates)
                             .in('id', childIds)
 
-                        // Recurse for each child
-                        for (const childId of childIds) {
-                            await updateDescendants(childId)
+                        if (updateError) throw updateError
+
+                        // Recurse to next level
+                        for (const id of childIds) {
+                            await cascadeToDescendants(id)
                         }
                     }
                 }
 
-                await updateDescendants(taskId)
+                await cascadeToDescendants(taskId)
             }
 
-            return data as Task
+            return primaryTask as Task
         },
         onMutate: async ({ taskId, updates }) => {
             // Cancel outgoing refetches
@@ -160,45 +169,51 @@ export function useUpdateTask() {
                 if (!list) return
                 const filter = (queryKey[1] as any) || {}
 
-                // Determine if the updated primary task should be in THIS list
+                // Determine if a task matches this list's filter
                 const matchesFilter = (task: any) => {
+                    // Deleted/Trash logic
+                    if (filter.type === 'trash') return task.deleted_at !== null
+                    if (task.deleted_at !== null) return false
+
+                    // Project/Inbox/Today logic
                     if (filter.type === 'project') return task.project_id === filter.projectId
                     if (filter.type === 'inbox') return task.project_id === null
                     if (filter.type === 'today') {
                         const today = new Date().toISOString().split('T')[0]
                         return task.due_date === today
                     }
-                    return true // default for others
+                    return true
                 }
 
+                // Snapshots of the primary task and its descendants after the proposed update
                 const updatedPrimary = { ...allCachedTasks.find(t => t.id === taskId), ...positionalUpdates, ...contextualUpdates } as Task
-                const shouldBeInList = matchesFilter(updatedPrimary)
+                const updatedDescendants = descendantIds.map(did => {
+                    const original = allCachedTasks.find(t => t.id === did)
+                    return original ? { ...original, ...contextualUpdates } : null
+                }).filter(Boolean) as Task[]
 
+                const shouldPrimaryBeInList = matchesFilter(updatedPrimary)
                 const hasPrimary = list.some(t => t.id === taskId)
                 const hasDescendants = list.some(t => descendantIds.includes(t.id))
 
-                if (hasPrimary || hasDescendants || (shouldBeInList && filter.type)) {
+                if (hasPrimary || hasDescendants || (shouldPrimaryBeInList && filter.type)) {
                     modifiedLists.push({ queryKey, data: list })
 
+                    // Start with the list, replacing any existing versions of A or B
                     let newList = list.map(t => {
                         if (t.id === taskId) return updatedPrimary
-                        if (descendantIds.includes(t.id)) return { ...t, ...contextualUpdates }
+                        if (descendantIds.includes(t.id)) {
+                            return { ...t, ...contextualUpdates }
+                        }
                         return t
                     })
 
-                    // Handle Migration (Add/Remove)
-                    if (shouldBeInList && !hasPrimary && filter.type) {
-                        // ADD to new list (approximate position)
-                        newList = [...newList, updatedPrimary]
-                        // Also add descendants to the new list cache if they aren't there
-                        descendantIds.forEach(did => {
-                            if (!newList.some(t => t.id === did)) {
-                                const dTask = allCachedTasks.find(t => t.id === did)
-                                if (dTask) newList.push({ ...dTask, ...contextualUpdates })
-                            }
-                        })
-                    } else if (!shouldBeInList && hasPrimary) {
-                        // REMOVE from old list
+                    // Migration Logic
+                    if (shouldPrimaryBeInList && !hasPrimary && filter.type) {
+                        // ADD whole branch to the new list if it's missing the primary
+                        newList = [...newList, updatedPrimary, ...updatedDescendants.filter(ud => !newList.some(t => t.id === ud.id))]
+                    } else if (!shouldPrimaryBeInList && hasPrimary) {
+                        // REMOVE whole branch from the old list if primary no longer matches
                         newList = newList.filter(t => t.id !== taskId && !descendantIds.includes(t.id))
                     }
 
@@ -206,7 +221,7 @@ export function useUpdateTask() {
                 }
             }
 
-            // Update All Tasks (Calendar)
+            // Update All Tasks (Calendar/Global)
             if (previousAllTasks) {
                 queryClient.setQueryData<Task[]>(['all-tasks'], old =>
                     old?.map(t => {
@@ -217,12 +232,12 @@ export function useUpdateTask() {
                 )
             }
 
-            // Update 'task' (Detail view)
+            // Update individual task detail cache
             if (previousTask) {
                 queryClient.setQueryData<Task>(['task', taskId], { ...previousTask, ...positionalUpdates, ...contextualUpdates })
             }
 
-            // Update project/subtask lists
+            // Apply updates to all relevant project/smart lists
             tasksQueries.forEach(([queryKey, data]) => updateList(queryKey, data))
             subtasksQueries.forEach(([queryKey, data]) => updateList(queryKey, data))
 
