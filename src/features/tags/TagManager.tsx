@@ -93,7 +93,7 @@ export function TagManager({ taskId, readOnly }: TagManagerProps) {
                     </button>
 
                     {isOpen && (
-                        <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 shadow-lg rounded-md z-50 p-2">
+                        <div className="absolute bottom-full left-0 mb-1 w-56 bg-white border border-gray-200 shadow-lg rounded-md z-50 p-2">
                             {showInput && (
                                 <input
                                     type="text"

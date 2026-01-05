@@ -31,7 +31,7 @@ export type Task = {
     is_completed: boolean
     priority: 'low' | 'medium' | 'high' | null
     due_date: string | null
-    project_id: string
+    project_id: string | null
     user_id: string
     parent_id: string | null
     start_time: string | null

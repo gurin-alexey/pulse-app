@@ -10,8 +10,7 @@ import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { SubtaskList } from './SubtaskList'
 import { TagManager } from '../tags/TagManager'
-import { useProjects } from '@/hooks/useProjects'
-import { Folder } from 'lucide-react'
+import { ProjectPicker } from './ProjectPicker'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover'
 import { format } from 'date-fns'
@@ -27,7 +26,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask()
-    const { data: projects } = useProjects()
+
 
     // Breadcrumb Data (Moved up to follow Rules of Hooks)
     const { data: parentTask } = useTask(task?.parent_id || '')
@@ -388,27 +387,22 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                 <div className="flex flex-wrap items-center gap-4">
 
 
-                    {/* Project Picker */}
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors relative group/project">
-                        <Folder size={16} className="text-gray-400" />
-                        <select
-                            value={t.project_id || ''}
-                            onChange={(e) => {
-                                const pid = e.target.value || null
-                                if (pid !== t.project_id) {
-                                    updateTask({ taskId, updates: { project_id: pid ?? undefined, section_id: null } })
-                                }
-                            }}
-                            className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm appearance-none pr-4 min-w-[60px]"
-                        >
-                            <option value="">Inbox</option>
-                            <optgroup label="Projects">
-                                {projects?.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </optgroup>
-                        </select>
-                    </div>
+                    {/* Project & Section Picker */}
+                    <ProjectPicker
+                        projectId={t.project_id || null}
+                        sectionId={t.section_id || null}
+                        onSelect={(pid, sid) => {
+                            if (pid !== t.project_id || sid !== t.section_id) {
+                                updateTask({
+                                    taskId,
+                                    updates: {
+                                        project_id: pid ?? null, // Use null for Inbox
+                                        section_id: sid
+                                    }
+                                })
+                            }
+                        }}
+                    />
 
                     {/* Tag Manager */}
                     <TagManager taskId={taskId} />
