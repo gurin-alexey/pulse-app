@@ -11,7 +11,9 @@ import { Loader2 } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
 import { useState, useEffect, useRef } from "react"
-import { generateRecurringInstances, addExDateToRRule } from "@/utils/recurrence"
+import { generateRecurringInstances, addExDateToRRule, addUntilToRRule, updateDTStartInRRule } from "@/utils/recurrence"
+import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
+import { format } from "date-fns"
 
 export function CalendarPage() {
     const { data: tasks, isLoading } = useAllTasks()
@@ -22,6 +24,12 @@ export function CalendarPage() {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
     const [currentTitle, setCurrentTitle] = useState('')
     const [currentViewType, setCurrentViewType] = useState('timeGridDay')
+
+    // Recurrence Edit Modal State
+    const [recurrenceModal, setRecurrenceModal] = useState<{
+        isOpen: boolean;
+        info: any;
+    }>({ isOpen: false, info: null })
 
     // Refetch events when tasks data changes
     useEffect(() => {
@@ -75,12 +83,7 @@ export function CalendarPage() {
             updates.due_date = selectInfo.startStr.split('T')[0]
         }
 
-        // Create with empty title immediately
-        createTask({ ...updates, title: '' }, {
-            onSuccess: (newTask) => {
-                setSearchParams({ task: newTask.id, isNew: 'true' })
-            }
-        })
+        createTask({ ...updates, title: '' }) // Remove auto-open
     }
 
     if (isLoading) {
@@ -136,54 +139,22 @@ export function CalendarPage() {
             }
         })
 
-        // Sort: incomplete first
         allEvents.sort((a, b) => Number(a.extendedProps.isCompleted) - Number(b.extendedProps.isCompleted))
 
         successCallback(allEvents)
     }
 
     const handleEventDrop = (info: any) => {
-        // DETACH LOGIC
         if (info.event.extendedProps.isVirtual) {
-            const originalId = info.event.extendedProps.originalId
-            const occurrenceDate = info.event.extendedProps.occurrenceDate
-            const originalTask = tasks?.find(t => t.id === originalId)
-
-            if (originalTask && occurrenceDate) {
-                // 1. Update original task to exclude this date
-                const newRule = addExDateToRRule(originalTask.recurrence_rule || '', new Date(occurrenceDate as string))
-                updateTask({ taskId: originalId, updates: { recurrence_rule: newRule } })
-
-                // 2. Create new standalone task at the NEW position
-                const d = info.event.start
-                const dateStr = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null
-
-                createTask({
-                    title: originalTask.title,
-                    description: originalTask.description,
-                    priority: originalTask.priority,
-                    projectId: originalTask.project_id,
-                    userId: originalTask.user_id,
-                    due_date: dateStr,
-                    start_time: info.event.start?.toISOString() || null,
-                    end_time: info.event.end?.toISOString() || null
-                }, {
-                    onSuccess: (nt: any) => setSearchParams({ task: nt.id })
-                })
-                return
-            }
+            setRecurrenceModal({ isOpen: true, info })
+            return
         }
 
         const taskId = info.event.id
         const isAllDay = info.event.allDay
 
         if (isAllDay && info.event.start) {
-            const d = info.event.start
-            const year = d.getFullYear()
-            const month = String(d.getMonth() + 1).padStart(2, '0')
-            const day = String(d.getDate()).padStart(2, '0')
-            const dateStr = `${year}-${month}-${day}`
-
+            const dateStr = format(info.event.start, 'yyyy-MM-dd')
             updateTask({
                 taskId,
                 updates: {
@@ -195,16 +166,7 @@ export function CalendarPage() {
         } else {
             const newStart = info.event.start?.toISOString() || null
             const newEnd = info.event.end?.toISOString() || null
-
-            // Fix: due_date must be YYYY-MM-DD (Local), not ISO string with time
-            let dateStr = null
-            if (info.event.start) {
-                const d = info.event.start
-                const year = d.getFullYear()
-                const month = String(d.getMonth() + 1).padStart(2, '0')
-                const day = String(d.getDate()).padStart(2, '0')
-                dateStr = `${year}-${month}-${day}`
-            }
+            let dateStr = info.event.start ? format(info.event.start, 'yyyy-MM-dd') : null
 
             updateTask({
                 taskId,
@@ -218,33 +180,9 @@ export function CalendarPage() {
     }
 
     const handleEventResize = (info: any) => {
-        // DETACH LOGIC for Resize
         if (info.event.extendedProps.isVirtual) {
-            const originalId = info.event.extendedProps.originalId
-            const occurrenceDate = info.event.extendedProps.occurrenceDate
-            const originalTask = tasks?.find(t => t.id === originalId)
-
-            if (originalTask && occurrenceDate) {
-                const newRule = addExDateToRRule(originalTask.recurrence_rule || '', new Date(occurrenceDate as string))
-                updateTask({ taskId: originalId, updates: { recurrence_rule: newRule } })
-
-                const d = info.event.start
-                const dateStr = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null
-
-                createTask({
-                    title: originalTask.title,
-                    description: originalTask.description,
-                    priority: originalTask.priority,
-                    projectId: originalTask.project_id,
-                    userId: originalTask.user_id,
-                    due_date: dateStr,
-                    start_time: info.event.start?.toISOString() || null,
-                    end_time: info.event.end?.toISOString() || null
-                }, {
-                    onSuccess: (nt: any) => setSearchParams({ task: nt.id })
-                })
-                return
-            }
+            setRecurrenceModal({ isOpen: true, info })
+            return
         }
 
         const taskId = info.event.id
@@ -260,15 +198,93 @@ export function CalendarPage() {
         })
     }
 
+    const handleRecurrenceConfirm = (mode: 'single' | 'following' | 'all') => {
+        const { info } = recurrenceModal
+        if (!info) return
+
+        const event = info.event
+        const originalId = event.extendedProps.originalId
+        const occurrenceDate = event.extendedProps.occurrenceDate
+        const originalTask = tasks?.find(t => t.id === originalId)
+
+        if (!originalTask || !occurrenceDate) {
+            info.revert();
+            setRecurrenceModal({ isOpen: false, info: null });
+            return;
+        }
+
+        const newStart = event.start
+        const newEnd = event.end
+        const dateStr = newStart ? format(newStart, 'yyyy-MM-dd') : null
+
+        if (mode === 'single') {
+            // Materialize single instance
+            const newRule = addExDateToRRule(originalTask.recurrence_rule || '', new Date(occurrenceDate))
+            updateTask({ taskId: originalId, updates: { recurrence_rule: newRule } })
+
+            createTask({
+                title: originalTask.title,
+                description: originalTask.description,
+                priority: originalTask.priority,
+                projectId: originalTask.project_id,
+                userId: originalTask.user_id,
+                due_date: dateStr,
+                start_time: newStart?.toISOString() || null,
+                end_time: newEnd?.toISOString() || null
+            })
+        }
+        else if (mode === 'following') {
+            // Split series
+            // 1. End the old series
+            const prevDay = new Date(new Date(occurrenceDate).getTime() - 86400000)
+            const oldRuleEnd = addUntilToRRule(originalTask.recurrence_rule || '', prevDay)
+            updateTask({ taskId: originalId, updates: { recurrence_rule: oldRuleEnd } })
+
+            // 2. Start new series from new position
+            // We need to update DTSTART in the rule to skip to the new position
+            const newRule = updateDTStartInRRule(originalTask.recurrence_rule || '', newStart || new Date())
+
+            createTask({
+                title: originalTask.title,
+                description: originalTask.description,
+                priority: originalTask.priority,
+                projectId: originalTask.project_id,
+                userId: originalTask.user_id,
+                due_date: dateStr,
+                start_time: newStart?.toISOString() || null,
+                end_time: newEnd?.toISOString() || null,
+                recurrence_rule: newRule
+            })
+        }
+        else if (mode === 'all') {
+            // Update whole pattern
+            // Calculate delta? No, just update properties and DTSTART.
+            // But wait, if they moved IT to a different day, the series should shift.
+            // For now, let's keep it simple: update Start/End and DTSTART.
+            const newRule = updateDTStartInRRule(originalTask.recurrence_rule || '', newStart || new Date())
+
+            updateTask({
+                taskId: originalId,
+                updates: {
+                    start_time: newStart?.toISOString() || null,
+                    end_time: newEnd?.toISOString() || null,
+                    due_date: dateStr,
+                    recurrence_rule: newRule
+                }
+            })
+        }
+
+        setRecurrenceModal({ isOpen: false, info: null })
+    }
+
     const handleEventClick = (info: any) => {
-        // Close "more" popover if open
         const popover = document.querySelector('.fc-popover')
         if (popover) {
             const closeBtn = popover.querySelector('.fc-popover-close')
             if (closeBtn instanceof HTMLElement) {
                 closeBtn.click()
             } else {
-                (popover as HTMLElement).remove() // Fallback
+                (popover as HTMLElement).remove()
             }
         }
 
@@ -279,7 +295,6 @@ export function CalendarPage() {
         setSearchParams(params)
     }
 
-    // Custom Mobile Header Handlers
     const headerGoPrev = () => calendarRef.current?.getApi().prev()
     const headerGoNext = () => calendarRef.current?.getApi().next()
     const headerGoToday = () => calendarRef.current?.getApi().today()
@@ -287,8 +302,15 @@ export function CalendarPage() {
 
     return (
         <div className="h-full flex flex-col bg-white p-0 md:p-4 relative">
+            <RecurrenceEditModal
+                isOpen={recurrenceModal.isOpen}
+                onClose={() => {
+                    recurrenceModal.info?.revert();
+                    setRecurrenceModal({ isOpen: false, info: null });
+                }}
+                onConfirm={handleRecurrenceConfirm}
+            />
 
-            {/* Custom Mobile Header */}
             {isMobile && (
                 <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-100 shrink-0 z-10">
                     <div className="flex items-center gap-2">
@@ -329,10 +351,10 @@ export function CalendarPage() {
                         type: 'timeGrid',
                         duration: { days: 3 },
                         buttonText: '3 Days',
-                        titleFormat: { month: 'short', day: 'numeric' } // No Year
+                        titleFormat: { month: 'short', day: 'numeric' }
                     },
                     timeGridDay: {
-                        titleFormat: { month: 'short', day: 'numeric' } // No Year on Mobile
+                        titleFormat: { month: 'short', day: 'numeric' }
                     },
                     timeGridWeek: {
                         titleFormat: { month: 'short', day: 'numeric' }

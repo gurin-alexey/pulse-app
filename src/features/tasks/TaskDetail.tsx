@@ -28,6 +28,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask()
     const { data: projects } = useProjects()
 
+    // Breadcrumb Data (Moved up to follow Rules of Hooks)
+    const { data: parentTask } = useTask(task?.parent_id || '')
+
     // Enable hotkeys for this active task
     useTaskDateHotkeys(taskId, !!task)
 
@@ -147,11 +150,6 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
             </div>
         )
     }
-
-    // Breadcrumb Data
-    // We can use a separate useTask call for the parent, or lightweight fetch
-    // Since we need it reactive, useTask is fine.
-    const { data: parentTask } = useTask(task?.parent_id || '')
 
     const handleBreadcrumbClick = () => {
         if (task?.parent_id) {
