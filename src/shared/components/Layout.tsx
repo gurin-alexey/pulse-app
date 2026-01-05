@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { Menu, LogOut, ChevronRight } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import clsx from "clsx"
 import { useTags } from "@/hooks/useTags"
 import { supabase } from "@/lib/supabase"
@@ -24,6 +25,48 @@ export function Layout() {
     await supabase.auth.signOut()
     navigate('/login')
   }
+
+  // Prefetching Strategy
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    const prefetchData = async () => {
+      // 1. Prefetch Calendar (All Tasks)
+      await queryClient.prefetchQuery({
+        queryKey: ['all-tasks'],
+        queryFn: async () => {
+          const { data, error } = await supabase.from('tasks').select('*').order('due_date', { ascending: true })
+          if (error) throw error
+          return data
+        },
+        staleTime: 1000 * 60 * 5
+      })
+
+      // 2. Prefetch Inbox
+      await queryClient.prefetchQuery({
+        queryKey: ['tasks', { type: 'inbox' }],
+        queryFn: async () => {
+          const { data, error } = await supabase.from('tasks').select('*, task_tags(tags(*))').is('parent_id', null).is('project_id', null).order('created_at', { ascending: false })
+          if (error) throw error
+          return (data as any[]).map(task => ({ ...task, tags: task.task_tags.map((tt: any) => tt.tags) }))
+        },
+        staleTime: 1000 * 60 * 5
+      })
+
+      // 3. Prefetch Today
+      await queryClient.prefetchQuery({
+        queryKey: ['tasks', { type: 'today' }],
+        queryFn: async () => {
+          const today = new Date().toISOString().split('T')[0]
+          const { data, error } = await supabase.from('tasks').select('*, task_tags(tags(*))').is('parent_id', null).eq('due_date', today).order('created_at', { ascending: false })
+          if (error) throw error
+          return (data as any[]).map(task => ({ ...task, tags: task.task_tags.map((tt: any) => tt.tags) }))
+        },
+        staleTime: 1000 * 60 * 5
+      })
+    }
+
+    prefetchData()
+  }, []) // Run once on mount (when layout loads)
 
   const isCalendarPage = location.pathname.startsWith('/calendar')
 

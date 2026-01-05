@@ -17,37 +17,42 @@ export function useDeleteTask() {
             if (error) throw error
         },
         onMutate: async (taskId) => {
-            // Cancel potential refetches
+            // Cancel outgoing refetches
+            await queryClient.cancelQueries({ queryKey: ['task', taskId] })
             await queryClient.cancelQueries({ queryKey: ['all-tasks'] })
+            await queryClient.cancelQueries({ queryKey: ['tasks'] })
+            await queryClient.cancelQueries({ queryKey: ['subtasks'] })
 
-            // Try to find the task to know its project_id for list updates
-            let task = queryClient.getQueryData<Task>(['task', taskId])
-            if (!task) {
-                const allTasks = queryClient.getQueryData<Task[]>(['all-tasks'])
-                task = allTasks?.find(t => t.id === taskId)
-            }
-
-            if (task?.project_id) {
-                await queryClient.cancelQueries({ queryKey: ['tasks', task.project_id] })
-            }
-
-            // Snapshot previous values
+            // Snapshot previous value
             const previousAllTasks = queryClient.getQueryData<Task[]>(['all-tasks'])
-            const previousProjectTasks = task?.project_id
-                ? queryClient.getQueryData<Task[]>(['tasks', task.project_id])
-                : undefined
 
-            // Optimistically update Calendar (all-tasks)
-            queryClient.setQueryData<Task[]>(['all-tasks'], (old) =>
-                old ? old.filter(t => t.id !== taskId) : []
-            )
+            // Snapshot all list queries
+            const tasksQueries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
+            const subtasksQueries = queryClient.getQueriesData<Task[]>({ queryKey: ['subtasks'] })
 
-            // Optimistically update Project List
-            if (task?.project_id) {
-                queryClient.setQueryData<Task[]>(['tasks', task.project_id], (old) =>
+            const modifiedLists: { queryKey: readonly unknown[], data: Task[] }[] = []
+
+            // Helper to remove from list
+            const removeFromList = (queryKey: readonly unknown[], list: Task[] | undefined) => {
+                if (!list) return
+                if (list.some(t => t.id === taskId)) {
+                    modifiedLists.push({ queryKey, data: list })
+                    queryClient.setQueryData(queryKey, list.filter(t => t.id !== taskId))
+                }
+            }
+
+            // Update All Tasks (Calendar)
+            if (previousAllTasks) {
+                queryClient.setQueryData<Task[]>(['all-tasks'], old =>
                     old ? old.filter(t => t.id !== taskId) : []
                 )
             }
+
+            // Update all found project lists
+            tasksQueries.forEach(([queryKey, data]) => removeFromList(queryKey, data))
+
+            // Update all found subtask lists
+            subtasksQueries.forEach(([queryKey, data]) => removeFromList(queryKey, data))
 
             // Close the detail view immediately if open
             if (searchParams.get('task') === taskId) {
@@ -56,23 +61,21 @@ export function useDeleteTask() {
                 setSearchParams(newParams)
             }
 
-            return { previousAllTasks, previousProjectTasks, projectId: task?.project_id }
+            return { previousAllTasks, modifiedLists }
         },
         onError: (_err, _taskId, context) => {
             // Rollback
             if (context?.previousAllTasks) {
                 queryClient.setQueryData(['all-tasks'], context.previousAllTasks)
             }
-            if (context?.projectId && context?.previousProjectTasks) {
-                queryClient.setQueryData(['tasks', context.projectId], context.previousProjectTasks)
-            }
+            context?.modifiedLists.forEach(({ queryKey, data }) => {
+                queryClient.setQueryData(queryKey, data)
+            })
         },
-        onSettled: (_data, _error, _taskId, context) => {
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['all-tasks'] })
             queryClient.invalidateQueries({ queryKey: ['tasks'] })
-            if (context?.projectId) {
-                queryClient.invalidateQueries({ queryKey: ['tasks', context.projectId] })
-            }
+            queryClient.invalidateQueries({ queryKey: ['subtasks'] })
         },
     })
 }
