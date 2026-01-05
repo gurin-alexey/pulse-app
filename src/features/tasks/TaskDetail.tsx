@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
@@ -30,14 +30,35 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         }
     }, [task])
 
+    // Keep track of title for unmount check
+    const titleRef = useRef(title)
+    useEffect(() => {
+        titleRef.current = title
+    }, [title])
+
+    // Cleanup empty new tasks on unmount (covers close button, backdrop click, nav, etc.)
+    useEffect(() => {
+        return () => {
+            // Check if we are truly closing (URL no longer contains this task)
+            // This prevents deletion during React Strict Mode double-mount
+            const currentParams = new URLSearchParams(window.location.search)
+            if (!currentParams.get('task') && !titleRef.current.trim()) {
+                deleteTask(taskId)
+            }
+        }
+    }, [taskId]) // Run cleanup when taskId changes or component unmounts
+
     const handleClose = () => {
         const newParams = new URLSearchParams(searchParams)
         newParams.delete('task')
+        newParams.delete('isNew')
         setSearchParams(newParams)
     }
 
     const handleTitleBlur = () => {
-        if (task && title !== task.title) {
+        if (!task) return
+
+        if (title !== task.title) {
             updateTask({ taskId, updates: { title } })
         }
     }
@@ -50,7 +71,30 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const date = e.target.value || null
-        updateTask({ taskId, updates: { due_date: date } })
+        const updates: any = { due_date: date }
+
+        if (date && task?.start_time) {
+            // Sync start_time/end_time dates while preserving time
+            const [year, month, day] = date.split('-').map(Number)
+
+            const oldStart = new Date(task.start_time)
+            // Note: Month is 0-indexed in Date constructor
+            const newStart = new Date(year, month - 1, day, oldStart.getHours(), oldStart.getMinutes())
+            updates.start_time = newStart.toISOString()
+
+            if (task.end_time) {
+                const oldEnd = new Date(task.end_time)
+                const newEnd = new Date(year, month - 1, day, oldEnd.getHours(), oldEnd.getMinutes())
+                updates.end_time = newEnd.toISOString()
+            }
+        }
+
+        if (!date) {
+            updates.start_time = null
+            updates.end_time = null
+        }
+
+        updateTask({ taskId, updates })
     }
 
     const toggleStatus = () => {

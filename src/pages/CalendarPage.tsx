@@ -38,7 +38,7 @@ export function CalendarPage() {
             if (isMobile) {
                 calendarApi.changeView('timeGridDay')
             } else {
-                calendarApi.changeView('dayGridMonth')
+                calendarApi.changeView('timeGridWeek')
             }
         }
     }, [isMobile])
@@ -69,9 +69,10 @@ export function CalendarPage() {
             updates.due_date = selectInfo.startStr.split('T')[0]
         }
 
-        createTask(updates, {
+        // Create with empty title immediately
+        createTask({ ...updates, title: '' }, {
             onSuccess: (newTask) => {
-                setSearchParams({ task: newTask.id })
+                setSearchParams({ task: newTask.id, isNew: 'true' })
             }
         })
     }
@@ -217,7 +218,7 @@ export function CalendarPage() {
                         titleFormat: { month: 'short', day: 'numeric' }
                     }
                 }}
-                initialView={isMobile ? "timeGridDay" : "dayGridMonth"}
+                initialView={isMobile ? "timeGridDay" : "timeGridWeek"}
                 firstDay={1}
                 editable={true}
                 selectable={true}
