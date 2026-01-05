@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import clsx from "clsx"
-import { useTags } from "@/hooks/useTags"
 import { supabase } from "@/lib/supabase"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
 import { TaskDetailModal } from "@/features/tasks/TaskDetailModal"
@@ -26,7 +25,6 @@ import { useSettings } from "@/store/useSettings"
 export function Layout() {
   const isDesktop = useMediaQuery("(min-width: 768px)")
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
-  const [isTagsOpen, setIsTagsOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const location = useLocation()
@@ -34,7 +32,6 @@ export function Layout() {
   const [searchParams, setSearchParams] = useSearchParams()
   const taskId = searchParams.get('task')
 
-  const { data: tags, isLoading: tagsLoading } = useTags()
   const { fetchSettings } = useSettings()
 
   useEffect(() => {
@@ -219,53 +216,7 @@ export function Layout() {
     // ...
   }
 
-  function renderTags() {
-    return (
-      <div className="mt-8">
-        <button
-          onClick={() => setIsTagsOpen(!isTagsOpen)}
-          className="w-full px-3 mb-2 flex items-center justify-between group hover:text-gray-600 outline-none"
-        >
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-hover:text-gray-500 transition-colors">
-            Tags
-          </span>
-          <ChevronRight
-            size={16}
-            className={clsx("text-gray-400 transition-transform duration-200", isTagsOpen && "rotate-90")}
-          />
-        </button>
 
-        {isTagsOpen && (
-          <div className="space-y-1">
-            {tagsLoading ? (
-              <div className="px-3 space-y-2">
-                {[1, 2].map(i => <div key={i} className="h-6 bg-gray-100 rounded animate-pulse" />)}
-              </div>
-            ) : tags?.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-400">
-                No tags yet
-              </div>
-            ) : (
-              tags?.map(tag => (
-                <Link
-                  key={tag.id}
-                  to={`/tags/${tag.id}`}
-                  onClick={() => setIsSidebarOpen(false)}
-                  className={clsx(
-                    "flex items-center gap-3 px-3 py-1.5 rounded-lg transition-colors text-sm text-gray-600 hover:bg-gray-100",
-                    location.pathname === `/tags/${tag.id}` && "bg-blue-50 text-blue-600"
-                  )}
-                >
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
-                  <span className="truncate">{tag.name}</span>
-                </Link>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
 
   function renderLogout() {
     return (
@@ -316,7 +267,6 @@ export function Layout() {
           </div>
           <nav className="flex-1 space-y-1">
             <Sidebar activePath={location.pathname} />
-            {renderTags()}
             <div className="mt-auto pt-4 pb-2">
               <DroppableNavItem label="Trash">
                 {(isOver) => (
@@ -350,7 +300,7 @@ export function Layout() {
                 <span className="font-bold text-xl text-blue-600">Pulse</span>
                 <button
                   onClick={() => setIsSidebarOpen(false)}
-                  className="p-2 -mr-2 text-gray-400"
+                  className="p-2 -ml-2 text-gray-400"
                 >
                   <ChevronRight size={24} className="rotate-180" />
                 </button>
@@ -360,7 +310,6 @@ export function Layout() {
                   activePath={location.pathname}
                   onItemClick={() => setIsSidebarOpen(false)}
                 />
-                {renderTags()}
                 <div className="mt-auto pt-4 pb-2">
                   <DroppableNavItem label="Trash">
                     {(isOver) => (

@@ -8,7 +8,7 @@ export function useAllTasks() {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('tasks')
-                .select('*')
+                .select('*, task_tags(tag_id)')
                 .is('deleted_at', null)
                 .order('due_date', { ascending: true })
 
