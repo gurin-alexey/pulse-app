@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { TaskWithTags } from '@/hooks/useTasks'
 import type { SortOption, GroupOption } from './ViewOptions'
+import type { Project } from '@/types/database'
 
 // Helper to normalized date (set time to 00:00:00)
 const startOfDay = (d: Date) => {
@@ -14,9 +15,10 @@ type UseTaskViewProps = {
     showCompleted: boolean
     sortBy: SortOption
     groupBy: GroupOption
+    projects?: Project[]
 }
 
-export function useTaskView({ tasks, showCompleted, sortBy, groupBy }: UseTaskViewProps) {
+export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects }: UseTaskViewProps) {
     const sortedAndGroupedTasks = useMemo(() => {
         if (!tasks) return {}
 
@@ -24,8 +26,6 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy }: UseTaskVi
         let filtered = showCompleted ? tasks : tasks.filter(t => !t.is_completed)
 
         // 2. Sort (Applied before grouping to ensure group order or item order within groups)
-        // Note: If grouping by date, we might want to force sorting by date within groups?
-        // Let's adhere to the selected sort.
         filtered.sort((a, b) => {
             switch (sortBy) {
                 case 'date_created':
@@ -36,7 +36,7 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy }: UseTaskVi
                     // Tasks with due_date come first, nulls last
                     if (!a.due_date && !b.due_date) return 0
                     if (!a.due_date) return 1
-                    if (b.due_date === null) return -1 // Fix typescript warning logic
+                    if (b.due_date === null) return -1
                     if (!b.due_date) return -1
                     return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
                 default:
@@ -51,11 +51,7 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy }: UseTaskVi
 
         const groups: Record<string, TaskWithTags[]> = {}
 
-        if (groupBy === 'status') {
-            groups['To Do'] = filtered.filter(t => !t.is_completed)
-            groups['Completed'] = filtered.filter(t => t.is_completed)
-            // Remove empty groups? Maybe keep 'To Do' always.
-        } else if (groupBy === 'date') {
+        if (groupBy === 'date') {
             const today = startOfDay(new Date())
             const tomorrow = new Date(today)
             tomorrow.setDate(tomorrow.getDate() + 1)
@@ -81,10 +77,63 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy }: UseTaskVi
                 if (groups[k] && groups[k].length > 0) orderedGroups[k] = groups[k]
             })
             return orderedGroups
+        } else if (groupBy === 'priority') {
+            filtered.forEach(task => {
+                const p = task.priority || 'none'
+                // Capitalize for display
+                const groupName = p.charAt(0).toUpperCase() + p.slice(1)
+                if (!groups[groupName]) groups[groupName] = []
+                groups[groupName].push(task)
+            })
+
+            const orderedGroups: Record<string, TaskWithTags[]> = {}
+            const keys = ['High', 'Medium', 'Low', 'None']
+            keys.forEach(k => {
+                if (groups[k] && groups[k].length > 0) orderedGroups[k] = groups[k]
+            })
+            return orderedGroups
+        } else if (groupBy === 'project') {
+            filtered.forEach(task => {
+                let groupName = 'Inbox'
+                if (task.project_id) {
+                    const proj = projects?.find(p => p.id === task.project_id)
+                    if (proj) groupName = proj.name
+                    else groupName = 'Unknown Project'
+                }
+
+                if (!groups[groupName]) groups[groupName] = []
+                groups[groupName].push(task)
+            })
+
+            // Default sort: Inbox first, then A-Z
+            const orderedGroups: Record<string, TaskWithTags[]> = {}
+            if (groups['Inbox']) orderedGroups['Inbox'] = groups['Inbox']
+            const otherKeys = Object.keys(groups).filter(k => k !== 'Inbox').sort()
+            otherKeys.forEach(k => orderedGroups[k] = groups[k])
+
+            return orderedGroups
+        } else if (groupBy === 'tag') {
+            filtered.forEach(task => {
+                if (!task.tags || task.tags.length === 0) {
+                    if (!groups['No Tags']) groups['No Tags'] = []
+                    groups['No Tags'].push(task)
+                } else {
+                    task.tags.forEach(tag => {
+                        if (!groups[tag.name]) groups[tag.name] = []
+                        groups[tag.name].push(task)
+                    })
+                }
+            })
+
+            const orderedGroups: Record<string, TaskWithTags[]> = {}
+            const keys = Object.keys(groups).filter(k => k !== 'No Tags').sort()
+            keys.forEach(k => orderedGroups[k] = groups[k])
+            if (groups['No Tags']) orderedGroups['No Tags'] = groups['No Tags']
+            return orderedGroups
         }
 
         return groups
-    }, [tasks, showCompleted, sortBy, groupBy])
+    }, [tasks, showCompleted, sortBy, groupBy, projects])
 
     return sortedAndGroupedTasks
 }

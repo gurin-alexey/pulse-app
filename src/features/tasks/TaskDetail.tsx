@@ -360,7 +360,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                         (e.target as HTMLTextAreaElement).blur();
                                     }
                                 }}
-                                className="w-full text-xl font-semibold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-snug"
+                                className={clsx(
+                                    "w-full text-xl font-semibold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-snug",
+                                    t.is_project && "uppercase tracking-wide text-blue-800"
+                                )}
                                 placeholder="What needs to be done?"
                                 minRows={1}
                             />
@@ -415,14 +418,14 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                         <button
                             onClick={() => updateTask({ taskId, updates: { is_project: !t.is_project } })}
                             className={clsx(
-                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
+                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all tracking-wider",
                                 t.is_project
-                                    ? "bg-blue-600 text-white shadow-sm"
-                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                    ? "bg-blue-600 text-white shadow-md ring-2 ring-blue-100 ring-offset-1"
+                                    : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 border border-gray-200"
                             )}
-                            title="Mark as Project"
+                            title="Сделать проектом"
                         >
-                            {t.is_project ? "PROJECT" : "Task"}
+                            Проект
                         </button>
                     </div>
                 </div>

@@ -243,20 +243,22 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     }
 
     const navItems = [
-        { label: "Dashboard", path: "/", icon: LayoutDashboard },
+        { label: "Dashboard", path: "/", icon: LayoutDashboard, droppable: false },
         {
             label: "Inbox",
             path: "/inbox",
             icon: Inbox,
-            count: allTasks?.filter(t => !t.is_completed && !t.project_id).length
+            count: allTasks?.filter(t => !t.is_completed && !t.project_id).length,
+            droppable: true
         },
         {
             label: "Today",
             path: "/today",
             icon: Sun,
-            count: allTasks?.filter(t => !t.is_completed && t.due_date && isToday(parseISO(t.due_date))).length
+            count: allTasks?.filter(t => !t.is_completed && t.due_date && isToday(parseISO(t.due_date))).length,
+            droppable: false
         },
-        { label: "Calendar", path: "/calendar", icon: Calendar },
+        { label: "Calendar", path: "/calendar", icon: Calendar, droppable: false },
     ]
 
     return (
@@ -266,29 +268,40 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                 {navItems.map((item) => {
                     const Icon = item.icon
                     const isActive = activePath === item.path
-                    return (
-                        <DroppableNavItem key={item.path} label={item.label}>
-                            {(isOver) => (
-                                <Link
-                                    to={item.path}
-                                    onClick={onItemClick}
-                                    className={clsx(
-                                        "flex items-center gap-3 px-5 py-2.5 transition-colors",
-                                        isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600")
-                                    )}
-                                >
-                                    <Icon size={20} />
-                                    <span className="whitespace-nowrap font-semibold flex-1">
-                                        {item.label}
-                                    </span>
-                                    {!!item.count && item.count > 0 && (
-                                        <span className="text-xs text-gray-400 font-medium">
-                                            {item.count}
-                                        </span>
-                                    )}
-                                </Link>
+
+                    const renderLink = (isOver: boolean = false) => (
+                        <Link
+                            to={item.path}
+                            onClick={onItemClick}
+                            className={clsx(
+                                "flex items-center gap-3 px-5 py-2.5 transition-colors",
+                                isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600")
                             )}
-                        </DroppableNavItem>
+                        >
+                            <Icon size={20} />
+                            <span className="whitespace-nowrap font-semibold flex-1">
+                                {item.label}
+                            </span>
+                            {!!item.count && item.count > 0 && (
+                                <span className={clsx("text-xs font-medium", isOver ? "text-blue-100" : "text-gray-400")}>
+                                    {item.count}
+                                </span>
+                            )}
+                        </Link>
+                    )
+
+                    if (item.droppable) {
+                        return (
+                            <DroppableNavItem key={item.path} label={item.label}>
+                                {(isOver) => renderLink(isOver)}
+                            </DroppableNavItem>
+                        )
+                    }
+
+                    return (
+                        <div key={item.path} className="border-l-4 border-transparent w-full hover:bg-gray-50/50 transition-colors">
+                            {renderLink()}
+                        </div>
                     )
                 })}
             </div>

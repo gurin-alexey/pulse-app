@@ -225,7 +225,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
         return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
     })
 
-    const tasksForView = useTaskView({ tasks: sortedActiveTasks, showCompleted: false, sortBy, groupBy })
+    const tasksForView = useTaskView({ tasks: sortedActiveTasks, showCompleted: false, sortBy, groupBy, projects: allProjects })
     const renderMode = groupBy === 'none' ? 'sections' : 'groups'
 
     const handleTaskClick = (taskId: string) => {

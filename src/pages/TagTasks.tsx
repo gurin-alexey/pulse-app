@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom"
 import { useTagTasks } from "@/hooks/useTagTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useTags } from "@/hooks/useTags"
+import { useProjects } from "@/hooks/useProjects"
 import { AlertCircle, Loader2 } from "lucide-react" // Removed TagIcon if unused, or keep if used somewhere else (it was unused in previous code)
 import { ViewOptions, type SortOption, type GroupOption } from "@/features/tasks/ViewOptions"
 import { useTaskView } from "@/features/tasks/useTaskView"
@@ -13,6 +14,7 @@ export function TagTasks() {
     const [searchParams, setSearchParams] = useSearchParams()
     const { data: tasks, isLoading, isError } = useTagTasks(tagId)
     const { data: tags } = useTags()
+    const { data: allProjects } = useProjects()
     const { mutate: updateTask } = useUpdateTask()
 
     // View State
@@ -23,7 +25,7 @@ export function TagTasks() {
     const activeTaskId = searchParams.get('task')
     const currentTag = tags?.find(t => t.id === tagId)
 
-    const groupedTasks = useTaskView({ tasks, showCompleted, sortBy, groupBy })
+    const groupedTasks = useTaskView({ tasks, showCompleted, sortBy, groupBy, projects: allProjects })
 
     const handleTaskClick = (taskId: string) => {
         setSearchParams({ task: taskId })

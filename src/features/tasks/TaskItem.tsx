@@ -154,7 +154,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                         className={clsx(
                             "w-full bg-transparent border-0 outline-none focus:ring-0 p-0 leading-tight resize-none",
                             "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
-                            task.is_completed ? "text-gray-400 line-through" : "text-gray-700 font-medium"
+                            task.is_completed ? "text-gray-400 line-through" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
                         )}
                         spellCheck={false}
                     />

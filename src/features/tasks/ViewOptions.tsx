@@ -3,7 +3,7 @@ import { Settings2, CheckCircle2, Circle, Calendar, SortAsc, LayoutList } from '
 import clsx from 'clsx'
 
 export type SortOption = 'manual' | 'date_created' | 'due_date' | 'alphabetical'
-export type GroupOption = 'none' | 'date' | 'status'
+export type GroupOption = 'none' | 'date' | 'priority' | 'project' | 'tag'
 
 type ViewOptionsProps = {
     sortBy: SortOption
@@ -11,6 +11,8 @@ type ViewOptionsProps = {
     groupBy: GroupOption
     setGroupBy: (group: GroupOption) => void
 }
+
+import { Flag, Folder, Tag as TagIcon } from 'lucide-react'
 
 export function ViewOptions({
     sortBy, setSortBy,
@@ -59,10 +61,22 @@ export function ViewOptions({
                                 <Calendar size={16} /> Due Date
                             </button>
                             <button
-                                onClick={() => setGroupBy('status')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", groupBy === 'status' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
+                                onClick={() => setGroupBy('priority')}
+                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", groupBy === 'priority' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
                             >
-                                <CheckCircle2 size={16} /> Status
+                                <Flag size={16} /> Priority
+                            </button>
+                            <button
+                                onClick={() => setGroupBy('project')}
+                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", groupBy === 'project' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
+                            >
+                                <Folder size={16} /> Project
+                            </button>
+                            <button
+                                onClick={() => setGroupBy('tag')}
+                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", groupBy === 'tag' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
+                            >
+                                <TagIcon size={16} /> Tags
                             </button>
                         </div>
                     </div>
