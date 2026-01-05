@@ -16,6 +16,7 @@ export function useUpdateTask() {
                 updates.completed_at = updates.is_completed ? new Date().toISOString() : null
             }
 
+            // 1. Perform the primary update
             const { data, error } = await supabase
                 .from('tasks')
                 .update(updates)
@@ -24,6 +25,41 @@ export function useUpdateTask() {
                 .single()
 
             if (error) throw error
+
+            // 2. Cascade project/section changes to descendants
+            // If project_id or section_id changed, we must move all children too
+            if (updates.project_id !== undefined || updates.section_id !== undefined) {
+                const cascadeUpdates: any = {}
+                if (updates.project_id !== undefined) cascadeUpdates.project_id = updates.project_id
+                if (updates.section_id !== undefined) cascadeUpdates.section_id = updates.section_id
+
+                // We need to recursively update all levels. 
+                // Since Supabase/PostgREST doesn't support recursive updates in one call easily, 
+                // we'll fetch all descendants and update them in bulk.
+
+                const updateDescendants = async (parentId: string) => {
+                    const { data: children } = await supabase
+                        .from('tasks')
+                        .select('id')
+                        .eq('parent_id', parentId)
+
+                    if (children && children.length > 0) {
+                        const childIds = children.map(c => c.id)
+                        await supabase
+                            .from('tasks')
+                            .update(cascadeUpdates)
+                            .in('id', childIds)
+
+                        // Recurse for each child
+                        for (const childId of childIds) {
+                            await updateDescendants(childId)
+                        }
+                    }
+                }
+
+                await updateDescendants(taskId)
+            }
+
             return data as Task
         },
         onMutate: async ({ taskId, updates }) => {
@@ -45,14 +81,26 @@ export function useUpdateTask() {
             // Store snapshots of all modified lists
             const modifiedLists: { queryKey: readonly unknown[], data: Task[] }[] = []
 
-            // Helper to update a list if it contains the task
+            // Helper to get all descendant IDs from a list
+            const getDescendantIds = (parentId: string, allTasks: Task[]): string[] => {
+                const children = allTasks.filter(t => t.parent_id === parentId)
+                let ids = children.map(c => c.id)
+                children.forEach(c => {
+                    ids = [...ids, ...getDescendantIds(c.id, allTasks)]
+                })
+                return ids
+            }
+
+            const descendantIds = previousAllTasks ? getDescendantIds(taskId, previousAllTasks) : []
+            const allTargetIds = [taskId, ...descendantIds]
+
+            // Helper to update a list if it contains any of the target tasks
             const updateList = (queryKey: readonly unknown[], list: Task[] | undefined) => {
                 if (!list) return
-                const processedList = list // Copy not needed for find, but needed for setQueryData
-                if (processedList.some(t => t.id === taskId)) {
-                    modifiedLists.push({ queryKey, data: processedList })
-                    queryClient.setQueryData(queryKey, processedList.map(t =>
-                        t.id === taskId ? { ...t, ...updates } : t
+                if (list.some(t => allTargetIds.includes(t.id))) {
+                    modifiedLists.push({ queryKey, data: list })
+                    queryClient.setQueryData(queryKey, list.map(t =>
+                        allTargetIds.includes(t.id) ? { ...t, ...updates } : t
                     ))
                 }
             }
@@ -60,7 +108,7 @@ export function useUpdateTask() {
             // Update All Tasks (Calendar)
             if (previousAllTasks) {
                 queryClient.setQueryData<Task[]>(['all-tasks'], old =>
-                    old?.map(t => t.id === taskId ? { ...t, ...updates } : t) || []
+                    old?.map(t => allTargetIds.includes(t.id) ? { ...t, ...updates } : t) || []
                 )
             }
 
