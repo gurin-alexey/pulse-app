@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal } from "lucide-react"
 
 // ... existing code ...
 
@@ -23,6 +23,57 @@ type SidebarProps = {
 }
 
 // --- DND Components ---
+
+function ProjectActionsMenu({ project, onRename, onDelete, isOver }: any) {
+    const [isOpen, setIsOpen] = useState(false)
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setIsOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    return (
+        <div className="relative" ref={menuRef} onClick={e => e.preventDefault()}>
+            <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen) }}
+                className={clsx(
+                    "opacity-0 group-hover/project:opacity-100 p-1 rounded transition-all",
+                    isOpen && "opacity-100 bg-gray-100/20",
+                    isOver ? "text-blue-100 hover:bg-white/20 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                )}
+                title="Project Settings"
+            >
+                <MoreHorizontal size={16} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 shadow-xl rounded-md z-50 py-1 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onRename(project) }}
+                        className="text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-full transition-colors"
+                    >
+                        <Edit2 size={13} className="text-gray-400" />
+                        Rename
+                    </button>
+                    <div className="h-px bg-gray-50 my-0.5" />
+                    <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onDelete(e, project.id) }}
+                        className="text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 w-full transition-colors"
+                    >
+                        <Trash2 size={13} className="text-red-500" />
+                        Delete
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+}
 
 function DraggableProject({ project, activePath, children }: { project: any, activePath: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
     const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
@@ -192,6 +243,13 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         })
     }
 
+    const handleRenameProject = (project: any) => {
+        const newName = window.prompt("Rename Project:", project.name)
+        if (newName && newName.trim()) {
+            updateProject({ projectId: project.id, updates: { name: newName.trim() } })
+        }
+    }
+
     const handleDeleteProject = (e: React.MouseEvent, projectId: string) => {
         e.preventDefault()
         e.stopPropagation()
@@ -225,16 +283,12 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                 </span>
                             )}
 
-                            <button
-                                onClick={(e) => handleDeleteProject(e, project.id)}
-                                className={clsx(
-                                    "opacity-0 group-hover/project:opacity-100 p-1 rounded transition-all",
-                                    isOver ? "hover:bg-white/20 text-blue-100" : "hover:bg-black/5 text-gray-400 hover:text-red-500"
-                                )}
-                                title="Delete Project"
-                            >
-                                <Trash2 size={14} />
-                            </button>
+                            <ProjectActionsMenu
+                                project={project}
+                                onRename={handleRenameProject}
+                                onDelete={handleDeleteProject}
+                                isOver={isOver}
+                            />
                         </Link>
                     </div>
                 )}
