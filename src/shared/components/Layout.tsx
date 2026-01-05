@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { Menu, LogOut, ChevronRight, Trash2 } from "lucide-react"
+import { Menu, LogOut, ChevronRight, Trash2, Settings } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
@@ -16,17 +16,18 @@ import { useProjectGroups } from "@/hooks/useProjectGroups"
 import { useUpdateProject } from "@/hooks/useUpdateProject"
 import { TaskItem } from "@/features/tasks/TaskItem"
 import { createPortal } from "react-dom"
-
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, KeyboardSensor, type DragEndEvent, closestCorners, closestCenter, pointerWithin, rectIntersection, DragOverlay } from '@dnd-kit/core'
+import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, KeyboardSensor, type DragEndEvent, closestCorners, closestCenter, DragOverlay } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-
 import { Toaster } from "sonner"
+import { SettingsModal } from "@/features/settings/SettingsModal"
+import { useSettings } from "@/store/useSettings"
 
 export function Layout() {
   const isDesktop = useMediaQuery("(min-width: 768px)")
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isTagsOpen, setIsTagsOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -34,6 +35,11 @@ export function Layout() {
   const taskId = searchParams.get('task')
 
   const { data: tags, isLoading: tagsLoading } = useTags()
+  const { fetchSettings } = useSettings()
+
+  useEffect(() => {
+    fetchSettings()
+  }, [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -213,6 +219,75 @@ export function Layout() {
     // ...
   }
 
+  function renderTags() {
+    return (
+      <div className="mt-8">
+        <button
+          onClick={() => setIsTagsOpen(!isTagsOpen)}
+          className="w-full px-3 mb-2 flex items-center justify-between group hover:text-gray-600 outline-none"
+        >
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-hover:text-gray-500 transition-colors">
+            Tags
+          </span>
+          <ChevronRight
+            size={16}
+            className={clsx("text-gray-400 transition-transform duration-200", isTagsOpen && "rotate-90")}
+          />
+        </button>
+
+        {isTagsOpen && (
+          <div className="space-y-1">
+            {tagsLoading ? (
+              <div className="px-3 space-y-2">
+                {[1, 2].map(i => <div key={i} className="h-6 bg-gray-100 rounded animate-pulse" />)}
+              </div>
+            ) : tags?.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-400">
+                No tags yet
+              </div>
+            ) : (
+              tags?.map(tag => (
+                <Link
+                  key={tag.id}
+                  to={`/tags/${tag.id}`}
+                  onClick={() => setIsSidebarOpen(false)}
+                  className={clsx(
+                    "flex items-center gap-3 px-3 py-1.5 rounded-lg transition-colors text-sm text-gray-600 hover:bg-gray-100",
+                    location.pathname === `/tags/${tag.id}` && "bg-blue-50 text-blue-600"
+                  )}
+                >
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                  <span className="truncate">{tag.name}</span>
+                </Link>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  function renderLogout() {
+    return (
+      <div className="p-4 border-t border-gray-100 mt-auto space-y-1">
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-blue-600 w-full transition-colors"
+        >
+          <Settings size={20} />
+          <span className="whitespace-nowrap transition-opacity font-medium">Settings</span>
+        </button>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-red-600 w-full transition-colors"
+        >
+          <LogOut size={20} />
+          <span className="whitespace-nowrap transition-opacity font-medium">Logout</span>
+        </button>
+      </div>
+    )
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -222,7 +297,6 @@ export function Layout() {
       onDragOver={handleDragOver}
     >
       <div className="flex h-screen overflow-hidden bg-gray-50 flex-col md:flex-row">
-        {/* ... (keep existing layout structure) ... */}
         {/* Mobile Top Header */}
         <header className="md:hidden h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-30 pt-[env(safe-area-inset-top)]">
           <button
@@ -365,6 +439,8 @@ export function Layout() {
           <TaskDetailModal taskId={taskId} onClose={closeModal} />
         )}
 
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
       </div>
 
       <Toaster position="bottom-center" richColors />
@@ -382,67 +458,4 @@ export function Layout() {
       )}
     </DndContext>
   )
-
-
-  function renderTags() {
-    return (
-      <div className="mt-8">
-        <button
-          onClick={() => setIsTagsOpen(!isTagsOpen)}
-          className="w-full px-3 mb-2 flex items-center justify-between group hover:text-gray-600 outline-none"
-        >
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-hover:text-gray-500 transition-colors">
-            Tags
-          </span>
-          <ChevronRight
-            size={16}
-            className={clsx("text-gray-400 transition-transform duration-200", isTagsOpen && "rotate-90")}
-          />
-        </button>
-
-        {isTagsOpen && (
-          <div className="space-y-1">
-            {tagsLoading ? (
-              <div className="px-3 space-y-2">
-                {[1, 2].map(i => <div key={i} className="h-6 bg-gray-100 rounded animate-pulse" />)}
-              </div>
-            ) : tags?.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-400">
-                No tags yet
-              </div>
-            ) : (
-              tags?.map(tag => (
-                <Link
-                  key={tag.id}
-                  to={`/tags/${tag.id}`}
-                  onClick={() => setIsSidebarOpen(false)}
-                  className={clsx(
-                    "flex items-center gap-3 px-3 py-1.5 rounded-lg transition-colors text-sm text-gray-600 hover:bg-gray-100",
-                    location.pathname === `/tags/${tag.id}` && "bg-blue-50 text-blue-600"
-                  )}
-                >
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
-                  <span className="truncate">{tag.name}</span>
-                </Link>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  function renderLogout() {
-    return (
-      <div className="p-4 border-t border-gray-100 mt-auto">
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-red-600 w-full transition-colors"
-        >
-          <LogOut size={20} />
-          <span className="whitespace-nowrap transition-opacity">Logout</span>
-        </button>
-      </div>
-    )
-  }
 }

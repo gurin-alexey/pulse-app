@@ -5,8 +5,23 @@ import { DeadlineTasksWidget } from "@/features/dashboard/DeadlineTasksWidget"
 import { WeatherRatesWidget } from "@/features/dashboard/WeatherRatesWidget"
 import { Plus, LayoutGrid } from "lucide-react"
 import { toast } from "sonner"
+import { useSettings } from "@/store/useSettings"
 
 export function DashboardPage() {
+    const { settings } = useSettings()
+
+    // Default to visible if settings not yet loaded (prevents flicker if fast, or use isLoading)
+    // But since we want to respect user choice, if loaded, use it. If not, maybe show all or skeleton.
+    // For now, let's assume if settings is null, we show default true for all (Safe fallback).
+    const layout = settings?.dashboard_layout || {
+        greeting: true,
+        weather: true,
+        rates: true,
+        ai_chat: true,
+        quick_capture: true,
+        deadline_tasks: true
+    }
+
     return (
         <div className="h-full overflow-y-auto p-4 md:p-8 bg-gray-50/50">
             {/* Header */}
@@ -37,29 +52,39 @@ export function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
 
                 {/* 1. Greeting (Top-Left) */}
-                <div className="lg:col-span-2 h-[220px]">
-                    <GreetingWidget />
-                </div>
+                {layout.greeting && (
+                    <div className="lg:col-span-2 h-[220px]">
+                        <GreetingWidget />
+                    </div>
+                )}
 
                 {/* 2. AI Assistant (Center Column - Tall) */}
-                <div className="lg:col-span-1 lg:row-span-2 h-[500px] lg:h-auto">
-                    <AIAssistantWidget />
-                </div>
+                {layout.ai_chat && (
+                    <div className="lg:col-span-1 lg:row-span-2 h-[500px] lg:h-auto">
+                        <AIAssistantWidget />
+                    </div>
+                )}
 
                 {/* 3. Quick Note (Top-Right) */}
-                <div className="lg:col-span-1 h-[220px]">
-                    <QuickCaptureWidget />
-                </div>
+                {layout.quick_capture && (
+                    <div className="lg:col-span-1 h-[220px]">
+                        <QuickCaptureWidget />
+                    </div>
+                )}
 
                 {/* 4. Tasks (Bottom-Left) */}
-                <div className="lg:col-span-2 h-[300px]">
-                    <DeadlineTasksWidget />
-                </div>
+                {layout.deadline_tasks && (
+                    <div className="lg:col-span-2 h-[300px]">
+                        <DeadlineTasksWidget />
+                    </div>
+                )}
 
                 {/* 5. Weather (Bottom-Right) */}
-                <div className="lg:col-span-1 h-[300px]">
-                    <WeatherRatesWidget />
-                </div>
+                {(layout.weather || layout.rates) && (
+                    <div className="lg:col-span-1 h-[300px]">
+                        <WeatherRatesWidget />
+                    </div>
+                )}
 
             </div>
         </div>

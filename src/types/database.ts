@@ -52,8 +52,24 @@ export type Tag = {
     user_id: string
 }
 
+
 export type TaskTag = {
     task_id: string
     tag_id: string
     created_at: string
+}
+
+export type UserSettings = {
+    user_id: string
+    theme: 'light' | 'dark' | 'system'
+    dashboard_layout: Record<string, any>
+    preferences: {
+        openai_api_key?: string
+        start_of_week?: 'monday' | 'sunday'
+        language?: 'ru' | 'en'
+        show_completed_tasks?: boolean
+        [key: string]: any
+    }
+    created_at: string
+    updated_at: string
 }
