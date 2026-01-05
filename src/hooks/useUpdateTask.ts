@@ -131,35 +131,70 @@ export function useUpdateTask() {
             }
 
             const descendantIds = getDescendantIds(taskId, allCachedTasks)
-            const allTargetIds = [taskId, ...descendantIds]
 
-            // 3. Helper to update a list if it contains any of the target tasks
+            // 3. Separate updates
+            // Positional fields should ONLY apply to the primary task
+            const positionalFields = ['parent_id', 'sort_order', 'title', 'is_completed']
+            const positionalUpdates: any = {}
+            const contextualUpdates: any = {}
+
+            Object.entries(updates).forEach(([key, value]) => {
+                if (positionalFields.includes(key)) {
+                    positionalUpdates[key] = value
+                } else {
+                    contextualUpdates[key] = value
+                }
+            })
+
+            // If moving to a new parent, try to infer project/section from that parent in cache
+            if (updates.parent_id) {
+                const parentInCache = allCachedTasks.find(t => t.id === updates.parent_id)
+                if (parentInCache) {
+                    contextualUpdates.project_id = parentInCache.project_id
+                    contextualUpdates.section_id = parentInCache.section_id
+                }
+            }
+
+            // 4. Helper to update a list
             const updateList = (queryKey: readonly unknown[], list: Task[] | undefined) => {
                 if (!list) return
-                if (list.some(t => allTargetIds.includes(t.id))) {
+                const hasPrimary = list.some(t => t.id === taskId)
+                const hasDescendants = list.some(t => descendantIds.includes(t.id))
+
+                if (hasPrimary || hasDescendants) {
                     modifiedLists.push({ queryKey, data: list })
-                    queryClient.setQueryData(queryKey, list.map(t =>
-                        allTargetIds.includes(t.id) ? { ...t, ...updates } : t
-                    ))
+                    queryClient.setQueryData(queryKey, list.map(t => {
+                        if (t.id === taskId) {
+                            // Primary task gets BOTH positional and contextual updates
+                            return { ...t, ...positionalUpdates, ...contextualUpdates }
+                        }
+                        if (descendantIds.includes(t.id)) {
+                            // Descendants ONLY get contextual updates (they must keep their parent_id/sort_order)
+                            return { ...t, ...contextualUpdates }
+                        }
+                        return t
+                    }))
                 }
             }
 
             // Update All Tasks (Calendar)
             if (previousAllTasks) {
                 queryClient.setQueryData<Task[]>(['all-tasks'], old =>
-                    old?.map(t => allTargetIds.includes(t.id) ? { ...t, ...updates } : t) || []
+                    old?.map(t => {
+                        if (t.id === taskId) return { ...t, ...positionalUpdates, ...contextualUpdates }
+                        if (descendantIds.includes(t.id)) return { ...t, ...contextualUpdates }
+                        return t
+                    }) || []
                 )
             }
 
-            // Update 'task'
+            // Update 'task' (Detail view)
             if (previousTask) {
-                queryClient.setQueryData<Task>(['task', taskId], { ...previousTask, ...updates })
+                queryClient.setQueryData<Task>(['task', taskId], { ...previousTask, ...positionalUpdates, ...contextualUpdates })
             }
 
-            // Update all found project lists
+            // Update project/subtask lists
             tasksQueries.forEach(([queryKey, data]) => updateList(queryKey, data))
-
-            // Update all found subtask lists
             subtasksQueries.forEach(([queryKey, data]) => updateList(queryKey, data))
 
             return { previousTask, previousAllTasks, modifiedLists }
