@@ -9,15 +9,22 @@ import { motion } from "framer-motion"
 import { addDays, nextMonday, format, startOfToday } from "date-fns"
 import { toast } from "sonner"
 
+import { differenceInCalendarDays } from "date-fns"
+import { ChevronRight, ChevronDown } from "lucide-react"
+
 interface TaskItemProps {
     task: any
     isActive: boolean
     depth?: number
     listeners?: any
     attributes?: any
+    hasChildren?: boolean
+    isCollapsed?: boolean
+    onToggleCollapse?: () => void
+    disableAnimation?: boolean
 }
 
-export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: TaskItemProps) {
+export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation }: TaskItemProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
@@ -35,7 +42,6 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: T
     }, [task.title])
 
     const handleTaskClick = (e: React.MouseEvent) => {
-        // Don't open if editing or clicking checkboxes/tags
         if (isEditing) return
         setSearchParams({ task: task.id })
     }
@@ -55,7 +61,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: T
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            (e.currentTarget as HTMLTextAreaElement).blur() // Triggers onBlur -> saveTitle
+            (e.currentTarget as HTMLTextAreaElement).blur()
         }
 
         // Date Shortcuts: Alt + 1, 2, 3, 0
@@ -85,116 +91,115 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: T
             }
 
             e.preventDefault()
-
             const dateStr = newDate ? format(newDate, 'yyyy-MM-dd') : null
-
-            updateTask({
-                taskId: task.id,
-                updates: { due_date: dateStr }
-            })
-
+            updateTask({ taskId: task.id, updates: { due_date: dateStr } })
             toast.success(toastMessage, { duration: 1500 })
         }
     }
 
+    // Helper for relative date
+    const getRelativeDate = (dateStr: string) => {
+        const date = new Date(dateStr)
+        const today = startOfToday()
+        const diff = differenceInCalendarDays(date, today)
+
+        if (diff === 0) return <span className="text-green-600 font-medium">Сегодня</span>
+        if (diff === 1) return <span className="text-gray-500">Завтра</span>
+        if (diff > 1) return <span className="text-gray-500">{diff} дн.</span>
+        if (diff < 0) return <span className="text-red-500 font-medium">{diff} дн.</span> // Past
+        return null
+    }
+
     return (
         <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-            className="mb-2 relative"
-            style={{ marginLeft: `${depth * 24}px` }}
+            initial={disableAnimation ? false : { opacity: 0, y: 5 }}
+            animate={disableAnimation ? false : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.1 }}
+            className="group relative"
+            style={{ marginLeft: `${depth * 24}px` }} // Indentation for hierarchy
         >
             <div
                 onClick={handleTaskClick}
                 className={clsx(
-                    "flex items-start p-3 border rounded-lg transition-colors group bg-white w-full shadow-sm",
-                    isActive ? "bg-blue-50 border-blue-200" : "border-gray-100 hover:bg-gray-50",
-                    task.is_completed && "opacity-60"
+                    "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent", // h-9 = 36px fixed height, added transparent border for sizing consistency
+                    isActive ? "bg-blue-50/80 !border-blue-100" : "hover:bg-gray-100/60",
+                    task.is_completed && "opacity-50"
                 )}
             >
-                {/* Drag Handle */}
+                {/* Drag Handle (Hidden by default, visible on hover) */}
                 <div
                     {...listeners}
                     {...attributes}
-                    className={clsx(
-                        "mt-1 mr-2 p-1 -ml-2 touch-none transition-colors rounded hover:bg-black/5",
-                        "cursor-move active:cursor-grabbing",
-                        isActive ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"
-                    )}
-                    onPointerDown={e => {
-                        listeners?.onPointerDown?.(e)
-                        e.stopPropagation()
-                    }}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-gray-600 cursor-move transition-opacity -ml-1"
                 >
-                    <GripVertical size={18} />
+                    <GripVertical size={14} />
                 </div>
 
                 {/* Checkbox */}
                 <button
-                    onClick={(e) => toggleStatus(e)}
-                    className={clsx("mt-0.5 mr-3 transition-colors", task.is_completed ? "text-green-500" : "text-gray-300 hover:text-gray-500")}
+                    onClick={toggleStatus}
+                    className={clsx("transition-colors", task.is_completed ? "text-gray-400" : "text-gray-300 hover:text-gray-500")}
                 >
-                    {task.is_completed ? <CheckSquare size={22} /> : <Square size={22} />}
+                    {task.is_completed ? <CheckSquare size={18} /> : <Square size={18} />}
                 </button>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                    <div className="flex flex-col gap-1">
-                        <TextareaAutosize
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            onBlur={saveTitle}
-                            onKeyDown={handleKeyDown}
-                            onFocus={() => setIsEditing(true)}
-                            onClick={(e) => e.stopPropagation()} // Prevent opening details when clicking to edit
-                            minRows={1}
-                            className={clsx(
-                                "w-full resize-none bg-transparent border-none p-0 focus:ring-0 leading-tight",
-                                "block overflow-hidden", // Important for TextareaAutosize
-                                task.is_completed ? "text-gray-400 line-through" : "text-gray-700",
-                                task.is_project ? "uppercase tracking-wide font-bold text-sm" : "font-medium"
-                            )}
-                        />
-
-                        <div className="flex items-center gap-2 min-h-[16px]">
-                            {/* Tags */}
-                            <div className="flex items-center gap-1">
-                                {task.tags?.map((tag: any) => (
-                                    <div key={tag.id} className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} title={tag.name} />
-                                ))}
-                            </div>
-
-                            {/* Meta Info */}
-                            <div className="flex items-center gap-3 text-xs">
-                                {task.due_date && (
-                                    <div
-                                        className="flex items-center gap-1 cursor-help"
-                                        title="Tip: Alt+1 (Today), Alt+2 (Tomorrow), Alt+3 (Next Week)"
-                                    >
-                                        <Calendar size={12} className={clsx(
-                                            new Date(task.due_date) < new Date() && !task.is_completed ? "text-red-500" : "text-gray-400"
-                                        )} />
-                                        <span className={clsx(
-                                            new Date(task.due_date) < new Date() && !task.is_completed ? "text-red-500 font-medium" : "text-gray-400"
-                                        )}>
-                                            {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                        </span>
-                                    </div>
-                                )}
-                                {task.start_time && (
-                                    <span className="text-gray-400">
-                                        {new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                {/* Title (Flex 1, Truncate) */}
+                <div className="flex-1 min-w-0 flex items-center self-stretch">
+                    <TextareaAutosize
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        onBlur={saveTitle}
+                        onKeyDown={handleKeyDown}
+                        onFocus={() => {
+                            setIsEditing(true)
+                            setSearchParams({ task: task.id })
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        minRows={1}
+                        className={clsx(
+                            "w-full bg-transparent border-0 outline-none focus:ring-0 p-0 leading-tight resize-none",
+                            "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
+                            task.is_completed ? "text-gray-400 line-through" : "text-gray-700 font-medium"
+                        )}
+                        spellCheck={false}
+                    />
                 </div>
 
-                {/* Details Button (Chevron) */}
-                <div className="ml-2 text-gray-300 group-hover:text-blue-500 transition-colors cursor-pointer">
-                    {/* We can use something visual here or just let the whole row be clickable (except textarea) */}
+                {/* Right Side: Tags & Date */}
+                <div className="flex items-center gap-3 shrink-0">
+                    {/* Tags (Dots) */}
+                    <div className="flex items-center -space-x-1">
+                        {task.tags?.map((tag: any) => (
+                            <div key={tag.id} className="w-2 h-2 rounded-full ring-2 ring-white" style={{ backgroundColor: tag.color }} title={tag.name} />
+                        ))}
+                    </div>
+
+                    {/* Compact Date */}
+                    {task.due_date && (
+                        <div
+                            className="text-xs tabular-nums cursor-help"
+                            title={format(new Date(task.due_date), 'dd MMM yyyy')}
+                        >
+                            {getRelativeDate(task.due_date)}
+                        </div>
+                    )}
+
+                    {/* Chevron (Right Side) */}
+                    <div
+                        className={clsx(
+                            "w-6 h-6 flex items-center justify-center cursor-pointer transition-transform hover:bg-gray-200 rounded shrink-0",
+                            !hasChildren && "invisible pointer-events-none",
+                            isCollapsed ? "" : "rotate-90"
+                        )}
+                        onClick={(e) => {
+                            if (hasChildren && onToggleCollapse) {
+                                e.stopPropagation()
+                                onToggleCollapse()
+                            }
+                        }}
+                    >
+                        <ChevronRight size={16} className="text-gray-400" />
+                    </div>
                 </div>
             </div>
         </motion.div>

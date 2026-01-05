@@ -7,6 +7,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TaskItem } from './TaskItem'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import clsx from 'clsx'
 
 function SortableSubtaskItem({ task }: { task: any }) {
     const {
@@ -21,25 +22,38 @@ function SortableSubtaskItem({ task }: { task: any }) {
     const style = {
         transform: CSS.Translate.toString(transform),
         transition,
-        opacity: isDragging ? 0.3 : 1,
-        zIndex: isDragging ? 999 : 'auto'
+        zIndex: isDragging ? 0 : 'auto'
     }
 
     return (
-        <div ref={setNodeRef} style={style} className="touch-none">
-            <TaskItem
-                task={task}
-                isActive={isDragging}
-                listeners={listeners}
-                attributes={attributes}
-            />
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={clsx(
+                "touch-none rounded-md transition-all",
+                isDragging && "bg-blue-50/20 outline outline-2 outline-dashed outline-blue-300 -outline-offset-2"
+            )}
+        >
+            <div className={isDragging ? "opacity-0" : ""}>
+                <TaskItem
+                    task={task}
+                    isActive={isDragging}
+                    listeners={listeners}
+                    attributes={attributes}
+                />
+            </div>
         </div>
     )
 }
 
-export function SubtaskList({ taskId, projectId }: { taskId: string; projectId: string | null }) {
+import { useUpdateTask } from '@/hooks/useUpdateTask'
+
+// ... existing imports ...
+
+export function SubtaskList({ taskId, projectId, isProject }: { taskId: string; projectId: string | null; isProject: boolean }) {
     const { data: subtasks, isLoading } = useSubtasks(taskId)
     const { mutate: createTask } = useCreateTask()
+    const { mutate: updateTask } = useUpdateTask()
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
 
     const completedCount = subtasks?.filter(t => t.is_completed).length || 0
@@ -59,7 +73,12 @@ export function SubtaskList({ taskId, projectId }: { taskId: string; projectId: 
             userId: user.id,
             parentId: taskId
         }, {
-            onSuccess: () => setNewSubtaskTitle('')
+            onSuccess: () => {
+                setNewSubtaskTitle('')
+                if (!isProject) {
+                    updateTask({ taskId, updates: { is_project: true } })
+                }
+            }
         })
     }
 

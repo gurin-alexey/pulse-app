@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Settings2, CheckCircle2, Circle, Calendar, SortAsc, LayoutList } from 'lucide-react'
 import clsx from 'clsx'
 
-export type SortOption = 'date_created' | 'due_date' | 'alphabetical'
+export type SortOption = 'manual' | 'date_created' | 'due_date' | 'alphabetical'
 export type GroupOption = 'none' | 'date' | 'status'
 
 type ViewOptionsProps = {
@@ -71,6 +71,12 @@ export function ViewOptions({
                     <div className="px-3 py-2">
                         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Sort By</div>
                         <div className="space-y-1">
+                            <button
+                                onClick={() => setSortBy('manual')}
+                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", sortBy === 'manual' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
+                            >
+                                <SortAsc size={16} /> Manual
+                            </button>
                             <button
                                 onClick={() => setSortBy('date_created')}
                                 className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", sortBy === 'date_created' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}

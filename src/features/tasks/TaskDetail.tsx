@@ -281,7 +281,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                         placeholder="Add a description..."
                     />
 
-                    <SubtaskList taskId={task.id} projectId={task.project_id} />
+                    <SubtaskList taskId={task.id} projectId={task.project_id} isProject={task.is_project} />
                 </div>
             </div>
 
