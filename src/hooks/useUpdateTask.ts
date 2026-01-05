@@ -158,22 +158,51 @@ export function useUpdateTask() {
             // 4. Helper to update a list
             const updateList = (queryKey: readonly unknown[], list: Task[] | undefined) => {
                 if (!list) return
+                const filter = (queryKey[1] as any) || {}
+
+                // Determine if the updated primary task should be in THIS list
+                const matchesFilter = (task: any) => {
+                    if (filter.type === 'project') return task.project_id === filter.projectId
+                    if (filter.type === 'inbox') return task.project_id === null
+                    if (filter.type === 'today') {
+                        const today = new Date().toISOString().split('T')[0]
+                        return task.due_date === today
+                    }
+                    return true // default for others
+                }
+
+                const updatedPrimary = { ...allCachedTasks.find(t => t.id === taskId), ...positionalUpdates, ...contextualUpdates } as Task
+                const shouldBeInList = matchesFilter(updatedPrimary)
+
                 const hasPrimary = list.some(t => t.id === taskId)
                 const hasDescendants = list.some(t => descendantIds.includes(t.id))
 
-                if (hasPrimary || hasDescendants) {
+                if (hasPrimary || hasDescendants || (shouldBeInList && filter.type)) {
                     modifiedLists.push({ queryKey, data: list })
-                    queryClient.setQueryData(queryKey, list.map(t => {
-                        if (t.id === taskId) {
-                            // Primary task gets BOTH positional and contextual updates
-                            return { ...t, ...positionalUpdates, ...contextualUpdates }
-                        }
-                        if (descendantIds.includes(t.id)) {
-                            // Descendants ONLY get contextual updates (they must keep their parent_id/sort_order)
-                            return { ...t, ...contextualUpdates }
-                        }
+
+                    let newList = list.map(t => {
+                        if (t.id === taskId) return updatedPrimary
+                        if (descendantIds.includes(t.id)) return { ...t, ...contextualUpdates }
                         return t
-                    }))
+                    })
+
+                    // Handle Migration (Add/Remove)
+                    if (shouldBeInList && !hasPrimary && filter.type) {
+                        // ADD to new list (approximate position)
+                        newList = [...newList, updatedPrimary]
+                        // Also add descendants to the new list cache if they aren't there
+                        descendantIds.forEach(did => {
+                            if (!newList.some(t => t.id === did)) {
+                                const dTask = allCachedTasks.find(t => t.id === did)
+                                if (dTask) newList.push({ ...dTask, ...contextualUpdates })
+                            }
+                        })
+                    } else if (!shouldBeInList && hasPrimary) {
+                        // REMOVE from old list
+                        newList = newList.filter(t => t.id !== taskId && !descendantIds.includes(t.id))
+                    }
+
+                    queryClient.setQueryData(queryKey, newList)
                 }
             }
 
