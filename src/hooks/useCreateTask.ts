@@ -11,6 +11,8 @@ type CreateTaskParams = {
     due_date?: string | null
     start_time?: string | null
     end_time?: string | null
+    description?: string | null
+    priority?: string | null
 }
 
 /**
@@ -21,7 +23,7 @@ export function useCreateTask() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async ({ title, projectId, userId, parentId, sectionId, due_date, start_time, end_time }: CreateTaskParams) => {
+        mutationFn: async ({ title, projectId, userId, parentId, sectionId, due_date, start_time, end_time, description, priority }: CreateTaskParams) => {
             const { data, error } = await supabase
                 .from('tasks')
                 .insert({
@@ -32,7 +34,9 @@ export function useCreateTask() {
                     section_id: sectionId || null,
                     due_date: due_date || null,
                     start_time: start_time || null,
-                    end_time: end_time || null
+                    end_time: end_time || null,
+                    description: description || null,
+                    priority: priority || 'low'
                 })
                 .select()
                 .single()

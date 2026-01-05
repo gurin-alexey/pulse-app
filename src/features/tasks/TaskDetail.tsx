@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import TextareaAutosize from 'react-textarea-autosize'
 import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
+import { useCreateTask } from '@/hooks/useCreateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
 import { X, Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp, Flag, Repeat } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
@@ -13,6 +14,7 @@ import { Folder } from 'lucide-react'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover'
 import { format } from 'date-fns'
+import { addExDateToRRule } from '@/utils/recurrence'
 
 type TaskDetailProps = {
     taskId: string
@@ -22,6 +24,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const [searchParams, setSearchParams] = useSearchParams()
     const { data: task, isLoading } = useTask(taskId)
     const { mutate: updateTask } = useUpdateTask()
+    const { mutate: createTask } = useCreateTask()
     const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask()
     const { data: projects } = useProjects()
 
@@ -31,6 +34,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     // Local state for auto-save inputs
     const [title, setTitle] = useState('')
     const [description, setDescription] = useState('')
+
+    // Instance handling (for recurrence)
+    const occurrence = searchParams.get('occurrence')
 
     // Sync local state when task loads
     useEffect(() => {
@@ -62,6 +68,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         const newParams = new URLSearchParams(searchParams)
         newParams.delete('task')
         newParams.delete('isNew')
+        newParams.delete('occurrence')
         setSearchParams(newParams)
     }
 
@@ -88,6 +95,42 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         deleteTask(taskId)
     }
 
+    const handleDetachInstance = () => {
+        if (!task || !occurrence) return
+
+        const occDate = new Date(occurrence as string)
+
+        // 1. Update original task to exclude this date
+        const newRule = addExDateToRRule(task.recurrence_rule || '', occDate)
+        updateTask({ taskId, updates: { recurrence_rule: newRule } })
+
+        // 2. Create new standalone task at the instance position
+        const dateStr = format(occDate, 'yyyy-MM-dd')
+
+        let endTime = null
+        if (task.start_time && task.end_time) {
+            const start = new Date(task.start_time)
+            const end = new Date(task.end_time)
+            const duration = end.getTime() - start.getTime()
+            endTime = new Date(occDate.getTime() + duration).toISOString()
+        }
+
+        createTask({
+            title: task.title,
+            description: task.description,
+            priority: task.priority,
+            projectId: task.project_id,
+            userId: task.user_id,
+            due_date: dateStr,
+            start_time: task.start_time ? occDate.toISOString() : null,
+            end_time: endTime
+        }, {
+            onSuccess: (nt: any) => {
+                setSearchParams({ task: nt.id })
+            }
+        })
+    }
+
     if (isLoading) {
         return (
             <div className="h-full flex items-center justify-center text-gray-400">
@@ -109,8 +152,6 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     // We can use a separate useTask call for the parent, or lightweight fetch
     // Since we need it reactive, useTask is fine.
     const { data: parentTask } = useTask(task?.parent_id || '')
-
-    // ... (keep existing effects)
 
     const handleBreadcrumbClick = () => {
         if (task?.parent_id) {
@@ -136,6 +177,22 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             </div>
                         )}
                     </div>
+
+                    {/* Occurrence Detach Banner */}
+                    {occurrence && task.recurrence_rule && (
+                        <div className="mb-2 p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between transition-all animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center gap-2.5 text-blue-700">
+                                <Repeat size={16} className="shrink-0" />
+                                <span className="text-sm font-medium">Это повторение задачи за {format(new Date(occurrence), 'd MMM')}</span>
+                            </div>
+                            <button
+                                onClick={handleDetachInstance}
+                                className="px-3 py-1 bg-white border border-blue-200 text-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-50 transition-colors shadow-sm active:scale-95 transition-transform"
+                            >
+                                Сделать отдельной
+                            </button>
+                        </div>
+                    )}
 
                     {/* Task Header (No Frame) */}
                     <div className="group/card">

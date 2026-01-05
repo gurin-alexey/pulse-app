@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
 import { useState, useEffect, useRef } from "react"
-import { generateRecurringInstances } from "@/utils/recurrence"
+import { generateRecurringInstances, addExDateToRRule } from "@/utils/recurrence"
 
 export function CalendarPage() {
     const { data: tasks, isLoading } = useAllTasks()
@@ -110,7 +110,9 @@ export function CalendarPage() {
                 description: task.description,
                 isCompleted: task.is_completed,
                 originalId: task.original_id || task.id,
-                isVirtual: task.is_virtual || false
+                isVirtual: task.is_virtual || false,
+                occurrenceDate: task.occurrence_date || null,
+                priority: task.priority
             }
         }
     }
@@ -141,14 +143,35 @@ export function CalendarPage() {
     }
 
     const handleEventDrop = (info: any) => {
-        // If virtual, we probably want to update the master task's recurrence or move THIS specific instance.
-        // Moving a specific instance of a recurring task usually requires creating an "exception".
-        // For MVP, we'll inhibit moving virtual instances or just move the master (which moves ALL future ones).
-        // Best for now: open detail view.
+        // DETACH LOGIC
         if (info.event.extendedProps.isVirtual) {
-            info.revert()
-            setSearchParams({ task: info.event.extendedProps.originalId })
-            return
+            const originalId = info.event.extendedProps.originalId
+            const occurrenceDate = info.event.extendedProps.occurrenceDate
+            const originalTask = tasks?.find(t => t.id === originalId)
+
+            if (originalTask && occurrenceDate) {
+                // 1. Update original task to exclude this date
+                const newRule = addExDateToRRule(originalTask.recurrence_rule || '', new Date(occurrenceDate as string))
+                updateTask({ taskId: originalId, updates: { recurrence_rule: newRule } })
+
+                // 2. Create new standalone task at the NEW position
+                const d = info.event.start
+                const dateStr = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null
+
+                createTask({
+                    title: originalTask.title,
+                    description: originalTask.description,
+                    priority: originalTask.priority,
+                    projectId: originalTask.project_id,
+                    userId: originalTask.user_id,
+                    due_date: dateStr,
+                    start_time: info.event.start?.toISOString() || null,
+                    end_time: info.event.end?.toISOString() || null
+                }, {
+                    onSuccess: (nt: any) => setSearchParams({ task: nt.id })
+                })
+                return
+            }
         }
 
         const taskId = info.event.id
@@ -195,10 +218,33 @@ export function CalendarPage() {
     }
 
     const handleEventResize = (info: any) => {
+        // DETACH LOGIC for Resize
         if (info.event.extendedProps.isVirtual) {
-            info.revert()
-            setSearchParams({ task: info.event.extendedProps.originalId })
-            return
+            const originalId = info.event.extendedProps.originalId
+            const occurrenceDate = info.event.extendedProps.occurrenceDate
+            const originalTask = tasks?.find(t => t.id === originalId)
+
+            if (originalTask && occurrenceDate) {
+                const newRule = addExDateToRRule(originalTask.recurrence_rule || '', new Date(occurrenceDate as string))
+                updateTask({ taskId: originalId, updates: { recurrence_rule: newRule } })
+
+                const d = info.event.start
+                const dateStr = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : null
+
+                createTask({
+                    title: originalTask.title,
+                    description: originalTask.description,
+                    priority: originalTask.priority,
+                    projectId: originalTask.project_id,
+                    userId: originalTask.user_id,
+                    due_date: dateStr,
+                    start_time: info.event.start?.toISOString() || null,
+                    end_time: info.event.end?.toISOString() || null
+                }, {
+                    onSuccess: (nt: any) => setSearchParams({ task: nt.id })
+                })
+                return
+            }
         }
 
         const taskId = info.event.id
@@ -225,7 +271,12 @@ export function CalendarPage() {
                 (popover as HTMLElement).remove() // Fallback
             }
         }
-        setSearchParams({ task: info.event.extendedProps.originalId })
+
+        const params: any = { task: info.event.extendedProps.originalId }
+        if (info.event.extendedProps.isVirtual) {
+            params.occurrence = info.event.extendedProps.occurrenceDate
+        }
+        setSearchParams(params)
     }
 
     // Custom Mobile Header Handlers
