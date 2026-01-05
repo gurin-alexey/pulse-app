@@ -14,9 +14,11 @@ import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useProjects } from "@/hooks/useProjects"
 import { useProjectGroups } from "@/hooks/useProjectGroups"
 import { useUpdateProject } from "@/hooks/useUpdateProject"
+import { TaskItem } from "@/features/tasks/TaskItem"
+import { createPortal } from "react-dom"
 
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, type DragEndEvent, closestCorners, closestCenter, pointerWithin, rectIntersection } from '@dnd-kit/core'
+import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, type DragEndEvent, closestCorners, closestCenter, pointerWithin, rectIntersection, DragOverlay } from '@dnd-kit/core'
 
 export function Layout() {
   const isDesktop = useMediaQuery("(min-width: 768px)")
@@ -124,11 +126,19 @@ export function Layout() {
   // Global Mutations
   const { mutate: updateTask } = useUpdateTask()
 
+  // Drag state
+  const [activeTask, setActiveTask] = useState<any>(null)
+
+  const handleDragStart = (event: any) => {
+    setActiveTask(event.active.data.current?.task)
+  }
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTask(null)
     const { active, over } = event
-
+    // ... rest of existing logic
     if (!over) return
-
+    // ...
     const activeTask = active.data.current?.task
     if (!activeTask) return
 
@@ -195,21 +205,19 @@ export function Layout() {
   }
 
   const handleDragOver = (event: any) => {
-    const { over } = event
-    if (over) {
-      console.log('Global Drag Over:', over.id, over.data.current?.type)
-    }
+    // ...
   }
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={customCollisionDetection}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
     >
       <div className="flex h-screen overflow-hidden bg-gray-50 flex-col md:flex-row">
-
+        {/* ... (keep existing layout structure) ... */}
         {/* Mobile Top Header */}
         <header className="md:hidden h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-30 pt-[env(safe-area-inset-top)]">
           <button
@@ -314,6 +322,18 @@ export function Layout() {
         )}
 
       </div>
+
+      {/* Global Drag Overlay */}
+      {createPortal(
+        <DragOverlay>
+          {activeTask ? (
+            <div className="opacity-90 rotate-2 cursor-grabbing pointer-events-none">
+              <TaskItem task={activeTask} isActive={true} />
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body
+      )}
     </DndContext>
   )
 

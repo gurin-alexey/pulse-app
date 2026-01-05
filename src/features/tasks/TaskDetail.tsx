@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
+import TextareaAutosize from 'react-textarea-autosize'
 import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
-import { X, Loader2, CheckCircle2, Circle, Trash2, Calendar as CalendarIcon } from 'lucide-react'
+import { X, Loader2, CheckCircle2, Circle, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { SubtaskList } from './SubtaskList'
@@ -126,184 +127,214 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         )
     }
 
+    // Breadcrumb Data
+    // We can use a separate useTask call for the parent, or lightweight fetch
+    // Since we need it reactive, useTask is fine.
+    const { data: parentTask } = useTask(task?.parent_id || '')
+
+    // ... (keep existing effects)
+
+    const handleBreadcrumbClick = () => {
+        if (task?.parent_id) {
+            setSearchParams({ task: task.parent_id })
+        }
+    }
+
+
+
     return (
-        <div className="h-full flex flex-col bg-white">
-            {/* Header */}
-            <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100 shrink-0">
-                <div className="flex items-center gap-4">
-                    {/* Checkbox / Status toggle */}
-                    <button
-                        onClick={toggleStatus}
-                        className={clsx("transition-colors", task.is_completed ? "text-green-500" : "text-gray-400 hover:text-gray-600")}
-                    >
-                        {task.is_completed ? <CheckCircle2 size={24} /> : <Circle size={24} />}
-                    </button>
+        <div className="h-full flex flex-col bg-white overflow-hidden relative">
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-24">
+                <div className="mb-6 space-y-4">
+                    {/* Top Row: Breadcrumbs (Left) + Date/Time (Right) */}
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                        {/* Breadcrumbs */}
+                        <div>
+                            {task.parent_id && parentTask && (
+                                <div
+                                    onClick={handleBreadcrumbClick}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 hover:text-blue-600 cursor-pointer w-fit transition-all group"
+                                >
+                                    <ArrowUp size={16} className="text-gray-500 group-hover:text-blue-500" />
+                                    <span className="font-medium text-sm truncate max-w-[300px]">{parentTask.title}</span>
+                                </div>
+                            )}
+                        </div>
 
-                    <span className="text-xs text-gray-400 uppercase font-semibold">
-                        {task.is_completed ? 'Completed' : 'Open'}
-                    </span>
-                </div>
+                        {/* Date & Time (moved from footer) */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
+                                <CalendarIcon size={16} className="text-gray-400" />
+                                <input
+                                    type="date"
+                                    value={task.due_date ? task.due_date.split('T')[0] : ''}
+                                    onChange={handleDateChange}
+                                    className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm"
+                                />
+                            </div>
 
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={handleDelete}
-                        disabled={isDeleting}
-                        className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                        title="Delete task"
-                    >
-                        {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
-                    </button>
-                    <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-50">
-                        <X size={20} />
-                    </button>
+                            {/* Time Picker */}
+                            {task.due_date && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
+                                    <input
+                                        type="time"
+                                        value={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
+                                        onChange={(e) => {
+                                            const time = e.target.value
+                                            if (!time) return
+
+                                            const datePart = task.due_date ? task.due_date.split('T')[0] : null
+                                            if (!datePart) return
+
+                                            const newStart = `${datePart}T${time}:00`
+                                            const startDate = new Date(newStart)
+
+                                            let endDateStr = task.end_time
+                                            if (!endDateStr) {
+                                                endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
+                                            } else {
+                                                const currentEnd = new Date(endDateStr)
+                                                if (currentEnd <= startDate) {
+                                                    endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
+                                                }
+                                            }
+
+                                            updateTask({
+                                                taskId,
+                                                updates: {
+                                                    start_time: startDate.toISOString(),
+                                                    end_time: endDateStr
+                                                }
+                                            })
+                                        }}
+                                        className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm w-[46px]"
+                                    />
+                                    {task.start_time && (
+                                        <>
+                                            <span className="text-gray-400">-</span>
+                                            <input
+                                                type="time"
+                                                value={task.end_time ? new Date(task.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
+                                                onChange={(e) => {
+                                                    const time = e.target.value
+                                                    if (!time) return
+
+                                                    const datePart = task.due_date ? task.due_date.split('T')[0] : null
+                                                    if (!datePart) return
+
+                                                    const newEnd = `${datePart}T${time}:00`
+                                                    updateTask({
+                                                        taskId,
+                                                        updates: {
+                                                            end_time: new Date(newEnd).toISOString()
+                                                        }
+                                                    })
+                                                }}
+                                                className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm w-[46px]"
+                                            />
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                        {/* Checkbox */}
+                        <button
+                            onClick={toggleStatus}
+                            className={clsx("mt-1.5 transition-colors shrink-0", task.is_completed ? "text-green-500" : "text-gray-300 hover:text-gray-500")}
+                        >
+                            {task.is_completed ? <CheckCircle2 size={24} /> : <Circle size={24} />}
+                        </button>
+
+                        <TextareaAutosize
+                            autoFocus={searchParams.get('isNew') === 'true'}
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onBlur={handleTitleBlur}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    (e.target as HTMLTextAreaElement).blur();
+                                }
+                            }}
+                            className="w-full text-2xl font-bold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-tight"
+                            placeholder="Task title"
+                            minRows={1}
+                        />
+                    </div>
+
+                    <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        onBlur={handleDescriptionBlur}
+                        className="w-full min-h-[120px] resize-none text-gray-600 border-none focus:ring-0 p-1 text-base leading-relaxed placeholder:text-gray-300 ml-9"
+                        placeholder="Add a description..."
+                    />
+
+                    <SubtaskList taskId={task.id} projectId={task.project_id} />
                 </div>
             </div>
 
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-6">
-                <div className="mb-6 space-y-4">
-                    <input
-                        autoFocus={searchParams.get('isNew') === 'true'}
-                        type="text"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        onBlur={handleTitleBlur}
-                        className="w-full text-2xl font-bold border-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300"
-                        placeholder="Task title"
-                    />
+            {/* Footer */}
+            <div className="absolute bottom-0 left-0 w-full px-6 py-4 bg-white/95 backdrop-blur-sm border-t border-gray-100 flex items-center justify-between gap-4 z-20">
+                {/* Meta Controls (Left) */}
+                <div className="flex flex-wrap items-center gap-4">
 
-                    {/* Meta Controls */}
-                    <div className="flex flex-wrap items-center gap-4">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
-                            <CalendarIcon size={16} className="text-gray-400" />
-                            <input
-                                type="date"
-                                value={task.due_date ? task.due_date.split('T')[0] : ''}
-                                onChange={handleDateChange}
-                                className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm"
-                            />
-                        </div>
 
-                        {/* Time Picker */}
-                        {task.due_date && (
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
-                                <input
-                                    type="time"
-                                    value={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
-                                    onChange={(e) => {
-                                        const time = e.target.value
-                                        if (!time) return
+                    {/* Project Picker */}
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors relative group/project">
+                        <Folder size={16} className="text-gray-400" />
+                        <select
+                            value={task.project_id || ''}
+                            onChange={(e) => {
+                                const pid = e.target.value || null
+                                if (pid !== task.project_id) {
+                                    updateTask({ taskId, updates: { project_id: pid ?? undefined, section_id: null as any } })
+                                }
+                            }}
+                            className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm appearance-none pr-4 min-w-[60px]"
+                        >
+                            <option value="">Inbox</option>
+                            <optgroup label="Projects">
+                                {projects?.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </optgroup>
+                        </select>
+                    </div>
 
-                                        const datePart = task.due_date ? task.due_date.split('T')[0] : null
-                                        if (!datePart) return
+                    {/* Tag Manager */}
+                    <TagManager taskId={task.id} />
 
-                                        const newStart = `${datePart}T${time}:00`
-                                        const startDate = new Date(newStart)
-
-                                        let endDateStr = task.end_time
-                                        if (!endDateStr) {
-                                            endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
-                                        } else {
-                                            const currentEnd = new Date(endDateStr)
-                                            if (currentEnd <= startDate) {
-                                                endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
-                                            }
-                                        }
-
-                                        updateTask({
-                                            taskId,
-                                            updates: {
-                                                start_time: startDate.toISOString(),
-                                                end_time: endDateStr
-                                            }
-                                        })
-                                    }}
-                                    className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm w-[46px]"
-                                />
-                                {task.start_time && (
-                                    <>
-                                        <span className="text-gray-400">-</span>
-                                        <input
-                                            type="time"
-                                            value={task.end_time ? new Date(task.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
-                                            onChange={(e) => {
-                                                const time = e.target.value
-                                                if (!time) return
-
-                                                const datePart = task.due_date ? task.due_date.split('T')[0] : null
-                                                if (!datePart) return
-
-                                                const newEnd = `${datePart}T${time}:00`
-                                                updateTask({
-                                                    taskId,
-                                                    updates: {
-                                                        end_time: new Date(newEnd).toISOString()
-                                                    }
-                                                })
-                                            }}
-                                            className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm w-[46px]"
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Project Picker */}
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors relative group/project">
-                            <Folder size={16} className="text-gray-400" />
-                            <select
-                                value={task.project_id || ''}
-                                onChange={(e) => {
-                                    const pid = e.target.value || null
-                                    if (pid !== task.project_id) {
-                                        updateTask({ taskId, updates: { project_id: pid ?? undefined, section_id: null as any } })
-                                    }
-                                }}
-                                className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm appearance-none pr-4 min-w-[60px]"
-                            >
-                                <option value="">Inbox</option>
-                                <optgroup label="Projects">
-                                    {projects?.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
-                                </optgroup>
-                            </select>
-                        </div>
-
-                        {/* Tag Manager */}
-                        <TagManager taskId={task.id} />
-
-                        {/* Project Type Toggle (GTD logic) */}
-                        <div className="flex items-center gap-2 border-l border-gray-100 pl-4 py-1">
-                            <button
-                                onClick={() => updateTask({ taskId, updates: { is_project: !task.is_project } as any })}
-                                className={clsx(
-                                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
-                                    task.is_project
-                                        ? "bg-blue-600 text-white shadow-sm"
-                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                )}
-                                title="Mark as Project"
-                            >
-                                {task.is_project ? "PROJECT" : "Task"}
-                            </button>
-                            <span className="text-[10px] text-gray-400 font-medium leading-none hidden sm:inline">
-                                {task.is_project ? "Multi-step" : "Single-step"}
-                            </span>
-                        </div>
+                    {/* Project Type Toggle (GTD logic) */}
+                    <div className="flex items-center gap-2 border-l border-gray-100 pl-4 py-1">
+                        <button
+                            onClick={() => updateTask({ taskId, updates: { is_project: !task.is_project } as any })}
+                            className={clsx(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
+                                task.is_project
+                                    ? "bg-blue-600 text-white shadow-sm"
+                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                            )}
+                            title="Mark as Project"
+                        >
+                            {task.is_project ? "PROJECT" : "Task"}
+                        </button>
                     </div>
                 </div>
 
-                <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    onBlur={handleDescriptionBlur}
-                    className="w-full min-h-[120px] resize-none text-gray-600 border-none focus:ring-0 p-0 text-base leading-relaxed placeholder:text-gray-300 mt-4"
-                    placeholder="Add a description..."
-                />
-
-                {/* Subtasks */}
-                <SubtaskList taskId={task.id} projectId={task.project_id} />
+                {/* Delete Button (Right) */}
+                <button
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                    title="Delete task"
+                >
+                    {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+                </button>
             </div>
         </div>
     )

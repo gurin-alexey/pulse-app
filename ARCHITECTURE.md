@@ -104,6 +104,17 @@ The application has been extensively adapted for mobile devices, preparing for n
 - **Drag Handle Design**: A dedicated drag handle (`GripVertical`) with `cursor: move` ensures cross-browser compatibility and respects system cursor color settings, avoiding the hardcoded white "grab" cursor issue.
 - **Conflict Resolution**: Drag-and-Drop resorting using `dnd-kit` is scoped via collision detection strategies (closestCenter for sidebar, closestCorners for lists) to ensure deterministic behavior. Swipes were removed in favor of a cleaner DnD-first UX.
 
+### 6. Task Detail UI & Interaction (Refined)
+- **Headerless Design**: The Task Detail modal has been simplified by removing the dedicated header bar and close button. Closing is handled via backdrop click or breadcrumb navigation.
+- **Top-Right Date Picker**: Date and time controls are positioned at the top-right for quick scheduling, mirroring the breadcrumb navigation on the top-left.
+- **Footer Controls**: Contextual actions (Project selection, Tags, GTD "Project" toggle) are grouped in a dedicated footer bar.
+- **Breadcrumb Navigation**: Displays hierarchy (Parent > Child) with an "Up" arrow (ArrowUp) to easily traverse up the task tree.
+- **Soft Focus**: Input fields (Title, Description) use simplified, borderless styles that only reveal boundaries on interaction, reducing visual noise.
+
+### 7. GTD Project Logic
+- **Task-as-Project**: Any task can be promoted to a "Project" via the `is_project` flag. This allows for infinite nesting while distinguishing between actionable "tasks" and structural "projects" in the UI.
+- **Visual Distinction**: "Project" tasks are rendered with uppercase, bold titles in lists to differentiate them from standard items.
+
 ## 6. Native Build Infrastructure
 - **Platform**: Android (added via Capacitor).
 - **Core Config**: `capacitor.config.ts` setup.

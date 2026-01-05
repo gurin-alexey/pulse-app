@@ -1,3 +1,5 @@
+import TextareaAutosize from 'react-textarea-autosize'
+import { useState, useRef, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { CheckCircle2, Circle, GripVertical } from "lucide-react"
@@ -14,7 +16,6 @@ interface TaskItemProps {
 }
 
 export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: TaskItemProps) {
-    // ... existing hooks ...
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
@@ -22,13 +23,38 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: T
     const { data: taskTags } = useTaskTags(task.id)
     const { mutate: toggleTag } = useToggleTaskTag()
 
-    const handleTaskClick = () => {
+    // Local state for inline editing
+    const [title, setTitle] = useState(task.title)
+    const [isEditing, setIsEditing] = useState(false)
+
+    // Sync title if task updates externally
+    useEffect(() => {
+        setTitle(task.title)
+    }, [task.title])
+
+    const handleTaskClick = (e: React.MouseEvent) => {
+        // Don't open if editing or clicking checkboxes/tags
+        if (isEditing) return
         setSearchParams({ task: task.id })
     }
 
     const toggleStatus = (e?: React.MouseEvent | React.TouchEvent) => {
         e?.stopPropagation()
         updateTask({ taskId: task.id, updates: { is_completed: !task.is_completed } })
+    }
+
+    const saveTitle = () => {
+        if (title.trim() !== task.title) {
+            updateTask({ taskId: task.id, updates: { title: title.trim() } })
+        }
+        setIsEditing(false)
+    }
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            (e.currentTarget as HTMLTextAreaElement).blur() // Triggers onBlur -> saveTitle
+        }
     }
 
     return (
@@ -42,64 +68,85 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes }: T
             <div
                 onClick={handleTaskClick}
                 className={clsx(
-                    "flex items-center p-3 border rounded-lg transition-colors group cursor-pointer bg-white w-full shadow-sm",
+                    "flex items-start p-3 border rounded-lg transition-colors group bg-white w-full shadow-sm",
                     isActive ? "bg-blue-50 border-blue-200" : "border-gray-100 hover:bg-gray-50",
                     task.is_completed && "opacity-60"
                 )}
             >
-                {/* Drag Handle - always rendered but functionality depends on parent dnd context */}
+                {/* Drag Handle */}
                 <div
                     {...listeners}
                     {...attributes}
                     className={clsx(
-                        "mr-2 p-2 -ml-2 touch-none transition-colors",
+                        "mt-1 mr-2 p-1 -ml-2 touch-none transition-colors rounded hover:bg-black/5",
                         "cursor-move active:cursor-grabbing",
-                        isActive ? "text-blue-600" : "text-gray-500 group-hover:text-gray-700"
+                        isActive ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"
                     )}
                     onPointerDown={e => {
                         listeners?.onPointerDown?.(e)
                         e.stopPropagation()
                     }}
                 >
-                    <GripVertical size={20} />
+                    <GripVertical size={18} />
                 </div>
 
+                {/* Checkbox */}
                 <button
                     onClick={(e) => toggleStatus(e)}
-                    className={clsx("mr-1 p-2 -ml-1 transition-colors", task.is_completed ? "text-green-500" : "text-gray-400")}
+                    className={clsx("mt-0.5 mr-3 transition-colors", task.is_completed ? "text-green-500" : "text-gray-300 hover:text-gray-500")}
                 >
-                    {task.is_completed ? <CheckCircle2 size={24} /> : <Circle size={24} />}
+                    {task.is_completed ? <CheckCircle2 size={22} /> : <Circle size={22} />}
                 </button>
 
+                {/* Content */}
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                        <div className={clsx(
-                            "font-medium truncate",
-                            task.is_completed ? "text-gray-400 line-through" : "text-gray-700",
-                            task.is_project && "uppercase tracking-wide font-bold"
-                        )}>
-                            {task.title}
-                        </div>
-                        <div className="flex items-center gap-1">
-                            {task.tags?.map((tag: any) => (
-                                <div key={tag.id} className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} title={tag.name} />
-                            ))}
+                    <div className="flex flex-col gap-1">
+                        <TextareaAutosize
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onBlur={saveTitle}
+                            onKeyDown={handleKeyDown}
+                            onFocus={() => setIsEditing(true)}
+                            onClick={(e) => e.stopPropagation()} // Prevent opening details when clicking to edit
+                            minRows={1}
+                            className={clsx(
+                                "w-full resize-none bg-transparent border-none p-0 focus:ring-0 leading-tight",
+                                "block overflow-hidden", // Important for TextareaAutosize
+                                task.is_completed ? "text-gray-400 line-through" : "text-gray-700",
+                                task.is_project ? "uppercase tracking-wide font-bold text-sm" : "font-medium"
+                            )}
+                        />
+
+                        <div className="flex items-center gap-2 min-h-[16px]">
+                            {/* Tags */}
+                            <div className="flex items-center gap-1">
+                                {task.tags?.map((tag: any) => (
+                                    <div key={tag.id} className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} title={tag.name} />
+                                ))}
+                            </div>
+
+                            {/* Meta Info */}
+                            <div className="flex items-center gap-3 text-xs">
+                                {task.due_date && (
+                                    <span className={clsx(
+                                        new Date(task.due_date) < new Date() && !task.is_completed ? "text-red-500 font-medium" : "text-gray-400"
+                                    )}>
+                                        {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    </span>
+                                )}
+                                {task.start_time && (
+                                    <span className="text-gray-400">
+                                        {new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs mt-0.5">
-                        {task.due_date && (
-                            <span className={clsx(
-                                new Date(task.due_date) < new Date() && !task.is_completed ? "text-red-500 font-medium" : "text-gray-400"
-                            )}>
-                                {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                            </span>
-                        )}
-                        {task.start_time && (
-                            <span className="text-gray-400">
-                                {new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                        )}
-                    </div>
+                </div>
+
+                {/* Details Button (Chevron) */}
+                <div className="ml-2 text-gray-300 group-hover:text-blue-500 transition-colors cursor-pointer">
+                    {/* We can use something visual here or just let the whole row be clickable (except textarea) */}
                 </div>
             </div>
         </motion.div>
