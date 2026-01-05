@@ -1,44 +1,62 @@
+import React from 'react'
 import { TaskDetail } from "@/features/tasks/TaskDetail"
 import clsx from "clsx"
+import { Drawer } from "vaul"
 
-interface TaskDetailModalProps {
-    taskId: string
-    onClose: () => void
-}
+export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: () => void }) {
+    // Simple media query for mobile check
+    const isMobile = useMediaQuery("(max-width: 768px)")
 
-export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
     if (!taskId) return null
 
-    const handleBackdropClick = (e: React.MouseEvent) => {
-        if (e.target === e.currentTarget) {
-            onClose()
-        }
-    }
-
-    return (
-        <div
-            className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 backdrop-blur-[2px] p-0 md:p-4 transition-all duration-300 animate-in fade-in"
-            onClick={handleBackdropClick}
-        >
+    // Desktop: Standard Centered Modal (Existing Logic)
+    if (!isMobile) {
+        return (
             <div
-                className={clsx(
-                    "bg-white shadow-2xl w-full flex flex-col relative overflow-hidden",
-                    // Desktop styles
-                    "md:max-w-2xl md:max-h-[85vh] md:rounded-2xl md:animate-in md:zoom-in-95",
-                    // Mobile Bottom Sheet styles
-                    "h-[80vh] rounded-t-2xl animate-in slide-in-from-bottom duration-300"
-                )}
-                onClick={(e) => e.stopPropagation()}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-200"
+                onClick={onClose}
             >
-                {/* Mobile Drag Handle */}
-                <div className="md:hidden w-full flex justify-center py-3 bg-white shrink-0 cursor-grab active:cursor-grabbing" onClick={onClose}>
-                    <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-                </div>
-
-                <div className="flex-1 overflow-y-auto">
-                    <TaskDetail taskId={taskId} />
+                <div
+                    className="bg-white shadow-2xl w-full max-w-2xl max-h-[85vh] rounded-2xl animate-in zoom-in-95 duration-200 flex flex-col relative overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="flex-1 overflow-y-auto">
+                        <TaskDetail taskId={taskId} />
+                    </div>
                 </div>
             </div>
-        </div>
+        )
+    }
+
+    // Mobile: Vaul Drawer
+    return (
+        <Drawer.Root open={true} onOpenChange={(open) => !open && onClose()}>
+            <Drawer.Portal>
+                <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" />
+                <Drawer.Content className="bg-white flex flex-col rounded-t-[10px] h-[90vh] mt-24 fixed bottom-0 left-0 right-0 z-50 focus:outline-none">
+                    {/* Drag Handle */}
+                    <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-2" />
+
+                    <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
+                        <TaskDetail taskId={taskId} />
+                    </div>
+                </Drawer.Content>
+            </Drawer.Portal>
+        </Drawer.Root>
     )
 }
+
+// Minimal hook inside for portable simplified usage if file missing
+function useMediaQuery(query: string) {
+    const [matches, setMatches] = React.useState(window.matchMedia(query).matches)
+    React.useEffect(() => {
+        const matchQueryList = window.matchMedia(query)
+        function handleChange(e: MediaQueryListEvent) {
+            setMatches(e.matches)
+        }
+        matchQueryList.addEventListener("change", handleChange)
+        return () => matchQueryList.removeEventListener("change", handleChange)
+    }, [query])
+    return matches
+}
+

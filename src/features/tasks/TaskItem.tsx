@@ -15,6 +15,7 @@ import { useTags, useToggleTaskTag, useTaskTags } from '@/hooks/useTags'
 import { Sun, Calendar, Tag, ArrowRight, Clock, Plus, MoreHorizontal } from "lucide-react"
 import clsx from "clsx"
 import { useRef } from "react"
+import { motion } from "framer-motion"
 
 interface TaskItemProps {
     task: any
@@ -24,6 +25,7 @@ interface TaskItemProps {
 }
 
 export function TaskItem({ task, isActive, listeners, attributes }: TaskItemProps) {
+    // ... existing hooks ...
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: deleteTask } = useDeleteTask()
@@ -44,6 +46,7 @@ export function TaskItem({ task, isActive, listeners, attributes }: TaskItemProp
         updateTask({ taskId: task.id, updates: { is_completed: !task.is_completed } })
     }
 
+    // ... helper functions (setQuickDate, handleCustomDate, handleCustomTime) ...
     const setQuickDate = (days: number) => {
         const date = new Date()
         date.setDate(date.getDate() + days)
@@ -55,7 +58,6 @@ export function TaskItem({ task, isActive, listeners, attributes }: TaskItemProp
         const date = e.target.value
         if (date) {
             updateTask({ taskId: task.id, updates: { due_date: date } })
-            // Optional: trigger time picker after date? 
             setTimeout(() => timeInputRef.current?.showPicker(), 300)
         }
     }
@@ -70,6 +72,7 @@ export function TaskItem({ task, isActive, listeners, attributes }: TaskItemProp
             updateTask({ taskId: task.id, updates: { start_time: newDate.toISOString() } })
         }
     }
+
 
     const leadingActions = () => (
         <LeadingActions>
@@ -127,7 +130,12 @@ export function TaskItem({ task, isActive, listeners, attributes }: TaskItemProp
     )
 
     return (
-        <div className="mb-2 relative">
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15 }}
+            className="mb-2 relative"
+        >
             {/* Hidden native pickers to be triggered from swipe */}
             <input
                 type="date"
@@ -201,6 +209,6 @@ export function TaskItem({ task, isActive, listeners, attributes }: TaskItemProp
                     </div>
                 </SwipeableListItem>
             </SwipeableList>
-        </div>
+        </motion.div>
     )
 }

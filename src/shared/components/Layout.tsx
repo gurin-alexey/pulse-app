@@ -1,7 +1,9 @@
+
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { Menu, LogOut, ChevronRight } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
+import { AnimatePresence, motion } from "framer-motion"
 import clsx from "clsx"
 import { useTags } from "@/hooks/useTags"
 import { supabase } from "@/lib/supabase"
@@ -138,12 +140,21 @@ export function Layout() {
         isCalendarPage ? "" : "lg:grid lg:grid-cols-[minmax(350px,1fr)_minmax(450px,1fr)_350px]"
       )}>
 
+
         {/* List Column */}
         <section className={clsx(
           "bg-white overflow-y-auto border-r border-gray-200 h-full",
           isCalendarPage ? "w-full" : "flex-1 lg:flex-none"
         )}>
-          <Outlet />
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15 }}
+            className="h-full"
+          >
+            <Outlet />
+          </motion.div>
         </section>
 
         {/* Detail Column (Desktop Only as a col, unless task is selected) */}
