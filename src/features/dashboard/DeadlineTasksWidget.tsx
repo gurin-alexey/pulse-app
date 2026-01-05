@@ -1,6 +1,7 @@
 import { useTasks } from "@/hooks/useTasks"
 import { Calendar, Clock, AlertCircle, CheckCircle2 } from "lucide-react"
 import clsx from "clsx"
+import { format } from "date-fns"
 
 export function DeadlineTasksWidget() {
     const { data: tasks, isLoading } = useTasks({ type: 'today' }) // Just mock 'today' for urgency
@@ -33,17 +34,17 @@ export function DeadlineTasksWidget() {
                 {urgentTasks.map(task => (
                     <div key={task.id} className="flex items-start gap-3 p-3 bg-gray-50/50 rounded-xl hover:bg-gray-100 transition-colors group">
                         <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${task.priority === 'high' ? 'bg-red-500' :
-                                task.priority === 'medium' ? 'bg-orange-500' : 'bg-blue-400'
+                            task.priority === 'medium' ? 'bg-orange-500' : 'bg-blue-400'
                             }`} />
                         <div className="flex-1 min-w-0">
                             <h4 className="text-sm font-medium text-gray-700 truncate">{task.title}</h4>
                             <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                                {task.due_time && (
+                                {task.start_time && (
                                     <span className="flex items-center gap-1 text-red-400">
-                                        <Clock size={10} /> {task.due_time?.slice(0, 5) || "All Day"}
+                                        <Clock size={10} /> {format(new Date(task.start_time), 'HH:mm')}
                                     </span>
                                 )}
-                                {!task.due_time && (
+                                {!task.start_time && (
                                     <span className="flex items-center gap-1">
                                         <Calendar size={10} /> Today
                                     </span>
