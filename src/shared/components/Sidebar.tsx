@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Search } from "lucide-react"
 
 // ... existing code ...
 
@@ -16,6 +16,7 @@ import { useDeleteProject } from "@/hooks/useDeleteProject"
 import { useAllTasks } from "@/hooks/useAllTasks"
 import { useTags } from "@/hooks/useTags"
 import { isToday, parseISO } from "date-fns"
+import { useCommandStore } from "@/store/useCommandStore"
 
 type SidebarProps = {
     activePath: string
@@ -317,6 +318,21 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
 
     return (
         <div className="space-y-6">
+            <div className="px-5 mb-2">
+                <button
+                    onClick={() => useCommandStore.getState().toggle()}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 bg-gray-100 hover:bg-gray-200/80 rounded-lg transition-colors border border-transparent hover:border-gray-300/50 group"
+                >
+                    <Search size={16} className="text-gray-400 group-hover:text-gray-600" />
+                    <span className="flex-1 text-left">Search...</span>
+                    <div className="flex gap-0.5">
+                        <kbd className="hidden sm:inline-flex h-4 items-center gap-1 rounded border bg-white px-1 font-mono text-[10px] font-medium text-gray-400">
+                            <span className="text-[10px]">Ctrl</span>K
+                        </kbd>
+                    </div>
+                </button>
+            </div>
+
             {/* Main Navigation */}
             <div className="space-y-1">
                 {navItems.map((item) => {

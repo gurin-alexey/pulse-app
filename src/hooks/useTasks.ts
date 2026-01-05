@@ -11,6 +11,7 @@ export type TaskFilter =
     | { type: 'today', includeSubtasks?: boolean }
     | { type: 'project', projectId: string, includeSubtasks?: boolean }
     | { type: 'trash' }
+    | { type: 'all', includeSubtasks?: boolean }
 
 export async function fetchTasks(filter: TaskFilter) {
     let query = supabase

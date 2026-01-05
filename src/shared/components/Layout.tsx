@@ -25,6 +25,7 @@ import { usePrefetchData } from "@/hooks/usePrefetchData"
 import { useSelectionStore } from "@/store/useSelectionStore"
 import { BulkActionsPanel } from "@/features/tasks/BulkActionsPanel"
 import { ChatWidget } from "@/features/ai/ChatWidget"
+import { GlobalSearch } from "@/features/search/GlobalSearch"
 
 export function Layout() {
   const isDesktop = useMediaQuery("(min-width: 768px)")
@@ -359,6 +360,7 @@ export function Layout() {
 
         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
         <ChatWidget />
+        <GlobalSearch />
       </div>
 
       <Toaster position="bottom-center" richColors />
