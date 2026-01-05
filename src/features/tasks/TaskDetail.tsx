@@ -3,7 +3,7 @@ import TextareaAutosize from 'react-textarea-autosize'
 import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
-import { X, Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp, Flag } from 'lucide-react'
+import { X, Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp, Flag, Repeat } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { SubtaskList } from './SubtaskList'
@@ -11,6 +11,8 @@ import { TagManager } from '../tags/TagManager'
 import { useProjects } from '@/hooks/useProjects'
 import { Folder } from 'lucide-react'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
+import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover'
+import { format } from 'date-fns'
 
 type TaskDetailProps = {
     taskId: string
@@ -77,34 +79,6 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         }
     }
 
-    const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const date = e.target.value || null
-        const updates: any = { due_date: date }
-
-        if (date && task?.start_time) {
-            // Sync start_time/end_time dates while preserving time
-            const [year, month, day] = date.split('-').map(Number)
-
-            const oldStart = new Date(task.start_time)
-            // Note: Month is 0-indexed in Date constructor
-            const newStart = new Date(year, month - 1, day, oldStart.getHours(), oldStart.getMinutes())
-            updates.start_time = newStart.toISOString()
-
-            if (task.end_time) {
-                const oldEnd = new Date(task.end_time)
-                const newEnd = new Date(year, month - 1, day, oldEnd.getHours(), oldEnd.getMinutes())
-                updates.end_time = newEnd.toISOString()
-            }
-        }
-
-        if (!date) {
-            updates.start_time = null
-            updates.end_time = null
-        }
-
-        updateTask({ taskId, updates })
-    }
-
     const toggleStatus = () => {
         if (!task) return
         updateTask({ taskId, updates: { is_completed: !task.is_completed } })
@@ -145,7 +119,6 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     }
 
 
-
     return (
         <div className="h-full flex flex-col bg-white overflow-hidden relative">
             {/* Body */}
@@ -181,43 +154,43 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             <div className="w-px h-5 bg-gray-200" />
 
                             {/* Date Picker */}
-                            <div className="flex items-center gap-2">
-                                <div
-                                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 transition-all cursor-pointer group/date"
-                                    title="Set Date"
-                                >
-                                    <CalendarIcon size={16} className="text-gray-400 group-hover/date:text-blue-500" />
-                                    <input
-                                        type="date"
-                                        value={task.due_date ? task.due_date.split('T')[0] : ''}
-                                        onChange={handleDateChange}
-                                        className={clsx(
-                                            "bg-transparent border-none p-0 focus:ring-0 cursor-pointer text-sm w-[110px]",
-                                            task.due_date ? "text-gray-700 font-medium" : "text-gray-400 italic"
-                                        )}
-                                    />
+                            <DatePickerPopover
+                                date={task.due_date ? new Date(task.due_date) : null}
+                                time={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null}
+                                recurrenceRule={task.recurrence_rule || null}
+                                onUpdate={({ date, time, recurrenceRule }) => {
+                                    const updates: Record<string, string | null | undefined> = {}
+                                    if (date) {
+                                        updates.due_date = format(date, 'yyyy-MM-dd')
+
+                                        if (time) {
+                                            const [h, m] = time.split(':').map(Number)
+                                            const newStart = new Date(date)
+                                            newStart.setHours(h, m, 0, 0)
+                                            updates.start_time = newStart.toISOString()
+                                        } else {
+                                            updates.start_time = null
+                                            updates.end_time = null
+                                        }
+                                        updates.recurrence_rule = recurrenceRule
+                                    } else {
+                                        updates.due_date = null
+                                        updates.start_time = null
+                                        updates.end_time = null
+                                        updates.recurrence_rule = null
+                                    }
+                                    updateTask({ taskId, updates })
+                                }}
+                            >
+                                <div className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 transition-all cursor-pointer group/date" title="Set Date">
+                                    <CalendarIcon size={16} className={clsx("group-hover/date:text-blue-500", task.due_date ? "text-blue-600" : "text-gray-400")} />
+                                    <span className={clsx("text-sm", task.due_date ? "text-gray-700 font-medium" : "text-gray-400 italic")}>
+                                        {task.due_date ? format(new Date(task.due_date), 'MMM d') : 'Set Date'}
+                                        {task.start_time && <span className="ml-1 text-gray-500 font-normal">{new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>}
+                                        {task.recurrence_rule && <Repeat size={12} className="inline ml-1 text-blue-500" />}
+                                    </span>
                                 </div>
-
-                                {/* Time Picker */}
-                                {task.due_date && (
-                                    <div className="flex items-center gap-1">
-                                        <input
-                                            type="time"
-                                            value={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
-                                            onChange={(e) => {
-                                                const time = e.target.value
-                                                if (!time) return
-                                                const datePart = task.due_date ? task.due_date.split('T')[0] : null
-                                                if (!datePart) return
-                                                const newStart = `${datePart}T${time}:00`
-
-                                                updateTask({ taskId, updates: { start_time: new Date(newStart).toISOString() } })
-                                            }}
-                                            className="bg-transparent border-none p-0 text-gray-500 focus:ring-0 cursor-pointer text-xs w-[40px] hover:bg-gray-50 hover:text-blue-600 rounded px-1"
-                                        />
-                                    </div>
-                                )}
-                            </div>
+                            </DatePickerPopover>
 
                             <div className="flex-1" />
 
@@ -227,7 +200,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                     e.stopPropagation()
                                     const next: Record<string, 'low' | 'medium' | 'high'> = { 'none': 'low', 'low': 'medium', 'medium': 'high', 'high': 'low' }
                                     const current = (task.priority as string) || 'none'
-                                    updateTask({ taskId, updates: { priority: next[current] as any } })
+                                    updateTask({ taskId, updates: { priority: next[current] } })
                                 }}
                                 className={clsx(
                                     "p-1.5 rounded transition-all hover:bg-gray-50",
@@ -287,7 +260,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             onChange={(e) => {
                                 const pid = e.target.value || null
                                 if (pid !== task.project_id) {
-                                    updateTask({ taskId, updates: { project_id: pid ?? undefined, section_id: null as any } })
+                                    updateTask({ taskId, updates: { project_id: pid ?? undefined, section_id: null } })
                                 }
                             }}
                             className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm appearance-none pr-4 min-w-[60px]"
@@ -307,7 +280,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     {/* Project Type Toggle (GTD logic) */}
                     <div className="flex items-center gap-2 border-l border-gray-100 pl-4 py-1">
                         <button
-                            onClick={() => updateTask({ taskId, updates: { is_project: !task.is_project } as any })}
+                            onClick={() => updateTask({ taskId, updates: { is_project: !task.is_project } })}
                             className={clsx(
                                 "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
                                 task.is_project

@@ -41,6 +41,7 @@ export type Task = {
     completed_at: string | null
     sort_order: number
     is_project: boolean
+    recurrence_rule: string | null
 }
 
 export type Tag = {
