@@ -72,9 +72,21 @@ The application has been extensively adapted for mobile devices, preparing for n
   - **Desktop**: Static sidebar (`min-w-64`).
   - **Mobile**: Fixed drawer with backdrop overlay, controlled by a "Hamburger" menu in a top header.
   - Sidebar automatically closes on navigation.
-- **Task Detail as Bottom Sheet**:
-  - On mobile, `TaskDetailModal` renders as a swipeable "Bottom Sheet" specific to touch usage (85% height, rounded top, drag handle).
-  - Desktop retains the centered modal experience.
+- **Task Detail Interaction (Unified)**:
+  - **Desktop**: 
+    - **Lists**: Side column (4-pane layout).
+    - **Calendar**: Centered Modal.
+  - **Mobile**:
+    - **Universal Drawer (Bottom Sheet)**: All task details (from Lists, Calendar, or Inbox) open in a native-style `vaul` Drawer.
+    - **Smart Positioning**: The drawer is anchored to the *top* (e.g., `top-[10vh]`) rather than having fixed height. This ensures that when the mobile keyboard opens (pushing the bottom viewport edge up), the drawer content resizes naturally instead of the entire modal being pushed off-screen.
+
+### Interaction & UX Refinements
+- **Tag Management Flow**:
+  - **No-Keyboard Default**: Adding a tag first opens a scrollable list of existing tags *without* focusing an input, preventing the virtual keyboard from obscuring the view.
+  - **Explicit Creation**: A "New Tag" button is required to switch to creation mode and activate the keyboard.
+- **Animation Philosophy**:
+  - **"Confident" UI**: Removed jittery "exit" animations from lists. Transitions are instant-out, fade-in to feel snappier.
+  - **Popover Hygiene**: FullCalendar "More tasks" popovers are programmatically closed by identifying and clicking their native close buttons when a task is selected, ensuring clean UI layering.
 
 ### Mobile Calendar Experience
 - **Custom Mobile Header**: Replaces standard FullCalendar toolbar on `< 768px`.

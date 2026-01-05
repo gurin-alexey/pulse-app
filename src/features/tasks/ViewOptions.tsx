@@ -10,14 +10,11 @@ type ViewOptionsProps = {
     setSortBy: (sort: SortOption) => void
     groupBy: GroupOption
     setGroupBy: (group: GroupOption) => void
-    showCompleted: boolean
-    setShowCompleted: (show: boolean) => void
 }
 
 export function ViewOptions({
     sortBy, setSortBy,
-    groupBy, setGroupBy,
-    showCompleted, setShowCompleted
+    groupBy, setGroupBy
 }: ViewOptionsProps) {
     const [isOpen, setIsOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
@@ -44,25 +41,6 @@ export function ViewOptions({
 
             {isOpen && (
                 <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-100">
-
-                    {/* Filter Section */}
-                    <div className="px-3 py-2 border-b border-gray-100">
-                        <label className="flex items-center justify-between cursor-pointer group">
-                            <span className="text-sm font-medium text-gray-700">Show Completed</span>
-                            <div
-                                onClick={() => setShowCompleted(!showCompleted)}
-                                className={clsx(
-                                    "w-9 h-5 rounded-full relative transition-colors",
-                                    showCompleted ? "bg-blue-600" : "bg-gray-200"
-                                )}
-                            >
-                                <div className={clsx(
-                                    "w-3.5 h-3.5 bg-white rounded-full absolute top-0.5 transition-transform",
-                                    showCompleted ? "left-[calc(100%-4px)] -translate-x-full" : "left-1"
-                                )} />
-                            </div>
-                        </label>
-                    </div>
 
                     {/* Grouping Section */}
                     <div className="px-3 py-2 border-b border-gray-100">

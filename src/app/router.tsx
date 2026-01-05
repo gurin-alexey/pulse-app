@@ -6,6 +6,7 @@ import { TasksPage } from "@/pages/TasksPage";
 import { CalendarPage } from "@/pages/CalendarPage";
 import { ProjectTasks } from "@/pages/ProjectTasks";
 import { TagTasks } from "@/pages/TagTasks";
+import { TrashPage } from "@/pages/TrashPage";
 
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { Login } from "@/pages/Login";
@@ -49,6 +50,10 @@ export const router = createBrowserRouter([
           {
             path: "tags/:tagId",
             element: <TagTasks />,
+          },
+          {
+            path: "trash",
+            element: <TrashPage />,
           },
         ],
       },

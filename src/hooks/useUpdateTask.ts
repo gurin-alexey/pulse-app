@@ -12,6 +12,10 @@ export function useUpdateTask() {
 
     return useMutation({
         mutationFn: async ({ taskId, updates }: UpdateTaskParams) => {
+            if (updates.is_completed !== undefined) {
+                updates.completed_at = updates.is_completed ? new Date().toISOString() : null
+            }
+
             const { data, error } = await supabase
                 .from('tasks')
                 .update(updates)

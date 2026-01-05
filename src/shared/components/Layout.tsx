@@ -11,9 +11,15 @@ import { TaskDetailModal } from "@/features/tasks/TaskDetailModal"
 import { DailyPlanner } from "@/features/calendar/DailyPlanner"
 import { Sidebar } from "@/shared/components/Sidebar"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
+import { useProjects } from "@/hooks/useProjects"
+import { useProjectGroups } from "@/hooks/useProjectGroups"
+import { useUpdateProject } from "@/hooks/useUpdateProject"
+
+import { useUpdateTask } from "@/hooks/useUpdateTask"
+import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, type DragEndEvent, closestCorners, closestCenter, pointerWithin, rectIntersection } from '@dnd-kit/core'
 
 export function Layout() {
-  const isDesktop = useMediaQuery("(min-width: 1024px)")
+  const isDesktop = useMediaQuery("(min-width: 768px)")
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isTagsOpen, setIsTagsOpen] = useState(false)
 
@@ -79,114 +85,238 @@ export function Layout() {
     setSearchParams(newParams)
   }
 
-  return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 flex-col md:flex-row">
 
-      {/* Mobile Top Header */}
-      <header className="md:hidden h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-30 pt-[env(safe-area-inset-top)]">
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg"
-        >
-          <Menu size={24} />
-        </button>
-        <span className="font-bold text-xl text-blue-600">Pulse</span>
-        <div className="w-10"></div> {/* Spacer for symmetry */}
-      </header>
-
-      {/* Column A: Sidebar (Desktop) */}
-      <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col overflow-y-auto shrink-0">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
-          <span className="font-bold text-xl text-blue-600">Pulse</span>
-        </div>
-        <nav className="flex-1 p-2 space-y-1">
-          <Sidebar activePath={location.pathname} />
-          {renderTags()}
-        </nav>
-        {renderLogout()}
-      </aside>
-
-      {/* Mobile Sidebar Overlay + Drawer */}
-      {isSidebarOpen && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-          <aside className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 md:hidden flex flex-col animate-in slide-in-from-left duration-300">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 pt-[env(safe-area-inset-top)]">
-              <span className="font-bold text-xl text-blue-600">Pulse</span>
-              <button
-                onClick={() => setIsSidebarOpen(false)}
-                className="p-2 -mr-2 text-gray-400"
-              >
-                <ChevronRight size={24} className="rotate-180" />
-              </button>
-            </div>
-            <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-              <Sidebar
-                activePath={location.pathname}
-                onItemClick={() => setIsSidebarOpen(false)}
-              />
-              {renderTags()}
-            </nav>
-            {renderLogout()}
-          </aside>
-        </>
-      )}
-
-      {/* Main Content Area */}
-      <main className={clsx(
-        "flex-1 flex overflow-hidden",
-        isCalendarPage ? "" : "lg:grid lg:grid-cols-[minmax(350px,1fr)_minmax(450px,1fr)_350px]"
-      )}>
-
-        {/* List Column */}
-        <section className={clsx(
-          "bg-white overflow-y-auto border-r border-gray-200 h-full",
-          isCalendarPage ? "w-full" : "flex-1 lg:flex-none"
-        )}>
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-            className="h-full"
-          >
-            <Outlet />
-          </motion.div>
-        </section>
-
-        {/* Detail Column (Desktop Only as a col, unless task is selected) */}
-        {!isCalendarPage && (
-          <section className={clsx(
-            "border-r border-gray-200 bg-white overflow-y-auto h-full hidden lg:block"
-          )}>
-            {taskId ? (
-              <TaskDetail taskId={taskId} />
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-                Select a task to view details
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Planner Column (Desktop Only) */}
-        {!isCalendarPage && (
-          <section className="bg-white overflow-hidden border-l border-gray-200 hidden xl:block w-[350px]">
-            <DailyPlanner />
-          </section>
-        )}
-      </main>
-
-      {/* Modal for Calendar Page OR Mobile List View */}
-      {taskId && (isCalendarPage || !isDesktop) && (
-        <TaskDetailModal taskId={taskId} onClose={closeModal} />
-      )}
-
-    </div>
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
   )
+
+
+  // Custom collision detection: prioritize sidebar items
+  const customCollisionDetection = (args: any) => {
+    const { pointerCoordinates } = args
+    if (!pointerCoordinates) return closestCorners(args)
+
+    // SIDEBAR ZONE: Exclusive area for sidebar targets (left 270px)
+    if (pointerCoordinates.x < 270) {
+      const sidebarContainers = args.droppableContainers.filter((c: any) =>
+        ['Nav', 'Project', 'Folder'].includes(c.data?.current?.type)
+      )
+
+      // Use closestCenter for magnetic feel
+      const collisions = closestCenter({
+        ...args,
+        droppableContainers: sidebarContainers
+      })
+
+      if (collisions.length > 0) {
+        return collisions
+      }
+
+      // If in sidebar zone but nothing found, return empty to avoid hitting background list
+      return []
+    }
+
+    // Default behavior for the task list
+    return closestCorners(args)
+  }
+
+  // Global Mutations
+  const { mutate: updateTask } = useUpdateTask()
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over) return
+
+    const activeTask = active.data.current?.task
+    if (!activeTask) return
+
+    const overType = over.data.current?.type
+
+    // 1. Task -> Sidebar Project
+    if (overType === 'Project') {
+      const targetProjectId = over.id as string
+      if (activeTask.project_id !== targetProjectId) {
+        updateTask({
+          taskId: activeTask.id,
+          updates: {
+            project_id: targetProjectId,
+            section_id: null,
+            parent_id: null,
+            sort_order: -new Date().getTime()
+          }
+        })
+      }
+    }
+
+    // 2. Task -> Sidebar Folder (Move to first project in folder)
+    else if (overType === 'Folder') {
+      const folder = over.data.current?.group
+      const projectsInFolder = queryClient.getQueryData<any[]>(['projects'])?.filter(p => p.group_id === folder?.id)
+
+      if (projectsInFolder && projectsInFolder.length > 0) {
+        updateTask({
+          taskId: activeTask.id,
+          updates: {
+            project_id: projectsInFolder[0].id,
+            section_id: null,
+            parent_id: null,
+            sort_order: -new Date().getTime()
+          }
+        })
+      }
+    }
+
+    // 3. Task -> Sidebar Nav (Inbox, Today)
+    else if (overType === 'Nav') {
+      const navLabel = over.data.current?.label
+      const updates: any = {}
+
+      if (navLabel === 'Inbox') {
+        updates.project_id = null
+        updates.section_id = null
+        updates.due_date = null
+      } else if (navLabel === 'Today') {
+        updates.due_date = new Date().toISOString().split('T')[0]
+      }
+
+      if (Object.keys(updates).length > 0) {
+        updateTask({
+          taskId: activeTask.id,
+          updates: {
+            ...updates,
+            parent_id: null,
+            sort_order: -new Date().getTime()
+          }
+        })
+      }
+    }
+  }
+
+  const handleDragOver = (event: any) => {
+    const { over } = event
+    if (over) {
+      console.log('Global Drag Over:', over.id, over.data.current?.type)
+    }
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={customCollisionDetection}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+    >
+      <div className="flex h-screen overflow-hidden bg-gray-50 flex-col md:flex-row">
+
+        {/* Mobile Top Header */}
+        <header className="md:hidden h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-30 pt-[env(safe-area-inset-top)]">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+          >
+            <Menu size={24} />
+          </button>
+          <span className="font-bold text-xl text-blue-600">Pulse</span>
+          <div className="w-10"></div> {/* Spacer for symmetry */}
+        </header>
+
+        {/* Column A: Sidebar (Desktop) */}
+        <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col overflow-y-auto shrink-0">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
+            <span className="font-bold text-xl text-blue-600">Pulse</span>
+          </div>
+          <nav className="flex-1 space-y-1">
+            <Sidebar activePath={location.pathname} />
+            {renderTags()}
+          </nav>
+          {renderLogout()}
+        </aside>
+
+        {/* Mobile Sidebar Overlay + Drawer */}
+        {(isSidebarOpen && !isDesktop) && (
+          <>
+            <div
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+            <aside className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 md:hidden flex flex-col animate-in slide-in-from-left duration-300">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 pt-[env(safe-area-inset-top)]">
+                <span className="font-bold text-xl text-blue-600">Pulse</span>
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-2 -mr-2 text-gray-400"
+                >
+                  <ChevronRight size={24} className="rotate-180" />
+                </button>
+              </div>
+              <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+                <Sidebar
+                  activePath={location.pathname}
+                  onItemClick={() => setIsSidebarOpen(false)}
+                />
+                {renderTags()}
+              </nav>
+              {renderLogout()}
+            </aside>
+          </>
+        )}
+
+        {/* Main Content Area */}
+        <main className={clsx(
+          "flex-1 flex overflow-hidden",
+          isCalendarPage ? "" : "lg:grid lg:grid-cols-[minmax(350px,1fr)_minmax(450px,1fr)_350px]"
+        )}>
+
+          {/* List Column */}
+          <section className={clsx(
+            "bg-white overflow-y-auto border-r border-gray-200 h-full",
+            isCalendarPage ? "w-full" : "flex-1 lg:flex-none"
+          )}>
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15 }}
+              className="h-full"
+            >
+              <Outlet />
+            </motion.div>
+          </section>
+
+          {/* Detail Column (Desktop Only as a col, unless task is selected) */}
+          {!isCalendarPage && (
+            <section className={clsx(
+              "border-r border-gray-200 bg-white overflow-y-auto h-full hidden lg:block"
+            )}>
+              {taskId ? (
+                <TaskDetail taskId={taskId} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                  Select a task to view details
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Planner Column (Desktop Only) */}
+          {!isCalendarPage && (
+            <section className="bg-white overflow-hidden border-l border-gray-200 hidden xl:block w-[350px]">
+              <DailyPlanner />
+            </section>
+          )}
+        </main>
+
+        {/* Modal for Calendar Page OR Mobile List View */}
+        {taskId && (isCalendarPage || !isDesktop) && (
+          <TaskDetailModal taskId={taskId} onClose={closeModal} />
+        )}
+
+      </div>
+    </DndContext>
+  )
+
 
   function renderTags() {
     return (

@@ -105,7 +105,7 @@ export function CalendarPage() {
                 isCompleted: task.is_completed
             }
         }
-    }) || []
+    }).sort((a, b) => Number(a.extendedProps.isCompleted) - Number(b.extendedProps.isCompleted)) || []
 
     const handleEventDrop = (info: any) => {
         const taskId = info.event.id
@@ -238,7 +238,7 @@ export function CalendarPage() {
                     setCurrentTitle(arg.view.title)
                     setCurrentViewType(arg.view.type)
                 }}
-                dayMaxEvents={true}
+                eventOrder="extendedProps.isCompleted,start,-duration,allDay,title"
                 height="100%"
                 events={events}
                 eventDrop={handleEventDrop}

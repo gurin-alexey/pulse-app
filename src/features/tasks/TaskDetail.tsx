@@ -7,6 +7,8 @@ import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { SubtaskList } from './SubtaskList'
 import { TagManager } from '../tags/TagManager'
+import { useProjects } from '@/hooks/useProjects'
+import { Folder } from 'lucide-react'
 
 type TaskDetailProps = {
     taskId: string
@@ -17,6 +19,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const { data: task, isLoading } = useTask(taskId)
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask()
+    const { data: projects } = useProjects()
 
     // Local state for auto-save inputs
     const [title, setTitle] = useState('')
@@ -103,9 +106,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     }
 
     const handleDelete = () => {
-        if (window.confirm("Are you sure you want to delete this task?")) {
-            deleteTask(taskId)
-        }
+        deleteTask(taskId)
     }
 
     if (isLoading) {
@@ -246,6 +247,28 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                 )}
                             </div>
                         )}
+
+                        {/* Project Picker */}
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors relative group/project">
+                            <Folder size={16} className="text-gray-400" />
+                            <select
+                                value={task.project_id || ''}
+                                onChange={(e) => {
+                                    const pid = e.target.value || null
+                                    if (pid !== task.project_id) {
+                                        updateTask({ taskId, updates: { project_id: pid, section_id: null as any } })
+                                    }
+                                }}
+                                className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm appearance-none pr-4 min-w-[60px]"
+                            >
+                                <option value="">Inbox</option>
+                                <optgroup label="Projects">
+                                    {projects?.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </optgroup>
+                            </select>
+                        </div>
 
                         {/* Tag Manager */}
                         <TagManager taskId={task.id} />

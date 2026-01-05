@@ -8,25 +8,34 @@ import { ViewOptions, type SortOption, type GroupOption } from "@/features/tasks
 import { useTaskView } from "@/features/tasks/useTaskView"
 import { useSections, useCreateSection, useDeleteSection, useUpdateSection } from "@/hooks/useSections"
 import clsx from "clsx"
-import { DndContext, useDraggable, useDroppable, type DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
+import { AnimatePresence, motion } from "framer-motion"
+import { useDraggable, useDroppable, type DragEndEvent, useDndMonitor, DragOverlay, defaultDropAnimationSideEffects } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TaskItem } from "@/features/tasks/TaskItem"
 
 // Draggable Task Item Wrapper
-function DraggableTaskItem({ task, children }: { task: any, children: (props: { listeners: any, attributes: any }) => React.ReactNode }) {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+// Sortable Task Item Wrapper
+function SortableTaskItem({ task, children }: { task: any, children: (props: { listeners: any, attributes: any }) => React.ReactNode }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: task.id,
-        data: { task }
+        data: {
+            type: 'Task',
+            task
+        }
     })
 
     const style = {
         transform: CSS.Translate.toString(transform),
-        opacity: isDragging ? 0.5 : 1,
+        transition,
+        opacity: isDragging ? 0.3 : 1,
+        zIndex: isDragging ? 999 : 'auto',
+        position: 'relative' as const
     }
 
     return (
-        <div ref={setNodeRef} style={style}>
-            {children({ listeners, attributes })}
+        <div ref={setNodeRef} style={style} {...attributes}>
+            {children({ listeners, attributes: {} })} {/* attributes applied to wrapper */}
         </div>
     )
 }
@@ -47,23 +56,36 @@ import type { TaskFilter } from "@/hooks/useTasks"
 
 // ... imports remain the same ...
 
+import { useProjects } from "@/hooks/useProjects"
+
+// ... imports remain the same ...
+
 export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     const { projectId } = useParams<{ projectId: string }>()
     const [searchParams, setSearchParams] = useSearchParams()
 
+    // Data Hooks
+    const { data: allProjects } = useProjects()
+
     // Determine filter
     const filter: TaskFilter = mode === 'inbox'
-        ? { type: 'inbox' }
+        ? { type: 'inbox', includeSubtasks: true }
         : mode === 'today'
-            ? { type: 'today' }
-            : { type: 'project', projectId: projectId! }
+            ? { type: 'today', includeSubtasks: true }
+            : { type: 'project', projectId: projectId!, includeSubtasks: true }
 
     // Data Hooks
     const { data: tasks, isLoading: tasksLoading, isError: tasksError } = useTasks(filter)
     const { data: sections, isLoading: sectionsLoading } = useSections(projectId)
 
     // Derived State
-    const pageTitle = mode === 'inbox' ? 'Inbox' : mode === 'today' ? 'Today' : 'Tasks'
+    const currentProject = allProjects?.find(p => p.id === projectId)
+    const pageTitle = mode === 'inbox'
+        ? 'Inbox'
+        : mode === 'today'
+            ? 'Today'
+            : currentProject?.name || 'Tasks'
+
     const showSections = !mode // Only show sections for specific projects
 
     // Mutation Hooks
@@ -73,23 +95,18 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     const { mutate: updateSection } = useUpdateSection()
 
     // View State
+    // ... State declarations remain ...
     const [sortBy, setSortBy] = useState<SortOption>('date_created')
     const [groupBy, setGroupBy] = useState<GroupOption>('none')
-    const [showCompleted, setShowCompleted] = useState(false)
+    const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false)
     const [isAddingSection, setIsAddingSection] = useState(false)
     const [newSectionName, setNewSectionName] = useState("")
     const [sectionMenuOpen, setSectionMenuOpen] = useState<string | null>(null)
     const [editingSectionId, setEditingSectionId] = useState<string | null>(null)
     const [editingSectionName, setEditingSectionName] = useState("")
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
-
-    const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        })
-    )
+    const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null) // Track which section we are hovering
+    const [activeDragItem, setActiveDragItem] = useState<any | null>(null) // Track active drag item for Overlay
 
     const activeTaskId = searchParams.get('task')
 
@@ -106,8 +123,45 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
         }
     }, [sections])
 
+    // Split tasks
+    const activeTasks = tasks?.filter(t => !t.is_completed) || []
+    const completedTasks = tasks?.filter(t => t.is_completed).sort((a, b) => {
+        if (!a.completed_at && !b.completed_at) return 0
+        if (!a.completed_at) return 1
+        if (!b.completed_at) return -1
+        return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
+    }) || []
 
-    const tasksForView = useTaskView({ tasks, showCompleted, sortBy, groupBy })
+    // Recursive flatten logic
+    // We use a helper to get flattened list for a specific container (Main List or Section)
+    const getFlattenedTasks = (containerSectionId: string | null) => {
+        // Helper to check if a task is an orphan (parent not in active list)
+        const isOrphan = (t: any) => t.parent_id && !activeTasks.find(p => p.id === t.parent_id)
+
+        const buildTree = (parentId: string | null, depth: number): (typeof activeTasks[0] & { depth: number })[] => {
+            return activeTasks
+                .filter(t => t.parent_id === parentId) // Get direct children
+                .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)) // Sort siblings
+                .reduce((acc, child) => {
+                    return [...acc, { ...child, depth }, ...buildTree(child.id, depth + 1)]
+                }, [] as (typeof activeTasks[0] & { depth: number })[])
+        }
+
+        // Roots are items that:
+        // 1. Have (parent_id === null OR are orphans)
+        // 2. Match the current container (section_id)
+        return activeTasks
+            .filter(t => (t.parent_id === null || isOrphan(t)) && (containerSectionId === null ? t.section_id === null : t.section_id === containerSectionId))
+            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+            .reduce((acc, root) => {
+                return [...acc, { ...root, depth: 0 }, ...buildTree(root.id, 1)]
+            }, [] as (typeof activeTasks[0] & { depth: number })[])
+    }
+
+    // Default sorted list for "Grouping" views (just flat sort by order or date)
+    const sortedActiveTasks = [...activeTasks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+
+    const tasksForView = useTaskView({ tasks: sortedActiveTasks, showCompleted: false, sortBy, groupBy })
     const renderMode = groupBy === 'none' ? 'sections' : 'groups'
 
     const handleTaskClick = (taskId: string) => {
@@ -115,27 +169,203 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     }
 
     const toggleStatus = (e: React.MouseEvent, task: any) => {
-        e.stopPropagation() // Prevent drag start if needed, but draggable handles.
-        // Prevent click bubbling to draggable listeners? 
-        // Actually button click is fine.
+        e.stopPropagation()
         updateTask({ taskId: task.id, updates: { is_completed: !task.is_completed } })
     }
 
-    const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event
+    // Monitor Drag Events
+    useDndMonitor({
+        onDragStart(event) {
+            setDragOverSectionId(null)
+            if (event.active.data.current?.type === 'Task') {
+                setActiveDragItem(event.active.data.current.task)
+            }
+        },
+        onDragOver(event) {
+            const { active, over } = event
+            if (!over) {
+                setDragOverSectionId(null)
+                return
+            }
 
-        if (!over) return
+            const activeTask = active.data.current?.task
+            if (!activeTask) return
 
-        const taskId = active.id as string
-        const targetContainerId = over.id as string // 'main-list' or sectionId
+            let potentialSectionId: string | null = null
 
-        // Optimistic update handled by hook usually, but here we just fire mutation
-        if (targetContainerId === 'main-list') {
-            updateTask({ taskId, updates: { section_id: null } })
-        } else {
-            updateTask({ taskId, updates: { section_id: targetContainerId } })
+            // If over a Container
+            if (over.id === 'main-list' || sections?.some(s => s.id === over.id)) {
+                potentialSectionId = over.id as string
+            }
+            // If over a Task
+            else if (over.data.current?.type === 'Task') {
+                const task = over.data.current.task
+                // If the task has a section_id, that's our target. If null, it's 'main-list'
+                potentialSectionId = task.section_id || 'main-list'
+            }
+
+            // Check if we are already in this section
+            // activeTask.section_id might be null, so treat it as 'main-list'
+            const currentSectionId = activeTask.section_id || 'main-list'
+
+            if (potentialSectionId && potentialSectionId !== currentSectionId) {
+                setDragOverSectionId(potentialSectionId)
+            } else {
+                setDragOverSectionId(null)
+            }
+        },
+        onDragEnd(event) {
+            setActiveDragItem(null)
+            setDragOverSectionId(null) // Reset highlight
+            const { active, over, delta } = event
+            if (!over) return
+
+            const activeId = active.id as string
+            const activeTask = active.data.current?.task
+            const overId = over.id as string
+
+            // 1. Handle Section Moving (Dropping on Container)
+            const isSectionDrop = overId === 'main-list' || sections?.some(s => s.id === overId)
+
+            if (activeTask && isSectionDrop) {
+                const newSectionId = overId === 'main-list' ? null : overId
+                // Only update if actually changing sections
+                if (activeTask.section_id !== newSectionId) {
+                    updateTask({
+                        taskId: activeId,
+                        updates: {
+                            section_id: newSectionId,
+                            parent_id: null, // Reset hierarchy when moving sections
+                            sort_order: -new Date().getTime() // Move to top roughly
+                        }
+                    })
+                }
+                return
+            }
+
+            // 2. Handle Reordering / Reparenting (Task over Task)
+            if (activeTask && over.data.current?.type === 'Task') {
+                const overTask = over.data.current.task
+
+                // Case A: Cross-Section Drop (Task -> Task in different section)
+                if (activeTask.section_id !== overTask.section_id) {
+                    // Reset to root (parent_id: null) as requested
+                    let newSortOrder = overTask.sort_order - 1 // Insert above by default
+
+                    updateTask({
+                        taskId: activeId,
+                        updates: {
+                            section_id: overTask.section_id,
+                            parent_id: null, // FORCE ROOT
+                            sort_order: newSortOrder
+                        }
+                    })
+                    return
+                }
+
+                // Case B: Same Section Reordering
+                if (activeId === overId && Math.abs(delta.x) < 10) return
+
+                // Determine Container
+                const currentSectionId = activeTask.section_id
+                const items = getFlattenedTasks(currentSectionId)
+
+                const activeIndex = items.findIndex(t => t.id === activeId)
+                const overIndex = items.findIndex(t => t.id === overId)
+
+                if (activeIndex === -1 || overIndex === -1) return
+
+                // Calculate Visual Depth
+                const projectedDepth = Math.max(0, (items[activeIndex].depth) + Math.round(delta.x / 24))
+
+                // Simulate the move in the list
+                const projectedList = [...items]
+                const [movedItem] = projectedList.splice(activeIndex, 1)
+                projectedList.splice(overIndex, 0, movedItem)
+
+                // Analyze Context at New Position
+                const prevItem = projectedList[overIndex - 1]
+                const nextItem = projectedList[overIndex + 1]
+
+                // Determine Parent based on Depth Constraints
+                // Max depth: cannot be deeper than prevItem.depth + 1
+                const maxDepth = prevItem ? prevItem.depth + 1 : 0
+                const finalDepth = Math.min(projectedDepth, maxDepth)
+
+                let newParentId: string | null = null
+
+                if (prevItem) {
+                    if (finalDepth === prevItem.depth + 1) {
+                        // Nest under prevItem
+                        newParentId = prevItem.id
+                    } else if (finalDepth === prevItem.depth) {
+                        // Sibling of prevItem
+                        newParentId = prevItem.parent_id
+                    } else {
+                        // Outdenting: Ascend ancestors to find one with depth === finalDepth - 1
+                        // We scan backwards from prevItem
+                        const ancestor = projectedList.slice(0, overIndex).reverse().find(t => t.depth === finalDepth - 1)
+                        newParentId = ancestor ? ancestor.id : null
+                    }
+                } else {
+                    // Top of list
+                    newParentId = null
+                }
+
+                // Resolve Sort Order
+                // Find nearest siblings in the projected list to interpolate sort_order
+                let prevSiblingOrder: number | null = null
+                let nextSiblingOrder: number | null = null
+
+                // Scan backwards for prev sibling (same parent)
+                for (let i = overIndex - 1; i >= 0; i--) {
+                    const t = projectedList[i]
+                    // If we hit the parent itself, we stop (we are first child)
+                    if (t.id === newParentId) break
+
+                    // If we hit a sibling
+                    if (t.depth === finalDepth) {
+                        prevSiblingOrder = t.sort_order ?? 0
+                        break
+                    }
+                    // If we hit an item with LOWER depth, it's an ancestor (stop)
+                    if (t.depth < finalDepth) break
+                }
+
+                // Scan forwards for next sibling
+                for (let i = overIndex + 1; i < projectedList.length; i++) {
+                    const t = projectedList[i]
+                    if (t.depth === finalDepth) {
+                        nextSiblingOrder = t.sort_order ?? 0
+                        break
+                    }
+                    if (t.depth < finalDepth) break // End of scope
+                }
+
+                // Calculate new order
+                let newSortOrder = 0
+                if (prevSiblingOrder !== null && nextSiblingOrder !== null) {
+                    newSortOrder = (prevSiblingOrder + nextSiblingOrder) / 2
+                } else if (prevSiblingOrder !== null) {
+                    newSortOrder = prevSiblingOrder + 65535.0 // Large step
+                } else if (nextSiblingOrder !== null) {
+                    newSortOrder = nextSiblingOrder - 65535.0
+                } else {
+                    newSortOrder = new Date().getTime() // Default fallback, though usually we want specific order.
+                    // If first item in list, maybe 0?
+                }
+
+                // Update
+                updateTask({
+                    taskId: activeId,
+                    updates: {
+                        parent_id: newParentId,
+                        sort_order: newSortOrder
+                    }
+                })
+            }
         }
-    }
+    })
 
     const toggleSection = (sectionId: string) => {
         setCollapsedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }))
@@ -153,129 +383,190 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
 
     // Helper to render a single task item
     const renderTaskItem = (task: any) => (
-        <DraggableTaskItem key={task.id} task={task}>
+        <SortableTaskItem key={task.id} task={task}>
             {({ listeners, attributes }) => (
                 <TaskItem
                     task={task}
                     isActive={activeTaskId === task.id}
+                    depth={task.depth} // Pass calculated depth
                     listeners={listeners}
                     attributes={attributes}
                 />
             )}
-        </DraggableTaskItem>
+        </SortableTaskItem>
     )
 
     if (tasksLoading || sectionsLoading) return <div className="flex items-center justify-center h-full text-gray-400"><Loader2 className="animate-spin mr-2" />Loading...</div>
     if (tasksError) return <div className="flex items-center justify-center h-full text-red-500"><AlertCircle className="mr-2" />Error loading tasks</div>
 
     return (
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-            <div className="h-full flex flex-col">
-                <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
-                    <h2 className="font-bold text-lg text-gray-800">{pageTitle}</h2>
-                    <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} showCompleted={showCompleted} setShowCompleted={setShowCompleted} />
-                </div>
+        <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
+                <h2 className="font-bold text-lg text-gray-800">{pageTitle}</h2>
+                <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />
+            </div>
 
-                <div className="flex-1 p-4 overflow-y-auto pb-20">
-                    {renderMode === 'groups' ? (
-                        // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
-                        <div className="mt-4">
-                            {/* Allow creating tasks in Inbox/Today even without projectId */}
-                            <div className="mb-6"><CreateTaskInput projectId={projectId || null} /></div>
+            <div className="flex-1 p-4 overflow-y-auto pb-20">
+                {renderMode === 'groups' ? (
+                    // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
+                    <div className="mt-4">
+                        {/* Allow creating tasks in Inbox/Today even without projectId */}
+                        <div className="mb-6"><CreateTaskInput projectId={projectId || null} /></div>
 
-                            {Object.entries(tasksForView).map(([groupName, groupTasks]) => (
-                                <div key={groupName} className="mb-8">
-                                    <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">{groupName} ({groupTasks.length})</h3>
-                                    {groupTasks.map(renderTaskItem)}
-                                </div>
-                            ))}
-                            {Object.keys(tasksForView).length === 0 && <div className="text-gray-400 text-center mt-10">No tasks match filter</div>}
-                        </div>
-                    ) : (
-                        // SECTIONS VIEW with Drag & Drop
-                        <div className="space-y-8">
-                            {/* 1. Main List (Uncategorized) */}
-                            <DroppableContainer id="main-list" className="min-h-[100px]">
-                                {projectId ? (
-                                    <CreateTaskInput projectId={projectId} sectionId={null} />
-                                ) : (
-                                    // For Inbox/Today, we don't need projectId if we handle it in API or pass null
-                                    <CreateTaskInput projectId={projectId || null} sectionId={null} />
-                                )}
+                        {Object.entries(tasksForView).map(([groupName, groupTasks]) => (
+                            <div key={groupName} className="mb-8">
+                                <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">{groupName} ({groupTasks.length})</h3>
+                                {groupTasks.map(renderTaskItem)}
+                            </div>
+                        ))}
+                        {Object.keys(tasksForView).length === 0 && <div className="text-gray-400 text-center mt-10">No active tasks</div>}
+                    </div>
+                ) : (
+                    // SECTIONS VIEW with Drag & Drop
+                    <div className="space-y-8">
+                        {/* 1. Main List (Uncategorized) */}
+                        <DroppableContainer
+                            id="main-list"
+                            className={clsx(
+                                "min-h-[100px] transition-colors rounded-xl p-2 -mt-2 -mx-2",
+                                dragOverSectionId === 'main-list' && "bg-blue-50/60 ring-2 ring-blue-100"
+                            )}
+                        >
+                            {projectId ? (
+                                <CreateTaskInput projectId={projectId} sectionId={null} />
+                            ) : (
+                                <CreateTaskInput projectId={projectId || null} sectionId={null} />
+                            )}
 
+                            <SortableContext items={getFlattenedTasks(null).map(t => t.id)} strategy={verticalListSortingStrategy}>
                                 <div className="mt-4 space-y-2">
-                                    {tasks?.filter(t => !t.section_id && (!showCompleted ? !t.is_completed : true))
-                                        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Simple sort
-                                        .map(renderTaskItem)
-                                    }
+                                    {getFlattenedTasks(null).map(renderTaskItem)}
                                 </div>
-                            </DroppableContainer>
+                            </SortableContext>
+                        </DroppableContainer>
 
-                            {/* 2. Accordion Sections - ONLY SHOW IF showSections is TRUE */}
-                            {showSections && (
-                                <div className="space-y-4">
-                                    {sections?.map(section => {
-                                        const sectionTasks = tasks?.filter(t => t.section_id === section.id && (!showCompleted ? !t.is_completed : true))
-                                        const isCollapsed = collapsedSections[section.id]
+                        {/* 2. Accordion Sections - ONLY SHOW IF showSections is TRUE */}
+                        {showSections && (
+                            <div className="space-y-4">
+                                {sections?.map(section => {
+                                    const sectionTasks = activeTasks.filter(t => t.section_id === section.id)
+                                    // Also sort these
+                                    const sortedSectionTasks = [...sectionTasks].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                                    const isCollapsed = collapsedSections[section.id]
 
-                                        return (
-                                            <DroppableContainer key={section.id} id={section.id} className="group/section border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
-                                                {/* Header */}
-                                                <div
-                                                    className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer select-none border-b border-gray-100"
-                                                    onClick={() => toggleSection(section.id)}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <ChevronRight size={16} className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")} />
-                                                        {editingSectionId === section.id ? (
-                                                            <form onSubmit={(e) => handleRenameSection(e, section.id)} onClick={e => e.stopPropagation()}>
-                                                                <input autoFocus type="text" value={editingSectionName} onChange={e => setEditingSectionName(e.target.value)} onBlur={() => setEditingSectionId(null)} className="font-bold text-sm text-gray-800 bg-white px-1 rounded outline-none border border-blue-200" />
-                                                            </form>
-                                                        ) : (
-                                                            <h3 className="font-bold text-sm text-gray-800">{section.name} <span className="text-gray-400 font-normal ml-1">({sectionTasks?.length})</span></h3>
-                                                        )}
-                                                    </div>
-                                                    <div className="relative" onClick={e => e.stopPropagation()}>
-                                                        <button onClick={() => setSectionMenuOpen(sectionMenuOpen === section.id ? null : section.id)} className="p-1 hover:bg-gray-200 rounded text-gray-400"><MoreHorizontal size={16} /></button>
-                                                        {sectionMenuOpen === section.id && (
-                                                            <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
-                                                                <button onClick={() => { setEditingSectionId(section.id); setEditingSectionName(section.name); setSectionMenuOpen(null) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"><Pencil size={14} /> Rename</button>
-                                                                <button onClick={() => { if (confirm('Delete?')) deleteSection(section.id) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={14} /> Delete</button>
-                                                            </div>
-                                                        )}
+                                    return (
+                                        <DroppableContainer
+                                            key={section.id}
+                                            id={section.id}
+                                            className={clsx(
+                                                "group/section rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all border border-transparent",
+                                                dragOverSectionId === section.id && "ring-2 ring-blue-400 shadow-lg bg-blue-50/30"
+                                            )}
+                                        >
+                                            {/* Header */}
+                                            <div
+                                                className="flex items-center justify-between p-3 bg-gray-50/50 hover:bg-gray-100/50 cursor-pointer select-none border-b border-gray-100"
+                                                onClick={() => toggleSection(section.id)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <ChevronRight size={16} className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")} />
+                                                    {editingSectionId === section.id ? (
+                                                        <form onSubmit={(e) => handleRenameSection(e, section.id)} onClick={e => e.stopPropagation()}>
+                                                            <input autoFocus type="text" value={editingSectionName} onChange={e => setEditingSectionName(e.target.value)} onBlur={() => setEditingSectionId(null)} className="font-bold text-sm text-gray-800 bg-white px-1 rounded outline-none border border-blue-200" />
+                                                        </form>
+                                                    ) : (
+                                                        <h3 className="font-bold text-sm text-gray-800">{section.name} <span className="text-gray-400 font-normal ml-1">({sectionTasks?.length})</span></h3>
+                                                    )}
+                                                </div>
+                                                <div className="relative" onClick={e => e.stopPropagation()}>
+                                                    <button onClick={() => setSectionMenuOpen(sectionMenuOpen === section.id ? null : section.id)} className="p-1 hover:bg-gray-200 rounded text-gray-400"><MoreHorizontal size={16} /></button>
+                                                    {sectionMenuOpen === section.id && (
+                                                        <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
+                                                            <button onClick={() => { setEditingSectionId(section.id); setEditingSectionName(section.name); setSectionMenuOpen(null) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"><Pencil size={14} /> Rename</button>
+                                                            <button onClick={() => { if (confirm('Delete?')) deleteSection(section.id) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={14} /> Delete</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Content */}
+                                            {!isCollapsed && (
+                                                <div className="p-3 bg-gray-50/30">
+                                                    <SortableContext items={getFlattenedTasks(section.id).map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                                        <div className="space-y-0.5 min-h-[50px]">
+                                                            {getFlattenedTasks(section.id).map(renderTaskItem)}
+                                                            {getFlattenedTasks(section.id).length === 0 && <div className="text-xs text-gray-300 p-2 text-center">Drop tasks here</div>}
+                                                        </div>
+                                                    </SortableContext>
+                                                    <div className="mt-3">
+                                                        {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." />}
                                                     </div>
                                                 </div>
+                                            )}
+                                        </DroppableContainer>
+                                    )
+                                })}
+                            </div>
+                        )}
 
-                                                {/* Content */}
-                                                {!isCollapsed && (
-                                                    <div className="p-3 bg-gray-50/30">
-                                                        <div className="space-y-0.5 min-h-[50px]">
-                                                            {sectionTasks?.map(renderTaskItem)}
-                                                            {sectionTasks?.length === 0 && <div className="text-xs text-gray-300 p-2 text-center">Drop tasks here</div>}
-                                                        </div>
-                                                        <div className="mt-3">
-                                                            {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." />}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </DroppableContainer>
-                                        )
-                                    })}
-                                </div>
-                            )}
+                        {/* 3. Add Section - ONLY SHOW IF showSections is TRUE */}
+                        {showSections && (
+                            isAddingSection ? (
+                                <form onSubmit={handleCreateSection} className="mt-4"><input autoFocus type="text" value={newSectionName} onChange={e => setNewSectionName(e.target.value)} onBlur={() => { if (!newSectionName) setIsAddingSection(false) }} placeholder="Section Name..." className="font-bold text-sm text-gray-800 bg-white border border-blue-200 rounded px-3 py-2 w-full outline-none" /></form>
+                            ) : (
+                                <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 text-gray-400 hover:text-blue-600 font-semibold text-sm mt-8 transition-colors p-2 -ml-2"><Plus size={16} /> Add Section</button>
+                            )
+                        )}
+                    </div>
+                )}
 
-                            {/* 3. Add Section - ONLY SHOW IF showSections is TRUE */}
-                            {showSections && (
-                                isAddingSection ? (
-                                    <form onSubmit={handleCreateSection} className="mt-4"><input autoFocus type="text" value={newSectionName} onChange={e => setNewSectionName(e.target.value)} onBlur={() => { if (!newSectionName) setIsAddingSection(false) }} placeholder="Section Name..." className="font-bold text-sm text-gray-800 bg-white border border-blue-200 rounded px-3 py-2 w-full outline-none" /></form>
-                                ) : (
-                                    <button onClick={() => setIsAddingSection(true)} className="flex items-center gap-2 text-gray-400 hover:text-blue-600 font-semibold text-sm mt-8 transition-colors p-2 -ml-2"><Plus size={16} /> Add Section</button>
-                                )
+                {/* COMPLETED ACCORDION */}
+                {completedTasks.length > 0 && (
+                    <div className="mt-12 border-t border-gray-100 pt-6">
+                        <button
+                            onClick={() => setCompletedAccordionOpen(!completedAccordionOpen)}
+                            className="flex items-center gap-2 text-gray-500 font-semibold text-sm hover:text-gray-700 transition-colors mb-4"
+                        >
+                            <ChevronRight size={16} className={clsx("transition-transform", completedAccordionOpen && "rotate-90")} />
+                            Completed ({completedTasks.length})
+                        </button>
+
+                        <AnimatePresence>
+                            {completedAccordionOpen && (
+                                <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="space-y-1 opacity-60">
+                                        {completedTasks.map(task => (
+                                            <TaskItem
+                                                key={task.id}
+                                                task={task}
+                                                isActive={activeTaskId === task.id}
+                                            />
+                                        ))}
+                                    </div>
+                                </motion.div>
                             )}
-                        </div>
-                    )}
-                </div>
+                        </AnimatePresence>
+                    </div>
+                )}
+
             </div>
-        </DndContext>
+            {/* Portal Overlay for smooth dragging across containers */}
+            <DragOverlay dropAnimation={null}>
+                {activeDragItem ? (
+                    <div className="opacity-90 scale-105 cursor-grabbing pointer-events-none">
+                        <TaskItem
+                            task={activeDragItem}
+                            depth={activeDragItem.depth}
+                            isActive={true}
+                        />
+                    </div>
+                ) : null}
+            </DragOverlay>
+        </div>
     )
 }

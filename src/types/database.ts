@@ -5,6 +5,7 @@ export type Project = {
     description: string | null
     user_id: string
     group_id: string | null
+    deleted_at: string | null
 }
 
 export type ProjectGroup = {
@@ -36,6 +37,9 @@ export type Task = {
     start_time: string | null
     end_time: string | null
     section_id: string | null
+    deleted_at: string | null
+    completed_at: string | null
+    sort_order: number
 }
 
 export type Tag = {

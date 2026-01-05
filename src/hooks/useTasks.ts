@@ -7,9 +7,10 @@ export type TaskWithTags = Task & {
 }
 
 export type TaskFilter =
-    | { type: 'project', projectId: string }
-    | { type: 'inbox' }
-    | { type: 'today' }
+    | { type: 'inbox', includeSubtasks?: boolean }
+    | { type: 'today', includeSubtasks?: boolean }
+    | { type: 'project', projectId: string, includeSubtasks?: boolean }
+    | { type: 'trash' }
 
 export function useTasks(filter: TaskFilter) {
     return useQuery({
@@ -18,8 +19,19 @@ export function useTasks(filter: TaskFilter) {
             let query = supabase
                 .from('tasks')
                 .select('*, task_tags(tags(*))')
-                .is('parent_id', null)
                 .order('created_at', { ascending: false })
+
+            // Filter parent_id unless includeSubtasks is true
+            // @ts-ignore
+            if (!filter.includeSubtasks) {
+                query = query.is('parent_id', null)
+            }
+
+            if (filter.type === 'trash') {
+                query = query.not('deleted_at', 'is', null)
+            } else {
+                query = query.is('deleted_at', null)
+            }
 
             if (filter.type === 'project') {
                 query = query.eq('project_id', filter.projectId)

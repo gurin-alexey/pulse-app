@@ -10,8 +10,9 @@ import { useProjectGroups, useCreateProjectGroup, useDeleteProjectGroup, useUpda
 import { useCreateProject } from "@/hooks/useCreateProject"
 import { useUpdateProject } from "@/hooks/useUpdateProject"
 import { supabase } from "@/lib/supabase"
-import { DndContext, useDraggable, useDroppable, type DragEndEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
+import { useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
+import { useDeleteProject } from "@/hooks/useDeleteProject"
 
 type SidebarProps = {
     activePath: string
@@ -20,10 +21,15 @@ type SidebarProps = {
 
 // --- DND Components ---
 
-function DraggableProject({ project, activePath, children }: { project: any, activePath: string, children: React.ReactNode }) {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+function DraggableProject({ project, activePath, children }: { project: any, activePath: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
+    const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
         id: project.id,
-        data: { project }
+        data: { project, type: 'Project' }
+    })
+
+    const { setNodeRef: setDropRef, isOver } = useDroppable({
+        id: project.id,
+        data: { project, type: 'Project' }
     })
 
     const style = {
@@ -32,19 +38,60 @@ function DraggableProject({ project, activePath, children }: { project: any, act
         touchAction: 'none'
     }
 
+    // Compose refs
+    const setNodeRef = (node: HTMLElement | null) => {
+        setDragRef(node)
+        setDropRef(node)
+    }
+
     return (
-        <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...listeners}
+            {...attributes}
+            className={clsx(
+                "transition-all duration-200 border-l-4 border-transparent w-full",
+                isOver ? "bg-blue-600 border-blue-400 shadow-lg scale-[1.02] z-20" : "hover:bg-gray-50/50"
+            )}
+        >
+            {typeof children === 'function' ? children(isOver) : children}
+        </div>
+    )
+}
+
+function DroppableZone({ id, data, children, className }: { id: string, data?: any, children?: React.ReactNode, className?: string }) {
+    const { setNodeRef, isOver } = useDroppable({ id, data })
+
+    return (
+        <div
+            ref={setNodeRef}
+            className={clsx(
+                className,
+                "transition-all duration-200",
+                isOver && "bg-blue-600/10 ring-4 ring-blue-400/50 rounded-xl"
+            )}
+        >
             {children}
         </div>
     )
 }
 
-function DroppableZone({ id, children, className }: { id: string, children?: React.ReactNode, className?: string }) {
-    const { setNodeRef, isOver } = useDroppable({ id })
+function DroppableNavItem({ label, children }: { label: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
+    const { setNodeRef, isOver } = useDroppable({
+        id: `nav-${label.toLowerCase()}`,
+        data: { type: 'Nav', label }
+    })
 
     return (
-        <div ref={setNodeRef} className={clsx(className, isOver && "bg-blue-50/50 ring-2 ring-blue-100 rounded-lg")}>
-            {children}
+        <div
+            ref={setNodeRef}
+            className={clsx(
+                "transition-all duration-200 border-l-4 border-transparent w-full",
+                isOver ? "bg-blue-600 border-blue-400 shadow-lg scale-[1.02] z-20" : "hover:bg-gray-50/50"
+            )}
+        >
+            {typeof children === 'function' ? children(isOver) : children}
         </div>
     )
 }
@@ -52,16 +99,20 @@ function DroppableZone({ id, children, className }: { id: string, children?: Rea
 // --- Main Sidebar Component ---
 
 export function Sidebar({ activePath, onItemClick }: SidebarProps) {
-    const { data: projects } = useProjects()
+    const { data: projects, isError: projectsError, error: pError } = useProjects()
+    if (projectsError) {
+        console.error('Projects fetch error:', pError)
+    }
+
     const { data: groups } = useProjectGroups()
     const { mutate: createGroup } = useCreateProjectGroup()
     const { mutate: createProject, isPending: isCreatingProject } = useCreateProject()
     const { mutate: updateProject } = useUpdateProject() // Using our optimistic update hook
     const { mutate: deleteGroup } = useDeleteProjectGroup()
     const { mutate: updateGroup } = useUpdateProjectGroup()
+    const { mutate: deleteProject } = useDeleteProject()
 
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
-    const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
     // Create Project State
     const [isCreatingProjectIn, setIsCreatingProjectIn] = useState<string | null>(null) // 'ungrouped' or groupId
@@ -69,14 +120,6 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
 
     const navigate = useNavigate()
     const menuRef = useRef<HTMLDivElement>(null)
-
-    const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        })
-    )
 
     // Close menu when clicking outside (kept if we re-add menus, but currently simplied)
     useEffect(() => {
@@ -141,54 +184,50 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         })
     }
 
-
-    const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event
-        setActiveDragId(null)
-
-        if (!over) return
-
-        const projectId = active.id as string
-        const targetId = over.id as string // groupId or 'inbox'
-
-        const project = projects?.find(p => p.id === projectId)
-        if (!project) return
-
-        // If dropped on 'inbox', group_id -> null
-        if (targetId === 'inbox') {
-            if (project.group_id !== null) {
-                updateProject({ projectId, updates: { group_id: null } })
-            }
-        }
-        // If dropped on a group, group_id -> targetId
-        else {
-            // Verify targetId is actually a group
-            const group = groups?.find(g => g.id === targetId)
-            if (group && project.group_id !== group.id) {
-                updateProject({ projectId, updates: { group_id: group.id } })
-            }
+    const handleDeleteProject = (e: React.MouseEvent, projectId: string) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (confirm("Move this project to Trash?")) {
+            deleteProject(projectId)
         }
     }
 
-    const renderProjectItem = (project: any) => (
-        <DraggableProject key={project.id} project={project} activePath={activePath}>
-            <div className="relative group/project mb-1">
-                <Link
-                    to={`/projects/${project.id}`}
-                    onClick={onItemClick}
-                    className={clsx(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm text-gray-600 hover:bg-gray-100",
-                        activePath === `/projects/${project.id}` && "bg-blue-50 text-blue-600"
-                    )}
-                >
-                    <Folder size={16} />
-                    <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
-                        {project.name}
-                    </span>
-                </Link>
-            </div>
-        </DraggableProject>
-    )
+    const renderProjectItem = (project: any) => {
+        const isActive = activePath === `/projects/${project.id}`
+        return (
+            <DraggableProject key={project.id} project={project} activePath={activePath}>
+                {(isOver) => (
+                    <div className="relative group/project">
+                        <Link
+                            to={`/projects/${project.id}`}
+                            onClick={onItemClick}
+                            className={clsx(
+                                "flex items-center gap-2 px-5 py-2.5 transition-colors text-sm",
+                                isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600"),
+                                "font-medium"
+                            )}
+                        >
+                            <Folder size={16} />
+                            <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
+                                {project.name}
+                            </span>
+
+                            <button
+                                onClick={(e) => handleDeleteProject(e, project.id)}
+                                className={clsx(
+                                    "opacity-0 group-hover/project:opacity-100 p-1 rounded transition-all",
+                                    isOver ? "hover:bg-white/20 text-blue-100" : "hover:bg-black/5 text-gray-400 hover:text-red-500"
+                                )}
+                                title="Delete Project"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </Link>
+                    </div>
+                )}
+            </DraggableProject>
+        )
+    }
 
     const navItems = [
         { label: "Dashboard", path: "/", icon: LayoutDashboard },
@@ -196,158 +235,170 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         { label: "Today", path: "/today", icon: Sun },
         { label: "Tasks", path: "/tasks", icon: CheckSquare },
         { label: "Calendar", path: "/calendar", icon: Calendar },
+        { label: "Trash", path: "/trash", icon: Trash2 },
     ]
 
     return (
-        <DndContext sensors={sensors} onDragStart={({ active }) => setActiveDragId(active.id as string)} onDragEnd={handleDragEnd}>
-            <div className="space-y-6">
-                {/* Main Navigation */}
-                <div className="space-y-1">
-                    {navItems.map((item) => {
-                        const Icon = item.icon
-                        const isActive = activePath === item.path
+        <div className="space-y-6">
+            {/* Main Navigation */}
+            <div className="space-y-1">
+                {navItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive = activePath === item.path
+                    return (
+                        <DroppableNavItem key={item.path} label={item.label}>
+                            {(isOver) => (
+                                <Link
+                                    to={item.path}
+                                    onClick={onItemClick}
+                                    className={clsx(
+                                        "flex items-center gap-3 px-5 py-2.5 transition-colors",
+                                        isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600")
+                                    )}
+                                >
+                                    <Icon size={20} />
+                                    <span className="whitespace-nowrap font-semibold">
+                                        {item.label}
+                                    </span>
+                                </Link>
+                            )}
+                        </DroppableNavItem>
+                    )
+                })}
+            </div>
+
+            <div className="mt-6 space-y-6">
+
+                {/* Header with Actions */}
+                <div className="px-5 flex items-center justify-between group/main-header">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                        Projects
+                    </span>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => startCreatingProject('ungrouped')}
+                            className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                            title="New Project"
+                        >
+                            <Plus size={16} />
+                        </button>
+                        <button
+                            onClick={handleCreateGroup}
+                            className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                            title="New Folder"
+                        >
+                            <FolderPlus size={16} />
+                        </button>
+                    </div>
+                </div>
+
+
+                {/* Content List */}
+                <div className="space-y-4">
+                    {/* 1. Groups */}
+                    {groups?.map(group => {
+                        const groupProjects = projects?.filter(p => p.group_id === group.id)
+                        const isCollapsed = collapsedGroups[group.id]
+
                         return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                onClick={onItemClick}
+                            <DroppableZone
+                                key={group.id}
+                                id={group.id}
+                                data={{ type: 'Folder', group }}
                                 className={clsx(
-                                    "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
-                                    isActive ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100"
+                                    "transition-all duration-200"
                                 )}
                             >
-                                <Icon size={20} />
-                                <span className="whitespace-nowrap font-medium">
-                                    {item.label}
-                                </span>
-                            </Link>
-                        )
-                    })}
-                </div>
+                                <div className={clsx(
+                                    "group/header relative border-l-4 border-transparent transition-all",
+                                    "rounded-r-lg"
+                                )}>
+                                    <div className="px-5 mb-1 flex items-center justify-between group/title">
+                                        <button
+                                            onClick={() => toggleGroup(group.id)}
+                                            className="flex items-center gap-1 text-sm font-bold text-gray-700 hover:text-gray-900 outline-none flex-1 truncate py-1"
+                                        >
+                                            <ChevronRight
+                                                size={16}
+                                                className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")}
+                                            />
+                                            <span className="truncate">{group.name}</span>
+                                            <span className="text-xs text-gray-400 font-normal ml-1">({groupProjects?.length})</span>
+                                        </button>
 
-                <div className="mt-6 space-y-6">
-
-                    {/* Header with Actions */}
-                    <div className="px-3 flex items-center justify-between group/main-header">
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                            Projects
-                        </span>
-                        <div className="flex items-center gap-1 opacity-100 transition-opacity">
-                            <button
-                                onClick={() => startCreatingProject('ungrouped')}
-                                className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-gray-100 transition-colors"
-                                title="New Project"
-                            >
-                                <Plus size={16} />
-                            </button>
-                            <button
-                                onClick={handleCreateGroup}
-                                className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-gray-100 transition-colors"
-                                title="New Folder"
-                            >
-                                <FolderPlus size={16} />
-                            </button>
-                        </div>
-                    </div>
-
-
-                    {/* Content List */}
-                    <div className="space-y-4">
-                        {/* 1. Groups */}
-                        {groups?.map(group => {
-                            const groupProjects = projects?.filter(p => p.group_id === group.id)
-                            const isCollapsed = collapsedGroups[group.id]
-
-                            return (
-                                <DroppableZone key={group.id} id={group.id} className="transition-all">
-                                    <div className="group/header relative">
-                                        <div className="px-3 mb-1 flex items-center justify-between group/title">
+                                        {/* Group Actions */}
+                                        <div className="opacity-0 group-hover/title:opacity-100 flex items-center gap-1 transition-opacity">
                                             <button
-                                                onClick={() => toggleGroup(group.id)}
-                                                className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 outline-none flex-1 truncate"
+                                                onClick={() => startCreatingProject(group.id)}
+                                                className="p-1 hover:bg-blue-50 text-blue-500 rounded"
+                                                title="Add Project to Folder"
                                             >
-                                                <ChevronRight
-                                                    size={16}
-                                                    className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")}
-                                                />
-                                                <span className="truncate">{group.name}</span>
-                                                <span className="text-xs text-gray-400 font-normal">({groupProjects?.length})</span>
+                                                <Plus size={12} />
                                             </button>
-
-                                            {/* Group Actions */}
-                                            <div className="opacity-0 group-hover/title:opacity-100 flex items-center gap-1 transition-opacity">
-                                                <button
-                                                    onClick={() => startCreatingProject(group.id)}
-                                                    className="p-1 hover:bg-blue-50 text-blue-500 rounded"
-                                                    title="Add Project to Folder"
-                                                >
-                                                    <Plus size={12} />
-                                                </button>
-                                                <button onClick={() => handleRenameGroup(group)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><Edit2 size={12} /></button>
-                                                <button onClick={() => handleDeleteGroup(group.id)} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 size={12} /></button>
-                                            </div>
+                                            <button onClick={() => handleRenameGroup(group)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><Edit2 size={12} /></button>
+                                            <button onClick={() => handleDeleteGroup(group.id)} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 size={12} /></button>
                                         </div>
                                     </div>
-
-                                    {!isCollapsed && (
-                                        <div className="pl-2 space-y-0.5 min-h-[10px]">
-                                            {isCreatingProjectIn === group.id && (
-                                                <form onSubmit={(e) => handleCreateProjectSubmit(e, group.id)} className="px-3 py-1 mb-1">
-                                                    <input
-                                                        autoFocus
-                                                        type="text"
-                                                        value={newProjectName}
-                                                        onChange={(e) => setNewProjectName(e.target.value)}
-                                                        onBlur={() => !newProjectName && setIsCreatingProjectIn(null)}
-                                                        placeholder="Project Name..."
-                                                        disabled={isCreatingProject}
-                                                        className="w-full py-1 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
-                                                    />
-                                                </form>
-                                            )}
-
-                                            {groupProjects?.map(renderProjectItem)}
-                                            {groupProjects?.length === 0 && !isCreatingProjectIn && (
-                                                <div className="px-3 py-2 text-xs text-gray-300 italic text-center border-2 border-dashed border-gray-100 rounded-lg mx-2">
-                                                    Drop projects here
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </DroppableZone>
-                            )
-                        })}
-
-                        {/* 2. Ungrouped (Root) Projects */}
-                        <DroppableZone id="inbox" className="space-y-0.5 min-h-[50px]">
-                            {isCreatingProjectIn === 'ungrouped' && (
-                                <form onSubmit={(e) => handleCreateProjectSubmit(e, undefined)} className="px-3 py-1 mb-1">
-                                    <input
-                                        autoFocus
-                                        type="text"
-                                        value={newProjectName}
-                                        onChange={(e) => setNewProjectName(e.target.value)}
-                                        onBlur={() => !newProjectName && setIsCreatingProjectIn(null)}
-                                        placeholder="Project Name..."
-                                        disabled={isCreatingProject}
-                                        className="w-full py-1 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
-                                    />
-                                </form>
-                            )}
-
-                            {projects?.filter(p => !p.group_id).map(renderProjectItem)}
-
-                            {/* Empty state hint only if absolutely nothing exists */}
-                            {projects?.length === 0 && groups?.length === 0 && !isCreatingProjectIn && (
-                                <div className="px-3 py-4 text-xs text-gray-300 italic text-center">
-                                    Create a project or folder
                                 </div>
-                            )}
-                        </DroppableZone>
-                    </div>
 
+                                {!isCollapsed && (
+                                    <div className="pl-2 space-y-0.5 min-h-[10px]">
+                                        {isCreatingProjectIn === group.id && (
+                                            <form onSubmit={(e) => handleCreateProjectSubmit(e, group.id)} className="px-3 py-1 mb-1">
+                                                <input
+                                                    autoFocus
+                                                    type="text"
+                                                    value={newProjectName}
+                                                    onChange={(e) => setNewProjectName(e.target.value)}
+                                                    onBlur={() => !newProjectName && setIsCreatingProjectIn(null)}
+                                                    placeholder="Project Name..."
+                                                    disabled={isCreatingProject}
+                                                    className="w-full py-1 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
+                                                />
+                                            </form>
+                                        )}
+
+                                        {groupProjects?.map(renderProjectItem)}
+                                        {groupProjects?.length === 0 && !isCreatingProjectIn && (
+                                            <div className="px-3 py-2 text-xs text-gray-300 italic text-center border-2 border-dashed border-gray-100 rounded-lg mx-2">
+                                                Drop projects here
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </DroppableZone>
+                        )
+                    })}
+
+                    {/* 2. Ungrouped (Root) Projects */}
+                    <DroppableZone id="projects-root" data={{ type: 'Folder', root: true }} className="space-y-0.5 min-h-[50px]">
+                        {isCreatingProjectIn === 'ungrouped' && (
+                            <form onSubmit={(e) => handleCreateProjectSubmit(e, undefined)} className="px-3 py-1 mb-1">
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={newProjectName}
+                                    onChange={(e) => setNewProjectName(e.target.value)}
+                                    onBlur={() => !newProjectName && setIsCreatingProjectIn(null)}
+                                    placeholder="Project Name..."
+                                    disabled={isCreatingProject}
+                                    className="w-full py-1 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
+                                />
+                            </form>
+                        )}
+
+                        {projects?.filter(p => !p.group_id).map(renderProjectItem)}
+
+                        {/* Empty state hint only if absolutely nothing exists */}
+                        {projects?.length === 0 && groups?.length === 0 && !isCreatingProjectIn && (
+                            <div className="px-3 py-4 text-xs text-gray-300 italic text-center">
+                                Create a project or folder
+                            </div>
+                        )}
+                    </DroppableZone>
                 </div>
+
             </div>
-        </DndContext>
+        </div>
     )
 }

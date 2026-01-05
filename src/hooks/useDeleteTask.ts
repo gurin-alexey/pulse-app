@@ -11,7 +11,7 @@ export function useDeleteTask() {
         mutationFn: async (taskId: string) => {
             const { error } = await supabase
                 .from('tasks')
-                .delete()
+                .update({ deleted_at: new Date().toISOString() })
                 .eq('id', taskId)
 
             if (error) throw error
