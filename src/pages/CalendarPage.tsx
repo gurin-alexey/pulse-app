@@ -130,12 +130,22 @@ export function CalendarPage() {
             const newStart = info.event.start?.toISOString() || null
             const newEnd = info.event.end?.toISOString() || null
 
+            // Fix: due_date must be YYYY-MM-DD (Local), not ISO string with time
+            let dateStr = null
+            if (info.event.start) {
+                const d = info.event.start
+                const year = d.getFullYear()
+                const month = String(d.getMonth() + 1).padStart(2, '0')
+                const day = String(d.getDate()).padStart(2, '0')
+                dateStr = `${year}-${month}-${day}`
+            }
+
             updateTask({
                 taskId,
                 updates: {
                     start_time: newStart,
                     end_time: newEnd,
-                    due_date: newStart
+                    due_date: dateStr
                 }
             })
         }
