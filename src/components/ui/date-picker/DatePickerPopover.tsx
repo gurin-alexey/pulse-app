@@ -1,7 +1,7 @@
 import { Popover, PopoverButton, PopoverPanel, Transition } from '@headlessui/react'
 import { Fragment, useState, useEffect } from 'react'
 import { format, addDays, startOfToday, startOfTomorrow, nextMonday, type Day, isSameDay, isSameMonth, startOfMonth, endOfMonth, eachDayOfInterval, getDay, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns'
-import { Calendar as CalendarIcon, Clock, Bell, Repeat, Sun, Sunrise, ChevronRight, ChevronLeft, ChevronDown, Check } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, Bell, Repeat, Sun, Sunrise, ChevronRight, ChevronLeft, ChevronDown, Check, ArrowRight } from 'lucide-react'
 import clsx from 'clsx'
 import { RecurrenceMenu } from './RecurrenceMenu'
 import { RRule } from 'rrule'
@@ -9,24 +9,27 @@ import { RRule } from 'rrule'
 type DatePickerPopoverProps = {
     date: Date | null
     time: string | null // "HH:MM"
+    endTime: string | null // "HH:MM"
     recurrenceRule: string | null
-    onUpdate: (updates: { date?: Date | null, time?: string | null, recurrenceRule?: string | null }) => void
+    onUpdate: (updates: { date?: Date | null, time?: string | null, endTime?: string | null, recurrenceRule?: string | null }) => void
     children: React.ReactNode // The trigger button
 }
 
-export function DatePickerPopover({ date, time, recurrenceRule, onUpdate, children }: DatePickerPopoverProps) {
+export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdate, children }: DatePickerPopoverProps) {
     const [currentMonth, setCurrentMonth] = useState(date || startOfToday())
     const [selectedDate, setSelectedDate] = useState<Date | null>(date)
     const [selectedTime, setSelectedTime] = useState<string | null>(time)
+    const [selectedEndTime, setSelectedEndTime] = useState<string | null>(endTime)
     const [selectedRecurrence, setSelectedRecurrence] = useState<string | null>(recurrenceRule)
 
     // Sync state when props change (if controlled)
     useEffect(() => {
         setSelectedDate(date)
         setSelectedTime(time)
+        setSelectedEndTime(endTime)
         setSelectedRecurrence(recurrenceRule)
         if (date) setCurrentMonth(date)
-    }, [date, time, recurrenceRule])
+    }, [date, time, endTime, recurrenceRule])
 
     const today = startOfToday()
 
@@ -55,6 +58,7 @@ export function DatePickerPopover({ date, time, recurrenceRule, onUpdate, childr
         onUpdate({
             date: selectedDate,
             time: selectedTime,
+            endTime: selectedEndTime,
             recurrenceRule: selectedRecurrence
         })
         close()
@@ -64,6 +68,7 @@ export function DatePickerPopover({ date, time, recurrenceRule, onUpdate, childr
         onUpdate({
             date: null,
             time: null,
+            endTime: null,
             recurrenceRule: null
         })
         close()
@@ -99,15 +104,7 @@ export function DatePickerPopover({ date, time, recurrenceRule, onUpdate, childr
                         leaveTo="opacity-0 translate-y-1"
                     >
                         <PopoverPanel className="absolute left-0 z-50 mt-2 w-[320px] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden text-sm font-sans">
-                            {/* Header Tabs */}
-                            <div className="p-2 bg-gray-50/50 border-b border-gray-100 flex gap-1">
-                                <button className="flex-1 py-1.5 text-center bg-white rounded-lg shadow-sm text-gray-900 font-medium text-xs">
-                                    Date
-                                </button>
-                                <button className="flex-1 py-1.5 text-center text-gray-500 hover:bg-gray-100/50 rounded-lg font-medium text-xs">
-                                    Duration
-                                </button>
-                            </div>
+                            {/* [REMOVED] Header Tabs: "Date" vs "Duration" */}
 
                             {/* Quick Actions */}
                             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -202,16 +199,32 @@ export function DatePickerPopover({ date, time, recurrenceRule, onUpdate, childr
 
                             {/* Options List */}
                             <div className="border-t border-gray-100">
-                                {/* Time */}
+                                {/* Time & EndTime */}
                                 <div className="flex items-center px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50">
-                                    <Clock size={16} className="text-gray-400 mr-3" />
+                                    <Clock size={16} className="text-gray-400 mr-3 shrink-0" />
+
+                                    {/* Start Time */}
                                     <input
                                         type="time"
                                         value={selectedTime || ''}
                                         onChange={(e) => setSelectedTime(e.target.value)}
-                                        className="bg-transparent border-none p-0 text-sm text-gray-700 focus:ring-0 flex-1 cursor-pointer"
+                                        className="bg-transparent border-none p-0 text-sm text-gray-700 focus:ring-0 w-[60px] cursor-pointer"
                                         placeholder="Add time"
                                     />
+
+                                    {/* End Time (Conditional) */}
+                                    {selectedTime && (
+                                        <div className="flex items-center ml-2 animate-in fade-in slide-in-from-left-2 duration-200">
+                                            <ArrowRight size={14} className="text-gray-400 mx-2" />
+                                            <input
+                                                type="time"
+                                                value={selectedEndTime || ''}
+                                                onChange={(e) => setSelectedEndTime(e.target.value)}
+                                                className="bg-transparent border-none p-0 text-sm text-gray-700 focus:ring-0 w-[60px] cursor-pointer"
+                                                placeholder="End time"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Reminder (Placeholder) */}

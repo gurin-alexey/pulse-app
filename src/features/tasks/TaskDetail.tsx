@@ -157,8 +157,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             <DatePickerPopover
                                 date={task.due_date ? new Date(task.due_date) : null}
                                 time={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null}
+                                endTime={task.end_time ? new Date(task.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null}
                                 recurrenceRule={task.recurrence_rule || null}
-                                onUpdate={({ date, time, recurrenceRule }) => {
+                                onUpdate={({ date, time, endTime, recurrenceRule }) => {
                                     const updates: Record<string, string | null | undefined> = {}
                                     if (date) {
                                         updates.due_date = format(date, 'yyyy-MM-dd')
@@ -168,6 +169,15 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                             const newStart = new Date(date)
                                             newStart.setHours(h, m, 0, 0)
                                             updates.start_time = newStart.toISOString()
+
+                                            if (endTime) {
+                                                const [eh, em] = endTime.split(':').map(Number)
+                                                const newEnd = new Date(date)
+                                                newEnd.setHours(eh, em, 0, 0)
+                                                updates.end_time = newEnd.toISOString()
+                                            } else {
+                                                updates.end_time = null
+                                            }
                                         } else {
                                             updates.start_time = null
                                             updates.end_time = null
@@ -186,7 +196,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                     <CalendarIcon size={16} className={clsx("group-hover/date:text-blue-500", task.due_date ? "text-blue-600" : "text-gray-400")} />
                                     <span className={clsx("text-sm", task.due_date ? "text-gray-700 font-medium" : "text-gray-400 italic")}>
                                         {task.due_date ? format(new Date(task.due_date), 'MMM d') : 'Set Date'}
-                                        {task.start_time && <span className="ml-1 text-gray-500 font-normal">{new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>}
+                                        {task.start_time && <span className="ml-1 text-gray-500 font-normal">
+                                            {new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                            {task.end_time && ` - ${new Date(task.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`}
+                                        </span>}
                                         {task.recurrence_rule && <Repeat size={12} className="inline ml-1 text-blue-500" />}
                                     </span>
                                 </div>
