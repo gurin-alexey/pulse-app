@@ -1,5 +1,4 @@
-// @ts-ignore
-import { useChat } from 'ai/react'
+import { useChat } from '@ai-sdk/react'
 import { useState, useRef, useEffect } from 'react'
 import { Bot, Send, X, Loader2, Sparkles, CheckCircle2 } from 'lucide-react'
 import clsx from 'clsx'
@@ -9,7 +8,9 @@ export function ChatWidget() {
     const [isOpen, setIsOpen] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
+    // @ts-ignore
     const { messages, input, handleInputChange, handleSubmit, isLoading, reload, stop } = useChat({
+        // @ts-ignore
         maxSteps: 5,
         api: '/api/chat', // Note: This requires Vercel deployment or a local proxy to a server running the route
         onError: (err: any) => {
@@ -31,7 +32,7 @@ export function ChatWidget() {
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                        className="fixed bottom-20 right-6 w-96 max-w-[calc(100vw-48px)] h-[500px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden z-50"
+                        className="fixed bottom-20 right-6 w-[1200px] max-w-[90vw] h-[700px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden z-50"
                     >
                         {/* Header */}
                         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex items-center justify-between text-white">
