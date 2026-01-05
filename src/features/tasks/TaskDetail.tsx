@@ -3,7 +3,7 @@ import TextareaAutosize from 'react-textarea-autosize'
 import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
-import { X, Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp } from 'lucide-react'
+import { X, Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp, Flag } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { SubtaskList } from './SubtaskList'
@@ -149,128 +149,116 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     return (
         <div className="h-full flex flex-col bg-white overflow-hidden relative">
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-24">
-                <div className="mb-6 space-y-4">
-                    {/* Top Row: Breadcrumbs (Left) + Date/Time (Right) */}
-                    <div className="flex items-start justify-between gap-4 mb-4">
-                        {/* Breadcrumbs */}
-                        <div>
-                            {task.parent_id && parentTask && (
-                                <div
-                                    onClick={handleBreadcrumbClick}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 hover:text-blue-600 cursor-pointer w-fit transition-all group"
-                                >
-                                    <ArrowUp size={16} className="text-gray-500 group-hover:text-blue-500" />
-                                    <span className="font-medium text-sm truncate max-w-[300px]">{parentTask.title}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Date & Time (moved from footer) */}
-                        <div className="flex items-center gap-2">
+            <div className="flex-1 overflow-y-auto px-6 pt-3 pb-24">
+                <div className="mb-2 space-y-2">
+                    {/* Breadcrumbs */}
+                    <div>
+                        {task.parent_id && parentTask && (
                             <div
-                                className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors cursor-help"
-                                title="Tip: Alt+1 (Today), Alt+2 (Tomorrow), Alt+3 (Next Week)"
+                                onClick={handleBreadcrumbClick}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 hover:text-blue-600 cursor-pointer w-fit transition-all group"
                             >
-                                <CalendarIcon size={16} className="text-gray-400" />
-                                <input
-                                    type="date"
-                                    value={task.due_date ? task.due_date.split('T')[0] : ''}
-                                    onChange={handleDateChange}
-                                    className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm"
-                                />
+                                <ArrowUp size={16} className="text-gray-500 group-hover:text-blue-500" />
+                                <span className="font-medium text-sm truncate max-w-[300px]">{parentTask.title}</span>
                             </div>
-
-                            {/* Time Picker */}
-                            {task.due_date && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors">
-                                    <input
-                                        type="time"
-                                        value={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
-                                        onChange={(e) => {
-                                            const time = e.target.value
-                                            if (!time) return
-
-                                            const datePart = task.due_date ? task.due_date.split('T')[0] : null
-                                            if (!datePart) return
-
-                                            const newStart = `${datePart}T${time}:00`
-                                            const startDate = new Date(newStart)
-
-                                            let endDateStr = task.end_time
-                                            if (!endDateStr) {
-                                                endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
-                                            } else {
-                                                const currentEnd = new Date(endDateStr)
-                                                if (currentEnd <= startDate) {
-                                                    endDateStr = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
-                                                }
-                                            }
-
-                                            updateTask({
-                                                taskId,
-                                                updates: {
-                                                    start_time: startDate.toISOString(),
-                                                    end_time: endDateStr
-                                                }
-                                            })
-                                        }}
-                                        className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm w-[46px]"
-                                    />
-                                    {task.start_time && (
-                                        <>
-                                            <span className="text-gray-400">-</span>
-                                            <input
-                                                type="time"
-                                                value={task.end_time ? new Date(task.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
-                                                onChange={(e) => {
-                                                    const time = e.target.value
-                                                    if (!time) return
-
-                                                    const datePart = task.due_date ? task.due_date.split('T')[0] : null
-                                                    if (!datePart) return
-
-                                                    const newEnd = `${datePart}T${time}:00`
-                                                    updateTask({
-                                                        taskId,
-                                                        updates: {
-                                                            end_time: new Date(newEnd).toISOString()
-                                                        }
-                                                    })
-                                                }}
-                                                className="bg-transparent border-none p-0 text-gray-600 focus:ring-0 cursor-pointer text-sm w-[46px]"
-                                            />
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                        )}
                     </div>
 
-                    <div className="flex items-start gap-3">
-                        {/* Checkbox */}
-                        <button
-                            onClick={toggleStatus}
-                            className={clsx("mt-1.5 transition-colors shrink-0", task.is_completed ? "text-green-500" : "text-gray-300 hover:text-gray-500")}
-                        >
-                            {task.is_completed ? <CheckSquare size={24} /> : <Square size={24} />}
-                        </button>
+                    {/* Task Header (No Frame) */}
+                    <div className="group/card">
 
-                        <TextareaAutosize
-                            autoFocus={searchParams.get('isNew') === 'true'}
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            onBlur={handleTitleBlur}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    (e.target as HTMLTextAreaElement).blur();
-                                }
-                            }}
-                            className="w-full text-2xl font-bold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-tight"
-                            placeholder="Task title"
-                            minRows={1}
-                        />
+                        {/* Top Meta Row */}
+                        <div className="flex items-center gap-3 pb-3 border-b border-gray-100 mb-4">
+                            {/* Checkbox */}
+                            <button
+                                onClick={toggleStatus}
+                                className={clsx("transition-colors shrink-0", task.is_completed ? "text-green-500" : "text-gray-400 hover:text-gray-600")}
+                            >
+                                {task.is_completed ? <CheckSquare size={20} /> : <Square size={20} />}
+                            </button>
+
+                            {/* Divider */}
+                            <div className="w-px h-5 bg-gray-200" />
+
+                            {/* Date Picker */}
+                            <div className="flex items-center gap-2">
+                                <div
+                                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 transition-all cursor-pointer group/date"
+                                    title="Set Date"
+                                >
+                                    <CalendarIcon size={16} className="text-gray-400 group-hover/date:text-blue-500" />
+                                    <input
+                                        type="date"
+                                        value={task.due_date ? task.due_date.split('T')[0] : ''}
+                                        onChange={handleDateChange}
+                                        className={clsx(
+                                            "bg-transparent border-none p-0 focus:ring-0 cursor-pointer text-sm w-[110px]",
+                                            task.due_date ? "text-gray-700 font-medium" : "text-gray-400 italic"
+                                        )}
+                                    />
+                                </div>
+
+                                {/* Time Picker */}
+                                {task.due_date && (
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="time"
+                                            value={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}
+                                            onChange={(e) => {
+                                                const time = e.target.value
+                                                if (!time) return
+                                                const datePart = task.due_date ? task.due_date.split('T')[0] : null
+                                                if (!datePart) return
+                                                const newStart = `${datePart}T${time}:00`
+
+                                                updateTask({ taskId, updates: { start_time: new Date(newStart).toISOString() } })
+                                            }}
+                                            className="bg-transparent border-none p-0 text-gray-500 focus:ring-0 cursor-pointer text-xs w-[40px] hover:bg-gray-50 hover:text-blue-600 rounded px-1"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex-1" />
+
+                            {/* Priority Flag */}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    const next: Record<string, 'low' | 'medium' | 'high'> = { 'none': 'low', 'low': 'medium', 'medium': 'high', 'high': 'low' }
+                                    const current = (task.priority as string) || 'none'
+                                    updateTask({ taskId, updates: { priority: next[current] as any } })
+                                }}
+                                className={clsx(
+                                    "p-1.5 rounded transition-all hover:bg-gray-50",
+                                    task.priority === 'high' ? "text-red-500" :
+                                        task.priority === 'medium' ? "text-orange-500" :
+                                            task.priority === 'low' ? "text-blue-500" : "text-gray-300 hover:text-gray-500"
+                                )}
+                                title={`Priority: ${task.priority || 'None'}`}
+                            >
+                                <Flag size={18} className={clsx(task.priority && "fill-current opacity-20")} />
+                            </button>
+                        </div>
+
+                        {/* Title Row */}
+                        <div>
+                            <TextareaAutosize
+                                autoFocus={searchParams.get('isNew') === 'true'}
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                onBlur={handleTitleBlur}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        (e.target as HTMLTextAreaElement).blur();
+                                    }
+                                }}
+                                className="w-full text-xl font-semibold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-snug"
+                                placeholder="What needs to be done?"
+                                minRows={1}
+                            />
+                        </div>
                     </div>
 
                     <textarea

@@ -1,16 +1,13 @@
 import TextareaAutosize from 'react-textarea-autosize'
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { CheckSquare, Square, GripVertical, Calendar } from "lucide-react"
+import { CheckSquare, Square, GripVertical, Calendar, ChevronRight } from "lucide-react"
 import { useTags, useToggleTaskTag, useTaskTags } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion } from "framer-motion"
-import { addDays, nextMonday, format, startOfToday } from "date-fns"
+import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } from "date-fns"
 import { toast } from "sonner"
-
-import { differenceInCalendarDays } from "date-fns"
-import { ChevronRight, ChevronDown } from "lucide-react"
 
 interface TaskItemProps {
     task: any
@@ -28,8 +25,6 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
-    const { data: allTags } = useTags()
-    const { data: taskTags } = useTaskTags(task.id)
     const { mutate: toggleTag } = useToggleTaskTag()
 
     // Local state for inline editing
