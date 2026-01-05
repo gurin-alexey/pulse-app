@@ -16,7 +16,23 @@ export function useUpdateTask() {
                 updates.completed_at = updates.is_completed ? new Date().toISOString() : null
             }
 
-            // 1. Perform the primary update
+            // 1. If parent_id is changing to a non-null value, inherit parent's context
+            if (updates.parent_id) {
+                const { data: parentTask } = await supabase
+                    .from('tasks')
+                    .select('project_id, section_id, due_date')
+                    .eq('id', updates.parent_id)
+                    .single()
+
+                if (parentTask) {
+                    updates.project_id = parentTask.project_id
+                    updates.section_id = parentTask.section_id
+                    // We don't overwrite due_date here as it might be specific, 
+                    // but we do inherit the project "location".
+                }
+            }
+
+            // 2. Perform the primary update
             const { data, error } = await supabase
                 .from('tasks')
                 .update(updates)
@@ -26,17 +42,20 @@ export function useUpdateTask() {
 
             if (error) throw error
 
-            // 2. Cascade project/section changes to descendants
-            // If project_id or section_id changed, we must move all children too
-            if (updates.project_id !== undefined || updates.section_id !== undefined) {
-                const cascadeUpdates: any = {}
-                if (updates.project_id !== undefined) cascadeUpdates.project_id = updates.project_id
-                if (updates.section_id !== undefined) cascadeUpdates.section_id = updates.section_id
+            // 3. Cascade critical fields to descendants
+            // We cascade: project_id, section_id, due_date, deleted_at
+            const fieldsToCascade = ['project_id', 'section_id', 'due_date', 'deleted_at'] as const
+            const cascadeUpdates: any = {}
+            let shouldCascade = false
 
-                // We need to recursively update all levels. 
-                // Since Supabase/PostgREST doesn't support recursive updates in one call easily, 
-                // we'll fetch all descendants and update them in bulk.
+            fieldsToCascade.forEach(field => {
+                if (updates[field] !== undefined) {
+                    cascadeUpdates[field] = updates[field]
+                    shouldCascade = true
+                }
+            })
 
+            if (shouldCascade) {
                 const updateDescendants = async (parentId: string) => {
                     const { data: children } = await supabase
                         .from('tasks')
@@ -81,20 +100,40 @@ export function useUpdateTask() {
             // Store snapshots of all modified lists
             const modifiedLists: { queryKey: readonly unknown[], data: Task[] }[] = []
 
-            // Helper to get all descendant IDs from a list
-            const getDescendantIds = (parentId: string, allTasks: Task[]): string[] => {
-                const children = allTasks.filter(t => t.parent_id === parentId)
+            // 1. Gather all unique tasks from all cached queries for descendant lookup
+            const allCachedTasks: Task[] = []
+            const seenIds = new Set<string>()
+
+            const queries = [
+                previousAllTasks || [],
+                ...(tasksQueries.flatMap(([_, data]) => data || [])),
+                ...(subtasksQueries.flatMap(([_, data]) => data || []))
+            ]
+
+            queries.forEach((item: Task | Task[]) => {
+                const list = Array.isArray(item) ? item : [item]
+                list.forEach((t: Task) => {
+                    if (!seenIds.has(t.id)) {
+                        allCachedTasks.push(t)
+                        seenIds.add(t.id)
+                    }
+                })
+            })
+
+            // 2. Helper to get all descendant IDs
+            const getDescendantIds = (parentId: string, tasksToSearch: Task[]): string[] => {
+                const children = tasksToSearch.filter(t => t.parent_id === parentId)
                 let ids = children.map(c => c.id)
                 children.forEach(c => {
-                    ids = [...ids, ...getDescendantIds(c.id, allTasks)]
+                    ids = [...ids, ...getDescendantIds(c.id, tasksToSearch)]
                 })
                 return ids
             }
 
-            const descendantIds = previousAllTasks ? getDescendantIds(taskId, previousAllTasks) : []
+            const descendantIds = getDescendantIds(taskId, allCachedTasks)
             const allTargetIds = [taskId, ...descendantIds]
 
-            // Helper to update a list if it contains any of the target tasks
+            // 3. Helper to update a list if it contains any of the target tasks
             const updateList = (queryKey: readonly unknown[], list: Task[] | undefined) => {
                 if (!list) return
                 if (list.some(t => allTargetIds.includes(t.id))) {
