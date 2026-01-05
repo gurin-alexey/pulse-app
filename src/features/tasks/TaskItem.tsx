@@ -9,6 +9,8 @@ import { motion } from "framer-motion"
 import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } from "date-fns"
 import { toast } from "sonner"
 
+import { useSelectionStore } from "@/store/useSelectionStore"
+
 interface TaskItemProps {
     task: any
     isActive: boolean
@@ -19,13 +21,17 @@ interface TaskItemProps {
     isCollapsed?: boolean
     onToggleCollapse?: () => void
     disableAnimation?: boolean
+    onShiftClick?: (id: string) => void
 }
 
-export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation }: TaskItemProps) {
+export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onShiftClick }: TaskItemProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: toggleTag } = useToggleTaskTag()
+
+    const { selectedIds, select, toggle } = useSelectionStore()
+    const isSelected = selectedIds.has(task.id)
 
     // Local state for inline editing
     const [title, setTitle] = useState(task.title)
@@ -38,6 +44,31 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const handleTaskClick = (e: React.MouseEvent) => {
         if (isEditing) return
+
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            toggle(task.id)
+            return
+        }
+
+        if (e.shiftKey && onShiftClick) {
+            e.preventDefault()
+            // Disable text selection during shift click
+            const selection = window.getSelection()
+            if (selection) selection.removeAllRanges()
+
+            onShiftClick(task.id)
+            return
+        }
+
+        if (selectedIds.size > 1) {
+            // If multiple selected, simple click clears others and selects this one
+            select(task.id)
+        } else {
+            // Ensure this is selected if it wasn't
+            if (!selectedIds.has(task.id)) select(task.id)
+        }
+
         setSearchParams({ task: task.id })
     }
 
@@ -117,7 +148,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 onClick={handleTaskClick}
                 className={clsx(
                     "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent", // h-9 = 36px fixed height, added transparent border for sizing consistency
-                    isActive ? "bg-blue-50/80 !border-blue-100" : "hover:bg-gray-100/60",
+                    isSelected ? "bg-blue-50 dark:bg-blue-900/20 !border-blue-100" : (isActive ? "bg-gray-100" : "hover:bg-gray-100/60"),
                     task.is_completed && "opacity-50"
                 )}
             >

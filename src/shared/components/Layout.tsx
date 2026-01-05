@@ -22,11 +22,14 @@ import { Toaster } from "sonner"
 import { SettingsModal } from "@/features/settings/SettingsModal"
 import { useSettings } from "@/store/useSettings"
 import { usePrefetchData } from "@/hooks/usePrefetchData"
+import { useSelectionStore } from "@/store/useSelectionStore"
+import { BulkActionsPanel } from "@/features/tasks/BulkActionsPanel"
 
 export function Layout() {
   const isDesktop = useMediaQuery("(min-width: 768px)")
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const { selectedIds } = useSelectionStore()
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -328,7 +331,9 @@ export function Layout() {
             <section className={clsx(
               "border-r border-gray-200 bg-white overflow-y-auto h-full hidden lg:block"
             )}>
-              {taskId ? (
+              {selectedIds.size > 1 ? (
+                <BulkActionsPanel />
+              ) : taskId ? (
                 <TaskDetail taskId={taskId} />
               ) : (
                 <div className="h-full flex items-center justify-center text-gray-400 text-sm">

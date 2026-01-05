@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useSelectionStore } from "@/store/useSelectionStore"
 import { useParams, useSearchParams } from "react-router-dom"
 import { useTasks } from "@/hooks/useTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
@@ -113,6 +114,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     const { mutate: createSection } = useCreateSection()
     const { mutate: deleteSection } = useDeleteSection()
     const { mutate: updateSection } = useUpdateSection()
+    const { lastSelectedId, selectRange } = useSelectionStore()
 
     // View State
     // ... State declarations remain ...
@@ -458,6 +460,47 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
         updateSection({ id: sectionId, updates: { name: editingSectionName } }); setEditingSectionId(null)
     }
 
+
+
+    const handleShiftClick = (currentId: string) => {
+        if (!lastSelectedId) return
+
+        let allVisibleItems: any[] = []
+
+        if (renderMode === 'groups') {
+            Object.values(tasksForView).forEach((groupTasks: any) => {
+                allVisibleItems.push(...groupTasks)
+            })
+        } else {
+            // Main List
+            allVisibleItems.push(...getFlattenedTasks(null))
+
+            // Sections
+            if (showSections && sections) {
+                sections.forEach(s => {
+                    allVisibleItems.push(...getFlattenedTasks(s.id))
+                })
+            }
+        }
+
+        if (completedAccordionOpen) {
+            allVisibleItems.push(...completedTasks)
+        }
+
+        const currentIndex = allVisibleItems.findIndex(t => t.id === currentId)
+        const lastIndex = allVisibleItems.findIndex(t => t.id === lastSelectedId)
+
+        if (currentIndex === -1 || lastIndex === -1) return
+
+        const start = Math.min(currentIndex, lastIndex)
+        const end = Math.max(currentIndex, lastIndex)
+
+        const rangeIds = allVisibleItems.slice(start, end + 1).map(t => t.id)
+        selectRange(rangeIds)
+    }
+
+    // ...
+
     // Helper to render a single task item
     const renderTaskItem = (task: any) => {
         const hasChildren = activeTasks.some(t => t.parent_id === task.id)
@@ -476,6 +519,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                         hasChildren={hasChildren}
                         isCollapsed={!!collapsedTaskIds[task.id]}
                         onToggleCollapse={() => setCollapsedTaskIds(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
+                        onShiftClick={handleShiftClick}
                     />
                 )}
             </SortableTaskItem>
