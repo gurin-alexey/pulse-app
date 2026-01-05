@@ -24,6 +24,8 @@ export function CalendarPage() {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
     const [currentTitle, setCurrentTitle] = useState('')
     const [currentViewType, setCurrentViewType] = useState('timeGridDay')
+    const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+    const lastClickRef = useRef<{ id: string | null; time: number }>({ id: null, time: 0 })
 
     // Recurrence Edit Modal State
     const [recurrenceModal, setRecurrenceModal] = useState<{
@@ -83,7 +85,10 @@ export function CalendarPage() {
             updates.due_date = selectInfo.startStr.split('T')[0]
         }
 
-        createTask({ ...updates, title: '' }) // Remove auto-open
+        const newId = crypto.randomUUID()
+        setSearchParams({ task: newId, isNew: 'true' })
+
+        createTask({ id: newId, ...updates, title: '' })
     }
 
     if (isLoading) {
@@ -99,15 +104,37 @@ export function CalendarPage() {
         let start = task.start_time || task.due_date
         let end = task.end_time
 
+        // Priority-based colors
+        let backgroundColor = '#94a3b8' // Default Gray (None)
+        let borderColor = '#64748b'
+        let textColor = '#ffffff'
+
+        if (task.is_completed) {
+            backgroundColor = '#f3f4f6' // Very light gray for completed
+            borderColor = '#e5e7eb'
+            textColor = '#9ca3af'
+        } else {
+            if (task.priority === 'high') {
+                backgroundColor = '#ef4444' // Red
+                borderColor = '#dc2626'
+            } else if (task.priority === 'medium') {
+                backgroundColor = '#fbbf24' // Amber/Light Orange
+                borderColor = '#f59e0b'
+            } else if (task.priority === 'low') {
+                backgroundColor = '#3b82f6' // Blue for Low
+                borderColor = '#2563eb'
+            }
+        }
+
         return {
             id: task.id,
             title: task.title || 'Untitled Task',
             start: start || undefined,
             end: end || undefined,
             allDay: !task.start_time,
-            backgroundColor: task.is_completed ? '#e5e7eb' : '#3b82f6',
-            borderColor: task.is_completed ? '#d1d5db' : '#2563eb',
-            textColor: task.is_completed ? '#9ca3af' : '#ffffff',
+            backgroundColor,
+            borderColor,
+            textColor,
             extendedProps: {
                 projectId: task.project_id,
                 description: task.description,

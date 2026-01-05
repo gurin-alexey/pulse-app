@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import type { Task } from '@/types/database'
 
 type CreateTaskParams = {
+    id?: string
     title: string
     projectId: string | null
     userId: string
@@ -24,10 +25,11 @@ export function useCreateTask() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async ({ title, projectId, userId, parentId, sectionId, due_date, start_time, end_time, description, priority, recurrence_rule }: CreateTaskParams) => {
+        mutationFn: async ({ id, title, projectId, userId, parentId, sectionId, due_date, start_time, end_time, description, priority, recurrence_rule }: CreateTaskParams) => {
             const { data, error } = await supabase
                 .from('tasks')
                 .insert({
+                    id,
                     title,
                     project_id: projectId || null,
                     user_id: userId,

@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Fragment } from 'react'
+import { Menu, Transition } from '@headlessui/react'
 import TextareaAutosize from 'react-textarea-autosize'
 import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
@@ -49,19 +50,24 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         }
     }, [task])
 
-    // Keep track of title for unmount check
+    // Keep track of values for unmount check
     const titleRef = useRef(title)
+    const descriptionRef = useRef(description)
+
     useEffect(() => {
         titleRef.current = title
-    }, [title])
+        descriptionRef.current = description
+    }, [title, description])
 
     // Cleanup empty new tasks on unmount (covers close button, backdrop click, nav, etc.)
     useEffect(() => {
         return () => {
             // Check if we are truly closing (URL no longer contains this task)
-            // This prevents deletion during React Strict Mode double-mount
             const currentParams = new URLSearchParams(window.location.search)
-            if (!currentParams.get('task') && !titleRef.current.trim()) {
+            const closing = !currentParams.get('task')
+            const isEmpty = !titleRef.current.trim() && !descriptionRef.current.trim()
+
+            if (closing && isEmpty) {
                 deleteTask(taskId)
             }
         }
@@ -134,7 +140,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         })
     }
 
-    if (isLoading) {
+    const isNew = searchParams.get('isNew') === 'true'
+
+    if (isLoading && !isNew) {
         return (
             <div className="h-full flex items-center justify-center text-gray-400">
                 <Loader2 className="animate-spin mr-2" />
@@ -143,7 +151,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         )
     }
 
-    if (!task) {
+    if (!task && !isNew) {
         return (
             <div className="h-full flex items-center justify-center text-gray-400">
                 Task not found
@@ -157,6 +165,22 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         }
     }
 
+    // Safety fallback for rendering while loading/creating
+    const t = task || ({
+        id: taskId,
+        title: '',
+        description: '',
+        priority: 'none',
+        is_completed: false,
+        project_id: null,
+        parent_id: null,
+        due_date: null,
+        start_time: null,
+        end_time: null,
+        recurrence_rule: null,
+        is_project: false
+    } as any)
+
 
     return (
         <div className="h-full flex flex-col bg-white overflow-hidden relative">
@@ -165,7 +189,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                 <div className="mb-2 space-y-2">
                     {/* Breadcrumbs */}
                     <div>
-                        {task.parent_id && parentTask && (
+                        {t.parent_id && parentTask && (
                             <div
                                 onClick={handleBreadcrumbClick}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 hover:text-blue-600 cursor-pointer w-fit transition-all group"
@@ -177,7 +201,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     </div>
 
                     {/* Occurrence Detach Banner */}
-                    {occurrence && task.recurrence_rule && (
+                    {occurrence && t.recurrence_rule && (
                         <div className="mb-2 p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between transition-all animate-in fade-in slide-in-from-top-2 duration-300">
                             <div className="flex items-center gap-2.5 text-blue-700">
                                 <Repeat size={16} className="shrink-0" />
@@ -200,9 +224,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             {/* Checkbox */}
                             <button
                                 onClick={toggleStatus}
-                                className={clsx("transition-colors shrink-0", task.is_completed ? "text-green-500" : "text-gray-400 hover:text-gray-600")}
+                                className={clsx("transition-colors shrink-0", t.is_completed ? "text-green-500" : "text-gray-400 hover:text-gray-600")}
                             >
-                                {task.is_completed ? <CheckSquare size={20} /> : <Square size={20} />}
+                                {t.is_completed ? <CheckSquare size={20} /> : <Square size={20} />}
                             </button>
 
                             {/* Divider */}
@@ -210,10 +234,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
                             {/* Date Picker */}
                             <DatePickerPopover
-                                date={task.due_date ? new Date(task.due_date) : null}
-                                time={task.start_time ? new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null}
-                                endTime={task.end_time ? new Date(task.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null}
-                                recurrenceRule={task.recurrence_rule || null}
+                                date={t.due_date ? new Date(t.due_date) : null}
+                                time={t.start_time ? new Date(t.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null}
+                                endTime={t.end_time ? new Date(t.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : null}
+                                recurrenceRule={t.recurrence_rule || null}
                                 onUpdate={({ date, time, endTime, recurrenceRule }) => {
                                     const updates: Record<string, string | null | undefined> = {}
                                     if (date) {
@@ -248,38 +272,77 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                                 }}
                             >
                                 <div className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 transition-all cursor-pointer group/date" title="Set Date">
-                                    <CalendarIcon size={16} className={clsx("group-hover/date:text-blue-500", task.due_date ? "text-blue-600" : "text-gray-400")} />
-                                    <span className={clsx("text-sm", task.due_date ? "text-gray-700 font-medium" : "text-gray-400 italic")}>
-                                        {task.due_date ? format(new Date(task.due_date), 'MMM d') : 'Set Date'}
-                                        {task.start_time && <span className="ml-1 text-gray-500 font-normal">
-                                            {new Date(task.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                            {task.end_time && ` - ${new Date(task.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`}
+                                    <CalendarIcon size={16} className={clsx("group-hover/date:text-blue-500", t.due_date ? "text-blue-600" : "text-gray-400")} />
+                                    <span className={clsx("text-sm", t.due_date ? "text-gray-700 font-medium" : "text-gray-400 italic")}>
+                                        {t.due_date ? format(new Date(t.due_date), 'MMM d') : 'Set Date'}
+                                        {t.start_time && <span className="ml-1 text-gray-500 font-normal">
+                                            {new Date(t.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                            {t.end_time && ` - ${new Date(t.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`}
                                         </span>}
-                                        {task.recurrence_rule && <Repeat size={12} className="inline ml-1 text-blue-500" />}
+                                        {t.recurrence_rule && <Repeat size={12} className="inline ml-1 text-blue-500" />}
                                     </span>
                                 </div>
                             </DatePickerPopover>
 
                             <div className="flex-1" />
 
-                            {/* Priority Flag */}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    const next: Record<string, 'low' | 'medium' | 'high'> = { 'none': 'low', 'low': 'medium', 'medium': 'high', 'high': 'low' }
-                                    const current = (task.priority as string) || 'none'
-                                    updateTask({ taskId, updates: { priority: next[current] } })
-                                }}
-                                className={clsx(
-                                    "p-1.5 rounded transition-all hover:bg-gray-50",
-                                    task.priority === 'high' ? "text-red-500" :
-                                        task.priority === 'medium' ? "text-orange-500" :
-                                            task.priority === 'low' ? "text-blue-500" : "text-gray-300 hover:text-gray-500"
-                                )}
-                                title={`Priority: ${task.priority || 'None'}`}
-                            >
-                                <Flag size={18} className={clsx(task.priority && "fill-current opacity-20")} />
-                            </button>
+                            {/* Priority Selection Menu */}
+                            <Menu as="div" className="relative">
+                                <Menu.Button
+                                    className={clsx(
+                                        "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all hover:bg-gray-50",
+                                        t.priority === 'high' ? "bg-red-50 border-red-200 text-red-600" :
+                                            t.priority === 'medium' ? "bg-amber-50 border-amber-200 text-amber-600" :
+                                                t.priority === 'low' ? "bg-blue-50 border-blue-200 text-blue-600" :
+                                                    "bg-white border-gray-200 text-gray-400 hover:text-gray-600"
+                                    )}
+                                    title={`Priority: ${t.priority || 'Normal'}`}
+                                >
+                                    <Flag size={16} className={clsx(t.priority && "fill-current opacity-20")} />
+                                    <span className="text-xs font-bold uppercase tracking-wider">
+                                        {t.priority === 'high' ? 'High' :
+                                            t.priority === 'medium' ? 'Medium' :
+                                                t.priority === 'low' ? 'Low' : 'Normal'}
+                                    </span>
+                                </Menu.Button>
+
+                                <Transition
+                                    as={Fragment}
+                                    enter="transition ease-out duration-100"
+                                    enterFrom="transform opacity-0 scale-95"
+                                    enterTo="transform opacity-100 scale-100"
+                                    leave="transition ease-in duration-75"
+                                    leaveFrom="transform opacity-100 scale-100"
+                                    leaveTo="transform opacity-0 scale-95"
+                                >
+                                    <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-lg ring-1 ring-black/5 focus:outline-none z-30 overflow-hidden">
+                                        <div className="p-1">
+                                            {[
+                                                { id: 'none', label: 'Normal', color: 'text-gray-500', bg: 'hover:bg-gray-50' },
+                                                { id: 'low', label: 'Low Priority', color: 'text-blue-500', bg: 'hover:bg-blue-50' },
+                                                { id: 'medium', label: 'Medium Priority', color: 'text-amber-500', bg: 'hover:bg-amber-50' },
+                                                { id: 'high', label: 'High Priority', color: 'text-red-500', bg: 'hover:bg-red-50' }
+                                            ].map((opt) => (
+                                                <Menu.Item key={opt.id}>
+                                                    {({ active }) => (
+                                                        <button
+                                                            onClick={() => updateTask({ taskId, updates: { priority: (opt.id === 'none' ? null : opt.id) as any } })}
+                                                            className={clsx(
+                                                                "flex w-full items-center gap-3 px-3 py-2 text-sm font-medium transition-colors",
+                                                                active ? opt.bg : "bg-white",
+                                                                opt.color
+                                                            )}
+                                                        >
+                                                            <Flag size={14} className={clsx(t.priority === opt.id && "fill-current")} />
+                                                            {opt.label}
+                                                        </button>
+                                                    )}
+                                                </Menu.Item>
+                                            ))}
+                                        </div>
+                                    </Menu.Items>
+                                </Transition>
+                            </Menu>
                         </div>
 
                         {/* Title Row */}
@@ -310,7 +373,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                         placeholder="Add a description..."
                     />
 
-                    <SubtaskList taskId={task.id} projectId={task.project_id} isProject={task.is_project} />
+                    <SubtaskList taskId={taskId} projectId={t.project_id} isProject={t.is_project} />
                 </div>
             </div>
 
@@ -324,10 +387,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-md border border-gray-100 hover:border-gray-300 transition-colors relative group/project">
                         <Folder size={16} className="text-gray-400" />
                         <select
-                            value={task.project_id || ''}
+                            value={t.project_id || ''}
                             onChange={(e) => {
                                 const pid = e.target.value || null
-                                if (pid !== task.project_id) {
+                                if (pid !== t.project_id) {
                                     updateTask({ taskId, updates: { project_id: pid ?? undefined, section_id: null } })
                                 }
                             }}
@@ -343,21 +406,21 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     </div>
 
                     {/* Tag Manager */}
-                    <TagManager taskId={task.id} />
+                    <TagManager taskId={taskId} />
 
                     {/* Project Type Toggle (GTD logic) */}
                     <div className="flex items-center gap-2 border-l border-gray-100 pl-4 py-1">
                         <button
-                            onClick={() => updateTask({ taskId, updates: { is_project: !task.is_project } })}
+                            onClick={() => updateTask({ taskId, updates: { is_project: !t.is_project } })}
                             className={clsx(
                                 "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
-                                task.is_project
+                                t.is_project
                                     ? "bg-blue-600 text-white shadow-sm"
                                     : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                             )}
                             title="Mark as Project"
                         >
-                            {task.is_project ? "PROJECT" : "Task"}
+                            {t.is_project ? "PROJECT" : "Task"}
                         </button>
                     </div>
                 </div>
@@ -372,6 +435,6 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
                 </button>
             </div>
-        </div>
+        </div >
     )
 }

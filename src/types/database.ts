@@ -29,7 +29,7 @@ export type Task = {
     title: string
     description: string | null
     is_completed: boolean
-    priority: 'low' | 'medium' | 'high'
+    priority: 'low' | 'medium' | 'high' | null
     due_date: string | null
     project_id: string
     user_id: string

@@ -14,11 +14,11 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
     if (!isMobile) {
         return (
             <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-200"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-150"
                 onClick={onClose}
             >
                 <div
-                    className="bg-white shadow-2xl w-full max-w-2xl max-h-[85vh] rounded-2xl animate-in zoom-in-95 duration-200 flex flex-col relative overflow-hidden"
+                    className="bg-white shadow-2xl w-full max-w-2xl max-h-[85vh] rounded-2xl animate-in zoom-in-95 duration-150 flex flex-col relative overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex-1 overflow-y-auto">
