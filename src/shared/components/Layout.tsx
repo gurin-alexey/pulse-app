@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { Menu, LogOut, ChevronRight, Trash2, Settings } from "lucide-react"
+import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
@@ -103,14 +103,14 @@ export function Layout() {
   const { mutate: updateTask } = useUpdateTask()
 
   // Drag state
-  const [activeTask, setActiveTask] = useState<any>(null)
+  const [activeDragData, setActiveDragData] = useState<any>(null)
 
   const handleDragStart = (event: any) => {
-    setActiveTask(event.active.data.current?.task)
+    setActiveDragData(event.active.data.current)
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
-    setActiveTask(null)
+    setActiveDragData(null)
     const { active, over } = event
     // ... rest of existing logic
     if (!over) return
@@ -368,9 +368,16 @@ export function Layout() {
       {/* Global Drag Overlay */}
       {createPortal(
         <DragOverlay dropAnimation={null}>
-          {activeTask ? (
-            <div className="opacity-90 rotate-2 cursor-grabbing pointer-events-none">
-              <TaskItem task={activeTask} isActive={true} />
+          {activeDragData?.type === 'Task' ? (
+            <div className="opacity-100 cursor-grabbing pointer-events-none scale-100">
+              <TaskItem task={activeDragData.task} isActive={true} />
+            </div>
+          ) : activeDragData?.type === 'Section' ? (
+            <div className="opacity-100 cursor-grabbing pointer-events-none bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-64 scale-100">
+              <div className="flex items-center gap-2">
+                <GripVertical size={14} className="text-gray-400" />
+                <h3 className="font-bold text-sm text-gray-800">{activeDragData.section.name}</h3>
+              </div>
             </div>
           ) : null}
         </DragOverlay>,
