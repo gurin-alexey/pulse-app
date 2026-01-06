@@ -43,7 +43,8 @@ export function useCreateTask() {
                     end_time: end_time || null,
                     description: description || null,
                     priority: priority || 'low',
-                    recurrence_rule: recurrence_rule || null
+                    recurrence_rule: recurrence_rule || null,
+                    sort_order: -Date.now() // Ensure new tasks appear at the top
                 })
                 .select()
                 .single()
@@ -76,7 +77,7 @@ export function useCreateTask() {
                 is_completed: false,
                 is_project: false,
                 created_at: new Date().toISOString(),
-                sort_order: 0,
+                sort_order: -Date.now(), // Optimistic update
                 deleted_at: null,
                 completed_at: null,
                 tags: [] // Emtpy tags for new task
