@@ -75,8 +75,8 @@ export function Layout() {
     const { pointerCoordinates } = args
     if (!pointerCoordinates) return closestCorners(args)
 
-    // SIDEBAR ZONE: Exclusive area for sidebar targets (left 270px)
-    if (pointerCoordinates.x < 270) {
+    // SIDEBAR ZONE: Exclusive area for sidebar targets (left 270px) - ONLY ON DESKTOP
+    if (isDesktop && pointerCoordinates.x < 270) {
       const sidebarContainers = args.droppableContainers.filter((c: any) =>
         ['Nav', 'Project', 'Folder'].includes(c.data?.current?.type)
       )
