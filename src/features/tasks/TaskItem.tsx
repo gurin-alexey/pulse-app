@@ -2,8 +2,9 @@ import TextareaAutosize from 'react-textarea-autosize'
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { CheckSquare, Square, GripVertical, Calendar, ChevronRight } from "lucide-react"
-import { useTags, useToggleTaskTag, useTaskTags } from '@/hooks/useTags'
+import { useDeleteTask } from "@/hooks/useDeleteTask"
+import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2 } from "lucide-react"
+import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion } from "framer-motion"
 import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } from "date-fns"
@@ -11,6 +12,9 @@ import { toast } from "sonner"
 
 import { useSelectionStore } from "@/store/useSelectionStore"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
+import { useSettings } from "@/store/useSettings"
+import { useTrashActions } from "@/hooks/useTrashActions"
+import { ContextMenu } from "@/shared/components/ContextMenu"
 
 interface TaskItemProps {
     task: any
@@ -29,7 +33,13 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
+    const { mutate: deleteTask } = useDeleteTask()
+    const { restoreTask } = useTrashActions()
     const { mutate: toggleTag } = useToggleTaskTag()
+    const { data: allTags } = useTags()
+    const { settings } = useSettings()
+
+    const showToasts = settings?.preferences.show_toast_hints !== false
 
     const { selectedIds, select, toggle } = useSelectionStore()
     const isSelected = selectedIds.has(task.id)
@@ -38,6 +48,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     // Local state for inline editing
     const [title, setTitle] = useState(task.title)
     const [isEditing, setIsEditing] = useState(false)
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
 
     // Sync title if task updates externally
     useEffect(() => {
@@ -55,19 +66,15 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
         if (e.shiftKey && onShiftClick) {
             e.preventDefault()
-            // Disable text selection during shift click
             const selection = window.getSelection()
             if (selection) selection.removeAllRanges()
-
             onShiftClick(task.id)
             return
         }
 
         if (selectedIds.size > 1) {
-            // If multiple selected, simple click clears others and selects this one
             select(task.id)
         } else {
-            // Ensure this is selected if it wasn't
             if (!selectedIds.has(task.id)) select(task.id)
         }
 
@@ -92,7 +99,6 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             (e.currentTarget as HTMLTextAreaElement).blur()
         }
 
-        // Date Shortcuts: Alt + 1, 2, 3, 0
         if (e.altKey) {
             let newDate: Date | null = null
             let toastMessage = ""
@@ -121,11 +127,15 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             e.preventDefault()
             const dateStr = newDate ? format(newDate, 'yyyy-MM-dd') : null
             updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-            toast.success(toastMessage, { duration: 1500 })
+            if (showToasts) toast.success(toastMessage, { duration: 1500 })
         }
     }
 
-    // Helper for relative date
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault()
+        setContextMenu({ x: e.clientX, y: e.clientY })
+    }
+
     const getRelativeDate = (dateStr: string) => {
         const date = new Date(dateStr)
         const today = startOfToday()
@@ -134,9 +144,79 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
         if (diff === 0) return <span className="text-green-600 font-medium">Сегодня</span>
         if (diff === 1) return <span className="text-gray-500">Завтра</span>
         if (diff > 1) return <span className="text-gray-500">{diff} дн.</span>
-        if (diff < 0) return <span className="text-red-500 font-medium">{diff} дн.</span> // Past
+        if (diff < 0) return <span className="text-red-500 font-medium">{diff} дн.</span>
         return null
     }
+
+    const menuItems = [
+        {
+            label: 'Сегодня',
+            icon: <Calendar size={14} className="text-green-500" />,
+            onClick: () => {
+                const dateStr = format(startOfToday(), 'yyyy-MM-dd')
+                updateTask({ taskId: task.id, updates: { due_date: dateStr } })
+                if (showToasts) toast.success("📅 Set to Today")
+            }
+        },
+        {
+            label: 'Завтра',
+            icon: <Calendar size={14} className="text-orange-500" />,
+            onClick: () => {
+                const dateStr = format(addDays(startOfToday(), 1), 'yyyy-MM-dd')
+                updateTask({ taskId: task.id, updates: { due_date: dateStr } })
+                if (showToasts) toast.success("📅 Set to Tomorrow")
+            }
+        },
+        {
+            label: 'Следующая неделя',
+            icon: <Calendar size={14} className="text-blue-500" />,
+            onClick: () => {
+                const dateStr = format(nextMonday(startOfToday()), 'yyyy-MM-dd')
+                updateTask({ taskId: task.id, updates: { due_date: dateStr } })
+                if (showToasts) toast.success("📅 Set to Next Week")
+            }
+        },
+        { type: 'separator' as const },
+        {
+            label: 'Метки',
+            icon: <TagIcon size={14} className="text-gray-400" />,
+            submenu: allTags?.map(tag => {
+                const isAttached = task.tags?.some((t: any) => t.id === tag.id)
+                return {
+                    label: tag.name,
+                    icon: (
+                        <div
+                            className={clsx(
+                                "w-2 h-2 rounded-full",
+                                isAttached ? "ring-2 ring-offset-2 ring-blue-400" : ""
+                            )}
+                            style={{ backgroundColor: tag.color }}
+                        />
+                    ),
+                    onClick: () => toggleTag({ taskId: task.id, tagId: tag.id, isAttached })
+                }
+            })
+        },
+        { type: 'separator' as const },
+        {
+            label: 'Удалить',
+            icon: <Trash2 size={14} />,
+            variant: 'danger' as const,
+            onClick: () => {
+                deleteTask(task.id)
+                if (showToasts) {
+                    toast.message("Задача удалена", {
+                        description: "Вы можете найти её в корзине",
+                        duration: 4000,
+                        action: {
+                            label: 'Отменить',
+                            onClick: () => restoreTask.mutate(task.id)
+                        }
+                    })
+                }
+            }
+        }
+    ]
 
     return (
         <motion.div
@@ -144,19 +224,19 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             animate={disableAnimation ? false : { opacity: 1, y: 0 }}
             transition={{ duration: 0.1 }}
             className="group relative"
-            style={{ marginLeft: `${depth * 24}px` }} // Indentation for hierarchy
+            style={{ marginLeft: `${depth * 24}px` }}
+            onContextMenu={handleContextMenu}
         >
             <div
                 onClick={handleTaskClick}
                 {...(isMobile ? listeners : {})}
                 {...(isMobile ? attributes : {})}
                 className={clsx(
-                    "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent", // h-9 = 36px fixed height, added transparent border for sizing consistency
+                    "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent",
                     isSelected ? "bg-blue-50 dark:bg-blue-900/20 !border-blue-100" : (isActive ? "bg-gray-100" : "hover:bg-gray-100/60"),
                     task.is_completed && "opacity-50"
                 )}
             >
-                {/* Drag Handle (Hidden by default, visible on hover) */}
                 <div
                     {...listeners}
                     {...attributes}
@@ -165,7 +245,6 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                     <GripVertical size={14} />
                 </div>
 
-                {/* Checkbox */}
                 <button
                     onClick={toggleStatus}
                     className={clsx("transition-colors", task.is_completed ? "text-gray-400" : "text-gray-300 hover:text-gray-500")}
@@ -206,16 +285,13 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                     )}
                 </div>
 
-                {/* Right Side: Tags & Date */}
                 <div className="flex items-center gap-3 shrink-0">
-                    {/* Tags (Dots) */}
                     <div className="flex items-center -space-x-1">
                         {task.tags?.map((tag: any) => (
                             <div key={tag.id} className="w-2 h-2 rounded-full ring-2 ring-white" style={{ backgroundColor: tag.color }} title={tag.name} />
                         ))}
                     </div>
 
-                    {/* Compact Date */}
                     {task.due_date && (
                         <div
                             className="text-xs tabular-nums cursor-help"
@@ -225,7 +301,6 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                         </div>
                     )}
 
-                    {/* Chevron (Right Side) */}
                     <div
                         className={clsx(
                             "w-6 h-6 flex items-center justify-center cursor-pointer transition-transform hover:bg-gray-200 rounded shrink-0",
@@ -243,6 +318,15 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                     </div>
                 </div>
             </div>
+
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    items={menuItems as any}
+                />
+            )}
         </motion.div>
     )
 }

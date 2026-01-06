@@ -214,6 +214,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                                                 <option value="en">English</option>
                                                             </select>
                                                         </div>
+
+                                                        {/* Hints Toggle */}
+                                                        <div className="flex items-center justify-between py-2">
+                                                            <div>
+                                                                <h5 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Всплывающие подсказки</h5>
+                                                                <p className="text-xs text-zinc-500">Показывать уведомления после команд меню</p>
+                                                            </div>
+                                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="sr-only peer"
+                                                                    checked={settings.preferences.show_toast_hints !== false}
+                                                                    onChange={(e) => updateSettings({
+                                                                        preferences: {
+                                                                            ...settings.preferences,
+                                                                            show_toast_hints: e.target.checked
+                                                                        }
+                                                                    })}
+                                                                />
+                                                                <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                                            </label>
+                                                        </div>
                                                     </div>
                                                 </section>
 

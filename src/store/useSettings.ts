@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS: Omit<UserSettings, 'user_id' | 'created_at' | 'updated_a
         start_of_week: 'monday',
         language: 'ru',
         show_completed_tasks: false,
+        show_toast_hints: true,
     },
 };
 

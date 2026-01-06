@@ -16,6 +16,9 @@ import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover
 import { format } from 'date-fns'
 import { addExDateToRRule } from '@/utils/recurrence'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { useTrashActions } from '@/hooks/useTrashActions'
+import { useSettings } from '@/store/useSettings'
+import { toast } from 'sonner'
 
 type TaskDetailProps = {
     taskId: string
@@ -27,6 +30,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask()
+    const { restoreTask } = useTrashActions()
+    const { settings } = useSettings()
+
+    const showToasts = settings?.preferences.show_toast_hints !== false
 
 
     // Breadcrumb Data (Moved up to follow Rules of Hooks)
@@ -102,6 +109,16 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
     const handleDelete = () => {
         deleteTask(taskId)
+        if (showToasts) {
+            toast.message("Задача удалена", {
+                description: "Вы можете найти её в корзине",
+                duration: 4000,
+                action: {
+                    label: 'Отменить',
+                    onClick: () => restoreTask.mutate(taskId)
+                }
+            })
+        }
     }
 
     const handleDetachInstance = () => {
