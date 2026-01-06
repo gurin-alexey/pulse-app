@@ -58,14 +58,14 @@ export function DashboardPage() {
                     </div>
                 )}
 
-                {/* 2. AI Assistant (Center Column - Tall) */}
-                {layout.ai_chat && (
-                    <div className="lg:col-span-1 lg:row-span-2 h-[500px] lg:h-auto">
-                        <AIAssistantWidget />
+                {/* 2. Weather (Top-Right-1) */}
+                {(layout.weather || layout.rates) && (
+                    <div className="lg:col-span-1 h-[220px]">
+                        <WeatherRatesWidget />
                     </div>
                 )}
 
-                {/* 3. Quick Note (Top-Right) */}
+                {/* 3. Quick Note (Top-Right-2) */}
                 {layout.quick_capture && (
                     <div className="lg:col-span-1 h-[220px]">
                         <QuickCaptureWidget />
@@ -74,15 +74,15 @@ export function DashboardPage() {
 
                 {/* 4. Tasks (Bottom-Left) */}
                 {layout.deadline_tasks && (
-                    <div className="lg:col-span-2 h-[300px]">
+                    <div className="lg:col-span-2 h-[450px]">
                         <DeadlineTasksWidget />
                     </div>
                 )}
 
-                {/* 5. Weather (Bottom-Right) */}
-                {(layout.weather || layout.rates) && (
-                    <div className="lg:col-span-1 h-[300px]">
-                        <WeatherRatesWidget />
+                {/* 5. AI Assistant (Bottom-Right - Wide) */}
+                {layout.ai_chat && (
+                    <div className="lg:col-span-2 h-[450px]">
+                        <AIAssistantWidget />
                     </div>
                 )}
 
