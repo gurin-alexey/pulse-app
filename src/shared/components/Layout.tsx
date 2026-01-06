@@ -16,7 +16,7 @@ import { useUpdateProject } from "@/hooks/useUpdateProject"
 import { TaskItem } from "@/features/tasks/TaskItem"
 import { createPortal } from "react-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { DndContext, useSensor, useSensors, PointerSensor, TouchSensor, KeyboardSensor, type DragEndEvent, closestCorners, closestCenter, DragOverlay } from '@dnd-kit/core'
+import { DndContext, useSensor, useSensors, MouseSensor, TouchSensor, KeyboardSensor, type DragEndEvent, closestCorners, closestCenter, DragOverlay } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Toaster } from "sonner"
 import { SettingsModal } from "@/features/settings/SettingsModal"
@@ -64,7 +64,7 @@ export function Layout() {
 
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
