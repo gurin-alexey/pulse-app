@@ -164,17 +164,24 @@ export function AIAssistantWidget() {
                             </button>
                         </div>
 
-                        <div className="space-y-3">
-                            {/* API Key Input */}
-                            <div className="relative">
-                                <Key size={16} className="absolute left-3 top-3.5 text-gray-400" />
-                                <input
-                                    type="password"
-                                    placeholder={provider === 'openai' ? "sk-..." : "AIza..."}
-                                    value={apiKey}
-                                    onChange={(e) => setApiKey(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all font-mono shadow-sm"
-                                />
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                                    API Key (Optional)
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="password"
+                                        value={apiKey}
+                                        onChange={(e) => setApiKey(e.target.value)}
+                                        placeholder="Leave empty to use Server Key"
+                                        className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-gray-400"
+                                    />
+                                    <Key size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-1.5 ml-1">
+                                    If empty, requests use the secure server proxy.
+                                </p>
                             </div>
 
                             {/* Model Name Input */}
