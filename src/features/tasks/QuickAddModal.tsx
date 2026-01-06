@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { useCreateTask } from '@/hooks/useCreateTask'
+import { supabase } from '@/lib/supabase'
 import { Send, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -12,12 +13,23 @@ type QuickAddModalProps = {
 export function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
     const [title, setTitle] = useState('')
     const { mutate: createTask, isPending } = useCreateTask()
+    const [userId, setUserId] = useState<string | null>(null)
+
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data }) => {
+            if (data.user) setUserId(data.user.id)
+        })
+    }, [])
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (!title.trim()) return
+        if (!userId) {
+            toast.error('User not authenticated')
+            return
+        }
 
-        createTask({ title, project_id: null }, { // Inbox by default
+        createTask({ title, userId, projectId: null }, { // Inbox by default
             onSuccess: () => {
                 toast.success('Task created')
                 setTitle('')
