@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
-import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2 } from "lucide-react"
+import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal } from "lucide-react"
 import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion } from "framer-motion"
@@ -196,6 +196,15 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                     onClick: () => toggleTag({ taskId: task.id, tagId: tag.id, isAttached })
                 }
             })
+        },
+        { type: 'separator' as const },
+        {
+            label: 'Добавить в проект',
+            icon: <MoreHorizontal size={14} className="text-gray-500" />, // Using MoreHorizontal as placeholder or maybe a Folder icon
+            onClick: () => {
+                // Trigger GlobalSearch in Move Mode
+                window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
+            }
         },
         { type: 'separator' as const },
         {
