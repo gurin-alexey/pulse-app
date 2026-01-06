@@ -10,6 +10,7 @@ import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } f
 import { toast } from "sonner"
 
 import { useSelectionStore } from "@/store/useSelectionStore"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 
 interface TaskItemProps {
     task: any
@@ -32,6 +33,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const { selectedIds, select, toggle } = useSelectionStore()
     const isSelected = selectedIds.has(task.id)
+    const isMobile = useMediaQuery("(max-width: 768px)")
 
     // Local state for inline editing
     const [title, setTitle] = useState(task.title)
@@ -146,6 +148,8 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
         >
             <div
                 onClick={handleTaskClick}
+                {...(isMobile ? listeners : {})}
+                {...(isMobile ? attributes : {})}
                 className={clsx(
                     "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent", // h-9 = 36px fixed height, added transparent border for sizing consistency
                     isSelected ? "bg-blue-50 dark:bg-blue-900/20 !border-blue-100" : (isActive ? "bg-gray-100" : "hover:bg-gray-100/60"),
@@ -169,26 +173,37 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                     {task.is_completed ? <CheckSquare size={18} /> : <Square size={18} />}
                 </button>
 
-                {/* Title (Flex 1, Truncate) */}
                 <div className="flex-1 min-w-0 flex items-center self-stretch">
-                    <TextareaAutosize
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        onBlur={saveTitle}
-                        onKeyDown={handleKeyDown}
-                        onFocus={() => {
-                            setIsEditing(true)
-                            setSearchParams({ task: task.id })
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        minRows={1}
-                        className={clsx(
-                            "w-full bg-transparent border-0 outline-none focus:ring-0 p-0 leading-tight resize-none",
-                            "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
-                            task.is_completed ? "text-gray-400 line-through" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
-                        )}
-                        spellCheck={false}
-                    />
+                    {isMobile ? (
+                        <span
+                            className={clsx(
+                                "w-full bg-transparent border-0 p-0 leading-tight",
+                                "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
+                                task.is_completed ? "text-gray-400 line-through" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
+                            )}
+                        >
+                            {task.title}
+                        </span>
+                    ) : (
+                        <TextareaAutosize
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onBlur={saveTitle}
+                            onKeyDown={handleKeyDown}
+                            onFocus={() => {
+                                setIsEditing(true)
+                                setSearchParams({ task: task.id })
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            minRows={1}
+                            className={clsx(
+                                "w-full bg-transparent border-0 outline-none focus:ring-0 p-0 leading-tight resize-none",
+                                "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
+                                task.is_completed ? "text-gray-400 line-through" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
+                            )}
+                            spellCheck={false}
+                        />
+                    )}
                 </div>
 
                 {/* Right Side: Tags & Date */}
