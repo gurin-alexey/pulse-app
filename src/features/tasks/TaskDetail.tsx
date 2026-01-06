@@ -5,7 +5,10 @@ import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useCreateTask } from '@/hooks/useCreateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
-import { X, Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp, Flag, Repeat } from 'lucide-react'
+import { toast } from 'sonner'
+import { ContextMenu } from '@/shared/components/ContextMenu'
+import { useTags, useToggleTaskTag } from '@/hooks/useTags'
+import { X, Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp, Flag, Repeat, MoreHorizontal, Tag as TagIcon } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { SubtaskList } from './SubtaskList'
@@ -18,7 +21,6 @@ import { addExDateToRRule } from '@/utils/recurrence'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useTrashActions } from '@/hooks/useTrashActions'
 import { useSettings } from '@/store/useSettings'
-import { toast } from 'sonner'
 
 type TaskDetailProps = {
     taskId: string
@@ -36,7 +38,12 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const showToasts = settings?.preferences.show_toast_hints !== false
 
 
-    // Breadcrumb Data (Moved up to follow Rules of Hooks)
+    // Context Menu State (Moved up)
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
+    const { mutate: toggleTag } = useToggleTaskTag()
+    const { data: allTags } = useTags()
+
+    // Breadcrumb Data
     const { data: parentTask } = useTask(task?.parent_id || '')
 
     // Enable hotkeys for this active task
@@ -66,10 +73,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         descriptionRef.current = description
     }, [title, description])
 
-    // Cleanup empty new tasks on unmount (covers close button, backdrop click, nav, etc.)
+    // Cleanup empty new tasks on unmount
     useEffect(() => {
         return () => {
-            // Check if we are truly closing (URL no longer contains this task)
             const currentParams = new URLSearchParams(window.location.search)
             const closing = !currentParams.get('task')
             const isEmpty = !titleRef.current.trim() && !descriptionRef.current.trim()
@@ -78,7 +84,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                 deleteTask(taskId)
             }
         }
-    }, [taskId]) // Run cleanup when taskId changes or component unmounts
+    }, [taskId])
 
     const handleClose = () => {
         const newParams = new URLSearchParams(searchParams)
@@ -157,30 +163,72 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         })
     }
 
-    const isNew = searchParams.get('isNew') === 'true'
-
-    if (isLoading && !isNew) {
-        return (
-            <div className="h-full flex items-center justify-center text-gray-400">
-                <Loader2 className="animate-spin mr-2" />
-                Loading details...
-            </div>
-        )
-    }
-
-    if (!task && !isNew) {
-        return (
-            <div className="h-full flex items-center justify-center text-gray-400">
-                Task not found
-            </div>
-        )
-    }
-
     const handleBreadcrumbClick = () => {
         if (task?.parent_id) {
             setSearchParams({ task: task.parent_id })
         }
     }
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault()
+        setContextMenu({ x: e.clientX, y: e.clientY })
+    }
+
+    const menuItems = [
+        {
+            label: 'Сегодня',
+            icon: <CalendarIcon size={14} className="text-green-500" />,
+            onClick: () => {
+                const dateStr = format(new Date(), 'yyyy-MM-dd')
+                updateTask({ taskId, updates: { due_date: dateStr } })
+                if (showToasts) toast.success("📅 Set to Today")
+            }
+        },
+        {
+            label: 'Завтра',
+            icon: <CalendarIcon size={14} className="text-orange-500" />,
+            onClick: () => {
+                const tomorrow = new Date()
+                tomorrow.setDate(tomorrow.getDate() + 1)
+                const dateStr = format(tomorrow, 'yyyy-MM-dd')
+                updateTask({ taskId, updates: { due_date: dateStr } })
+                if (showToasts) toast.success("📅 Set to Tomorrow")
+            }
+        },
+        { type: 'separator' as const },
+        {
+            label: 'Добавить в проект',
+            icon: <MoreHorizontal size={14} className="text-gray-500" />,
+            onClick: () => {
+                window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: taskId }))
+            }
+        },
+        { type: 'separator' as const },
+        {
+            label: 'Метки',
+            icon: <TagIcon size={14} className="text-gray-400" />,
+            submenu: allTags?.map((tag: any) => ({
+                label: tag.name,
+                icon: (
+                    <div
+                        className={clsx(
+                            "w-2 h-2 rounded-full",
+                            (task as any)?.tags?.some((t: any) => t.id === tag.id) ? "ring-2 ring-offset-2 ring-blue-400" : ""
+                        )}
+                        style={{ backgroundColor: tag.color }}
+                    />
+                ),
+                onClick: () => toggleTag({ taskId, tagId: tag.id, isAttached: (task as any)?.tags?.some((t: any) => t.id === tag.id) })
+            }))
+        },
+        { type: 'separator' as const },
+        {
+            label: 'Удалить',
+            icon: <Trash2 size={14} />,
+            variant: 'danger' as const,
+            onClick: handleDelete
+        }
+    ]
 
     // Safety fallback for rendering while loading/creating
     const t = task || ({
@@ -200,7 +248,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
 
     return (
-        <div className="h-full flex flex-col bg-white overflow-hidden">
+        <div
+            className="h-full flex flex-col bg-white overflow-hidden"
+            onContextMenu={handleContextMenu}
+        >
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 pt-3">
                 <div className="mb-2 space-y-2">
@@ -365,37 +416,39 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                         )}
 
                         {/* Title Row */}
-                        <div>
-                            <TextareaAutosize
-                                autoFocus={searchParams.get('isNew') === 'true'}
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                onBlur={handleTitleBlur}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        (e.target as HTMLTextAreaElement).blur();
-                                    }
-                                }}
-                                className={clsx(
-                                    "w-full text-xl font-semibold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-snug",
-                                    t.is_project && "uppercase tracking-wide text-blue-800"
-                                )}
-                                placeholder="What needs to be done?"
-                                minRows={1}
-                            />
-                        </div>
+                        <TextareaAutosize
+                            autoFocus={searchParams.get('isNew') === 'true'}
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onBlur={handleTitleBlur}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    (e.target as HTMLTextAreaElement).blur();
+                                }
+                            }}
+                            onContextMenu={(e) => e.stopPropagation()} // Allow native menu
+                            className={clsx(
+                                "w-full text-xl font-semibold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-snug",
+                                t.is_project && "uppercase tracking-wide text-blue-800"
+                            )}
+                            placeholder="What needs to be done?"
+                            minRows={1}
+                        />
+
                     </div>
 
 
-                    <RichTextEditor
-                        key={task?.id} // Force re-render when task changes
-                        content={description}
-                        onChange={setDescription}
-                        onBlur={handleDescriptionBlur}
-                        className="mt-4"
-                        placeholder="Add a description..."
-                    />
+                    <div onContextMenu={(e) => e.stopPropagation()}>
+                        <RichTextEditor
+                            key={task?.id} // Force re-render when task changes
+                            content={description}
+                            onChange={setDescription}
+                            onBlur={handleDescriptionBlur}
+                            className="mt-4"
+                            placeholder="Add a description..."
+                        />
+                    </div>
 
                     <SubtaskList taskId={taskId} projectId={t.project_id} isProject={t.is_project} />
                 </div>
@@ -454,6 +507,16 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
                 </button>
             </div>
+            {
+                contextMenu && (
+                    <ContextMenu
+                        x={contextMenu.x}
+                        y={contextMenu.y}
+                        onClose={() => setContextMenu(null)}
+                        items={menuItems as any}
+                    />
+                )
+            }
         </div >
     )
 }

@@ -106,6 +106,9 @@ export function GlobalSearch() {
             onOpenChange={setOpen}
             label="Global Search"
             className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh] bg-black/40 backdrop-blur-sm px-4"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) setOpen(false)
+            }}
         >
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: -20 }}
