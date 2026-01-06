@@ -15,6 +15,7 @@ import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover'
 import { format } from 'date-fns'
 import { addExDateToRRule } from '@/utils/recurrence'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 
 type TaskDetailProps = {
     taskId: string
@@ -369,11 +370,13 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                         </div>
                     </div>
 
-                    <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
+
+                    <RichTextEditor
+                        key={task?.id} // Force re-render when task changes
+                        content={description}
+                        onChange={setDescription}
                         onBlur={handleDescriptionBlur}
-                        className="w-full min-h-[120px] resize-none text-gray-600 border-none focus:ring-0 outline-none p-1 text-base leading-relaxed placeholder:text-gray-300 mt-2"
+                        className="mt-4"
                         placeholder="Add a description..."
                     />
 
