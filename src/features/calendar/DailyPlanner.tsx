@@ -1,4 +1,4 @@
-import { } from 'react'
+import { useState, useEffect } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
@@ -9,6 +9,8 @@ import { useCreateTask } from '@/hooks/useCreateTask'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import type { DateSelectArg } from "@fullcalendar/core"
+import { TaskDetail } from "@/features/tasks/TaskDetail"
+import clsx from 'clsx'
 
 // Manually define the type if it's missing or named differently in this version
 interface EventDropArg {
@@ -17,11 +19,24 @@ interface EventDropArg {
 }
 import './calendar.css' // We'll create this for custom styling if needed
 
+
 export function DailyPlanner() {
     const { data: tasks, isLoading } = useAllTasks()
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const [_, setSearchParams] = useSearchParams()
+
+    const [showCompleted, setShowCompleted] = useState(false)
+    const [popup, setPopup] = useState<{ taskId: string, x: number, y: number } | null>(null)
+
+    // Close popup on escape
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setPopup(null)
+        }
+        window.addEventListener('keydown', handleEsc)
+        return () => window.removeEventListener('keydown', handleEsc)
+    }, [])
 
     if (isLoading) {
         return (
@@ -32,7 +47,9 @@ export function DailyPlanner() {
         )
     }
 
-    const events = tasks?.map(task => {
+    const filteredTasks = tasks?.filter(t => showCompleted || !t.is_completed) || []
+
+    const events = filteredTasks.map(task => {
         // Fallback logic: if start_time is missing, try due_date
         let start = task.start_time || task.due_date
         let end = task.end_time
@@ -42,12 +59,13 @@ export function DailyPlanner() {
             title: task.title,
             start: start || undefined,
             end: end || undefined,
-            allDay: !task.start_time, // Simple heuristic for now: no start_time = all day
-            backgroundColor: task.is_completed ? '#e5e7eb' : '#3b82f6',
-            borderColor: task.is_completed ? '#d1d5db' : '#2563eb',
+            allDay: !task.start_time,
+            backgroundColor: task.is_completed ? '#f3f4f6' : '#3b82f6',
+            borderColor: task.is_completed ? '#e5e7eb' : '#2563eb',
             textColor: task.is_completed ? '#9ca3af' : '#ffffff',
+            classNames: clsx(task.is_completed && "opacity-75 line-through decoration-gray-400")
         }
-    }) || []
+    })
 
     const handleDateSelect = async (selectInfo: DateSelectArg) => {
         const calendarApi = selectInfo.view.calendar
@@ -77,21 +95,44 @@ export function DailyPlanner() {
 
         createTask(updates, {
             onSuccess: (newTask) => {
+                // Determine position for popup (center of selection roughly, or just mouse pos if available? Select doesn't give mouse event universally)
+                // Fallback to center screen or just URL param as before? 
+                // Creating new task -> maybe still open sidebar or model? 
+                // User specifically asked for "clicking on a task". 
+                // Let's stick to sidebar for NEW tasks for now to avoid complexity of positioning not from a click.
                 setSearchParams({ task: newTask.id })
             }
         })
     }
 
     const handleEventClick = (info: any) => {
-        setSearchParams({ task: info.event.id })
+        info.jsEvent.preventDefault()
+        const x = info.jsEvent.clientX
+        const y = info.jsEvent.clientY
+
+        // Basic screen edge detection to prevent overflow
+        const winW = window.innerWidth
+        const winH = window.innerHeight
+        const popupW = 400
+        const popupH = 500
+
+        let safeX = x + 10
+        let safeY = y - 50
+
+        if (safeX + popupW > winW) safeX = x - popupW - 10
+        if (safeY + popupH > winH) safeY = winH - popupH - 20
+        if (safeY < 0) safeY = 20
+
+        setPopup({ taskId: info.event.id, x: safeX, y: safeY })
     }
+
+    // ... handleEventDrop, handleEventResize same as before ...
 
     const handleEventDrop = (info: EventDropArg) => {
         const taskId = info.event.id
         const isAllDay = info.event.allDay
 
         if (isAllDay && info.event.start) {
-            // FORCE local YYYY-MM-DD to avoid UTC shift
             const d = info.event.start
             const year = d.getFullYear()
             const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -107,11 +148,9 @@ export function DailyPlanner() {
                 }
             })
         } else {
-            // Dropped into TimeGrid
             const newStart = info.event.start?.toISOString() || null
             const newEnd = info.event.end?.toISOString() || null
 
-            // Fix: ensure due_date is YYYY-MM-DD
             let dateStr = null
             if (info.event.start) {
                 const d = info.event.start
@@ -126,7 +165,7 @@ export function DailyPlanner() {
                 updates: {
                     start_time: newStart,
                     end_time: newEnd,
-                    due_date: dateStr // Fixed
+                    due_date: dateStr
                 }
             })
         }
@@ -146,8 +185,34 @@ export function DailyPlanner() {
         })
     }
 
+
     return (
-        <div className="h-full flex flex-col bg-white">
+        <div className="h-full flex flex-col bg-white overflow-hidden relative">
+            {/* Toolbar */}
+            <div className="flex items-center justify-end px-3 py-2 border-b border-gray-100 z-10 shrink-0">
+                <button
+                    onClick={() => setShowCompleted(!showCompleted)}
+                    className={clsx(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                        showCompleted
+                            ? "bg-blue-50 text-blue-700 border border-blue-100"
+                            : "bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100"
+                    )}
+                >
+                    {showCompleted ? (
+                        <>
+                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            Hide Completed
+                        </>
+                    ) : (
+                        <>
+                            <span className="w-2 h-2 rounded-full bg-gray-300" />
+                            Show Completed
+                        </>
+                    )}
+                </button>
+            </div>
+
             <div className="flex-1 overflow-hidden relative daily-planner-wrapper">
                 <FullCalendar
                     plugins={[timeGridPlugin, interactionPlugin]}
@@ -168,9 +233,39 @@ export function DailyPlanner() {
                     allDayText="All Day"
                     nowIndicator={true}
                     scrollTime="08:00:00"
-                    eventClassNames="text-xs font-medium rounded-md px-1"
+                    eventClassNames="text-xs font-medium rounded-md px-1 shadow-sm border-0"
                 />
             </div>
+
+            {/* Task Popover */}
+            {popup && (
+                <>
+                    {/* Backdrop */}
+                    <div
+                        className="fixed inset-0 z-40 bg-transparent" // Transparent to allow seeing context, but capturing click
+                        onClick={() => setPopup(null)}
+                    />
+                    {/* Popover Card */}
+                    <div
+                        className="fixed z-50 bg-white rounded-2xl shadow-xl ring-1 ring-black/5 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                        style={{
+                            left: popup.x,
+                            top: popup.y,
+                            width: 380,
+                            height: 520,
+                        }}
+                    >
+                        <TaskDetail taskId={popup.taskId} />
+                        {/* Close Button Overlay */}
+                        <button
+                            onClick={() => setPopup(null)}
+                            className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors z-20"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     )
 }
