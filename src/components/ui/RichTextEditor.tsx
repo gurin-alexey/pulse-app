@@ -100,7 +100,7 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
     }
 
     return (
-        <div className={clsx("w-full border border-transparent rounded-lg transition-all focus-within:border-gray-200 focus-within:ring-4 focus-within:ring-gray-50", className)}>
+        <div className={clsx("w-full transition-all", className)}>
 
             {/* Toolbar */}
             <div className="flex items-center gap-1 border-b border-gray-100 pb-2 mb-2 px-1 flex-wrap">

@@ -3,7 +3,7 @@ import { useSelectionStore } from "@/store/useSelectionStore"
 import { useParams, useSearchParams } from "react-router-dom"
 import { useTasks } from "@/hooks/useTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { AlertCircle, Loader2, MoreHorizontal, Plus, Trash2, Pencil, ChevronRight } from "lucide-react"
+import { AlertCircle, Loader2, MoreHorizontal, Plus, Trash2, Pencil, ChevronRight, GripVertical } from "lucide-react"
 import { CreateTaskInput } from "@/features/tasks/CreateTaskInput"
 import { ViewOptions, type SortOption, type GroupOption } from "@/features/tasks/ViewOptions"
 import { useTaskView } from "@/features/tasks/useTaskView"
@@ -637,30 +637,40 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                                                     <DroppableContainer
                                                         id={section.id}
                                                         className={clsx(
-                                                            "group/section rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-all border border-transparent",
-                                                            dragOverSectionId === section.id && "ring-2 ring-blue-400 shadow-lg bg-blue-50/30"
+                                                            "group/section transition-all",
+                                                            dragOverSectionId === section.id && "bg-blue-50/30 ring-2 ring-blue-100 rounded-lg"
                                                         )}
                                                     >
                                                         {/* Header */}
                                                         <div
-                                                            className="flex items-center justify-between p-3 bg-gray-50/50 hover:bg-gray-100/50 cursor-pointer select-none border-b border-gray-100"
+                                                            className="flex items-center justify-between py-2 cursor-pointer select-none group/header"
                                                             onClick={() => toggleSection(section.id)}
                                                         >
-                                                            <div className="flex items-center gap-2">
-                                                                <div {...listeners} className="p-1 text-gray-300 hover:text-gray-600 cursor-move">
-                                                                    <MoreHorizontal size={16} />
+                                                            <div className="flex-1 flex items-center gap-2">
+                                                                <div {...listeners} className="p-1 text-gray-300 hover:text-gray-600 cursor-move opacity-0 group-hover/header:opacity-100 transition-opacity">
+                                                                    <GripVertical size={14} />
                                                                 </div>
                                                                 <ChevronRight size={16} className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")} />
+
                                                                 {editingSectionId === section.id ? (
                                                                     <form onSubmit={(e) => handleRenameSection(e, section.id)} onClick={e => e.stopPropagation()}>
                                                                         <input autoFocus type="text" value={editingSectionName} onChange={e => setEditingSectionName(e.target.value)} onBlur={() => setEditingSectionId(null)} className="font-bold text-sm text-gray-800 bg-white px-1 rounded outline-none border border-blue-200" />
                                                                     </form>
                                                                 ) : (
-                                                                    <h3 className="font-bold text-sm text-gray-800">{section.name} <span className="text-gray-400 font-normal ml-1">({sectionTasks?.length})</span></h3>
+                                                                    <h3 className="font-bold text-xs uppercase tracking-wider text-gray-400 flex items-center gap-2 whitespace-nowrap">
+                                                                        {section.name}
+                                                                        <span className="text-gray-300 font-normal normal-case">({sectionTasks?.length})</span>
+                                                                    </h3>
                                                                 )}
+
+                                                                {/* Horizontal Line Separator */}
+                                                                <div className="flex-1 h-px bg-gray-100" />
                                                             </div>
-                                                            <div className="relative" onClick={e => e.stopPropagation()}>
-                                                                <button onClick={() => setSectionMenuOpen(sectionMenuOpen === section.id ? null : section.id)} className="p-1 hover:bg-gray-200 rounded text-gray-400"><MoreHorizontal size={16} /></button>
+
+                                                            <div className="relative ml-2" onClick={e => e.stopPropagation()}>
+                                                                <button onClick={() => setSectionMenuOpen(sectionMenuOpen === section.id ? null : section.id)} className="p-1 hover:bg-gray-100 rounded text-gray-400 opacity-0 group-hover/header:opacity-100 transition-opacity">
+                                                                    <MoreHorizontal size={16} />
+                                                                </button>
                                                                 {sectionMenuOpen === section.id && (
                                                                     <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
                                                                         <button onClick={() => { setEditingSectionId(section.id); setEditingSectionName(section.name); setSectionMenuOpen(null) }} className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"><Pencil size={14} /> Rename</button>
@@ -672,14 +682,14 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
 
                                                         {/* Content */}
                                                         {!isCollapsed && (
-                                                            <div className="p-3 bg-gray-50/30">
+                                                            <div className="py-2">
                                                                 <SortableContext items={getFlattenedTasks(section.id).map((t: any) => t.id)} strategy={verticalListSortingStrategy}>
-                                                                    <div className="space-y-0.5 min-h-[50px]">
+                                                                    <div className="space-y-0.5 min-h-[20px]">
                                                                         {getFlattenedTasks(section.id).map(renderTaskItem)}
-                                                                        {getFlattenedTasks(section.id).length === 0 && <div className="text-xs text-gray-300 p-2 text-center">Drop tasks here</div>}
+                                                                        {getFlattenedTasks(section.id).length === 0 && <div className="text-xs text-gray-300 p-4 text-center">Drop tasks here</div>}
                                                                     </div>
                                                                 </SortableContext>
-                                                                <div className="mt-3">
+                                                                <div className="mt-2 border-t border-gray-50/50 pt-2">
                                                                     {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." />}
                                                                 </div>
                                                             </div>
