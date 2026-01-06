@@ -183,9 +183,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
 
     return (
-        <div className="h-full flex flex-col bg-white overflow-hidden relative">
+        <div className="h-full flex flex-col bg-white overflow-hidden">
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 pt-3 pb-24">
+            <div className="flex-1 overflow-y-auto px-6 pt-3">
                 <div className="mb-2 space-y-2">
 
 
@@ -385,7 +385,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
             </div>
 
             {/* Footer */}
-            <div className="absolute bottom-0 left-0 w-full px-6 py-4 bg-white/95 backdrop-blur-sm border-t border-gray-100 flex items-center justify-between gap-4 z-20">
+            <div className="shrink-0 w-full px-6 py-4 bg-white/95 backdrop-blur-sm border-t border-gray-100 flex items-center justify-between gap-4 z-20">
                 {/* Meta Controls (Left) */}
                 <div className="flex flex-wrap items-center gap-4">
 
