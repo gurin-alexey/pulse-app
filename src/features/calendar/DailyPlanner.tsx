@@ -271,6 +271,16 @@ export function DailyPlanner() {
                     slotMinTime={hideNightTime ? "07:00:00" : "00:00:00"}
                     slotMaxTime={hideNightTime ? "23:00:00" : "24:00:00"}
                     scrollTime="08:00:00"
+                    slotLabelFormat={{
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    }}
+                    eventTimeFormat={{
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    }}
                     eventClassNames="text-xs font-medium rounded-md px-1 shadow-sm border-0"
                 />
             </div>
