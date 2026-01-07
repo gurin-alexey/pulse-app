@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
+import { Link, Outlet, useLocation, useNavigate, useSearchParams, matchPath } from "react-router-dom"
 import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus } from "lucide-react"
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
@@ -18,6 +18,7 @@ import { SettingsModal } from "@/features/settings/SettingsModal"
 import { useSettings } from "@/store/useSettings"
 import { usePrefetchData } from "@/hooks/usePrefetchData"
 import { useSelectionStore } from "@/store/useSelectionStore"
+import { useProjects } from "@/hooks/useProjects"
 import { BulkActionsPanel } from "@/features/tasks/BulkActionsPanel"
 import { useAppDragAndDrop } from "@/hooks/useAppDragAndDrop"
 
@@ -57,6 +58,27 @@ export function Layout() {
     setSearchParams(newParams)
   }
 
+  // Context Awareness for Mobile Title & FAB
+  const matchProject = matchPath("/projects/:projectId", location.pathname)
+  const projectId = matchProject?.params.projectId
+  const { data: projects } = useProjects()
+  const currentProject = projects?.find(p => p.id === projectId)
+
+  const isInbox = location.pathname === '/inbox'
+  const isToday = location.pathname === '/today'
+  const isTomorrow = location.pathname === '/tomorrow'
+  const isTrash = location.pathname === '/trash'
+  const isTag = location.pathname.startsWith('/tags/')
+
+  const mobileTitle = isCalendarPage ? "Calendar"
+    : isInbox ? "Inbox"
+      : isToday ? "Today"
+        : isTomorrow ? "Tomorrow"
+          : isTrash ? "Trash"
+            : isTag ? "Tag"
+              : currentProject ? currentProject.name
+                : "Pulse"
+
   // Drag and drop logic extracted to custom hook
   const {
     activeDragData,
@@ -77,11 +99,25 @@ export function Layout() {
     const newId = crypto.randomUUID()
     setSearchParams({ task: newId, isNew: 'true' })
 
+    // Determine default date
+    let defaultDate = null
+    if (isToday) {
+      const d = new Date()
+      const offset = d.getTimezoneOffset()
+      defaultDate = new Date(d.getTime() - (offset * 60000)).toISOString().split('T')[0]
+    } else if (isTomorrow) {
+      const d = new Date()
+      d.setDate(d.getDate() + 1)
+      const offset = d.getTimezoneOffset()
+      defaultDate = new Date(d.getTime() - (offset * 60000)).toISOString().split('T')[0]
+    }
+
     createTask({
       id: newId,
       title: '',
       userId: user.id,
-      projectId: null
+      projectId: projectId || null,
+      due_date: defaultDate
     })
   }
 
@@ -125,7 +161,7 @@ export function Layout() {
           </button>
 
           <div id="mobile-header-title" className="flex-1 flex justify-center items-center font-bold text-xl text-blue-600 truncate px-2">
-            {!isCalendarPage && "Pulse"}
+            {mobileTitle}
           </div>
 
           <div id="mobile-header-right" className="w-10 flex justify-end items-center">
@@ -270,9 +306,9 @@ export function Layout() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={handleCreateTask}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-xl flex items-center justify-center z-50 transition-colors hover:bg-blue-700 active:bg-blue-800"
+          className="fixed bottom-6 right-6 w-16 h-16 bg-blue-600 text-white rounded-full shadow-xl flex items-center justify-center z-50 transition-colors hover:bg-blue-700 active:bg-blue-800"
         >
-          <Plus size={32} />
+          <Plus size={36} />
         </motion.button>
 
         <GlobalSearch />

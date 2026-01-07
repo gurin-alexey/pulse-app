@@ -9,6 +9,8 @@ import { ViewOptions, type SortOption, type GroupOption } from "@/features/tasks
 import { useTaskView } from "@/features/tasks/useTaskView"
 import { useSections, useCreateSection, useDeleteSection, useUpdateSection } from "@/hooks/useSections"
 import clsx from "clsx"
+import { createPortal } from "react-dom"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { AnimatePresence, motion } from "framer-motion"
 import {
     useDraggable,
@@ -646,10 +648,24 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     if (tasksLoading || sectionsLoading) return <div className="flex items-center justify-center h-full text-gray-400"><Loader2 className="animate-spin mr-2" />Loading...</div>
     if (tasksError) return <div className="flex items-center justify-center h-full text-red-500"><AlertCircle className="mr-2" />Error loading tasks</div>
 
+    const isDesktop = useMediaQuery("(min-width: 768px)")
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
+
+    useEffect(() => {
+        setPortalTarget(document.getElementById('mobile-header-right'))
+    }, [])
+
+
     // Simplified Render: No DndContext, just children content. The Layout DndContext provides the context.
     return (
         <div className="h-full flex flex-col">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
+            {/* Mobile View Options Portal */}
+            {!isDesktop && portalTarget && createPortal(
+                <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />,
+                portalTarget
+            )}
+
+            <div className="p-4 border-b border-gray-100 hidden md:flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
                 <h2 className="font-bold text-lg text-gray-800">{pageTitle}</h2>
                 <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />
             </div>
@@ -659,7 +675,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                     // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
                     <div className="mt-4">
                         {/* Allow creating tasks in Inbox/Today even without projectId */}
-                        <div className="mb-6"><CreateTaskInput projectId={projectId || null} defaultDueDate={targetDate} /></div>
+                        <div className="mb-6 hidden md:block"><CreateTaskInput projectId={projectId || null} defaultDueDate={targetDate} /></div>
 
                         {Object.entries(tasksForView).map(([groupName, groupTasks]) => {
                             // Filter out children of collapsed parents
@@ -701,11 +717,13 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                                     dragOverSectionId === 'main-list' && "bg-blue-50/60 ring-2 ring-blue-100"
                                 )}
                             >
-                                {projectId ? (
-                                    <CreateTaskInput projectId={projectId} sectionId={null} defaultDueDate={targetDate} />
-                                ) : (
-                                    <CreateTaskInput projectId={projectId || null} sectionId={null} defaultDueDate={targetDate} />
-                                )}
+                                <div className="hidden md:block">
+                                    {projectId ? (
+                                        <CreateTaskInput projectId={projectId} sectionId={null} defaultDueDate={targetDate} />
+                                    ) : (
+                                        <CreateTaskInput projectId={projectId || null} sectionId={null} defaultDueDate={targetDate} />
+                                    )}
+                                </div>
 
                                 <SortableContext items={getFlattenedTasks(null).map((t: any) => t.id)} strategy={verticalListSortingStrategy}>
                                     <div className="mt-4 space-y-2">
@@ -784,7 +802,11 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                                                                     </div>
                                                                 </SortableContext>
                                                                 <div className="mt-2 border-t border-gray-50/50 pt-2">
-                                                                    {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." defaultDueDate={targetDate} />}
+                                                                    {projectId && (
+                                                                        <div className="hidden md:block">
+                                                                            <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." defaultDueDate={targetDate} />
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         )}
