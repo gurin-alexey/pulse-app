@@ -138,7 +138,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     // View State
     // ... State declarations remain ...
     const [sortBy, setSortBy] = useState<SortOption>('manual')
-    const [groupBy, setGroupBy] = useState<GroupOption>('none')
+    const [groupBy, setGroupBy] = useState<GroupOption>(mode === 'today' ? 'date' : 'none')
     const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false)
     const [isAddingSection, setIsAddingSection] = useState(false)
     const [newSectionName, setNewSectionName] = useState("")

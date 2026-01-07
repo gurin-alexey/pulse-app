@@ -25,7 +25,7 @@ import { GlobalSearch } from "@/features/search/GlobalSearch"
 
 export function Layout() {
   const isDesktop = useMediaQuery("(min-width: 768px)")
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { selectedIds } = useSelectionStore()
 
