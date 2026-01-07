@@ -107,7 +107,7 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
     }
 
     return (
-        <form onSubmit={handleSubmit} className="mb-4">
+        <form onSubmit={handleSubmit}>
             <div className="relative flex items-center">
                 <div className="absolute left-3 text-gray-400">
                     <Plus size={20} />

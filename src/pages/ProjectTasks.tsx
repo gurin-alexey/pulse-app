@@ -665,9 +665,14 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 portalTarget
             )}
 
-            <div className="p-4 border-b border-gray-100 hidden md:flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
-                <h2 className="font-bold text-lg text-gray-800">{pageTitle}</h2>
-                <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />
+            <div className="px-4 py-3 border-b border-gray-100 hidden md:flex items-center gap-4 min-h-[4rem] shrink-0 sticky top-0 bg-white z-10">
+                <h2 className="font-bold text-lg text-gray-800 shrink-0">{pageTitle}</h2>
+                <div className="flex-1 max-w-2xl">
+                    <CreateTaskInput projectId={projectId || null} defaultDueDate={targetDate} placeholder="Add a task..." />
+                </div>
+                <div className="shrink-0">
+                    <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />
+                </div>
             </div>
 
             <div className="flex-1 pl-4 pr-0 pt-4 md:p-4 overflow-y-auto pb-20">
@@ -675,7 +680,6 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                     // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
                     <div className="mt-4">
                         {/* Allow creating tasks in Inbox/Today even without projectId */}
-                        <div className="mb-6 hidden md:block"><CreateTaskInput projectId={projectId || null} defaultDueDate={targetDate} /></div>
 
                         {Object.entries(tasksForView).map(([groupName, groupTasks]) => {
                             // Filter out children of collapsed parents
