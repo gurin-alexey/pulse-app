@@ -349,7 +349,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                                     }}
                                     title={tag.name}
                                 >
-                                    {tag.name}
+                                    {isMobile ? tag.name.slice(0, 4) : tag.name}
                                 </div>
                             ))}
                         </div>

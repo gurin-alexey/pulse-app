@@ -670,7 +670,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />
             </div>
 
-            <div className="flex-1 p-4 overflow-y-auto pb-20">
+            <div className="flex-1 pl-4 pr-0 pt-4 md:p-4 overflow-y-auto pb-20">
                 {renderMode === 'groups' ? (
                     // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
                     <div className="mt-4">
