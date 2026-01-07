@@ -29,12 +29,23 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
         )
     }
 
+    const [snap, setSnap] = React.useState<number | string | null>('50%')
+
     // Mobile: Vaul Drawer
     return (
-        <Drawer.Root open={true} onOpenChange={(open) => !open && onClose()}>
+        <Drawer.Root
+            open={true}
+            onOpenChange={(open) => !open && onClose()}
+            snapPoints={['50%', '96%']}
+            activeSnapPoint={snap}
+            setActiveSnapPoint={setSnap}
+        >
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" />
-                <Drawer.Content className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 h-[50vh] z-50 focus:outline-none">
+                <Drawer.Content
+                    className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 h-[96vh] z-50 focus:outline-none"
+                    onFocusCapture={() => setSnap('96%')}
+                >
                     {/* Drag Handle */}
                     <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-2" />
 
