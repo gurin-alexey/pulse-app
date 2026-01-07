@@ -52,30 +52,38 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects }:
         const groups: Record<string, TaskWithTags[]> = {}
 
         if (groupBy === 'date') {
-            const today = startOfDay(new Date())
-            const tomorrow = new Date(today)
-            tomorrow.setDate(tomorrow.getDate() + 1)
+            const dateGroups: Record<string, TaskWithTags[]> = {
+                'DEADLINE': [],
+                'CALENDAR': [],
+                'ALL DAY': []
+            }
 
             filtered.forEach(task => {
-                let groupName = 'No Date'
-                if (task.due_date) {
-                    const due = startOfDay(new Date(task.due_date))
-                    if (due < today) groupName = 'Overdue'
-                    else if (due.getTime() === today.getTime()) groupName = 'Today'
-                    else if (due.getTime() === tomorrow.getTime()) groupName = 'Tomorrow'
-                    else groupName = 'Later'
+                // 1. DEADLINE: Project tasks (multi-step) with a due date
+                // We use is_project logic as requested
+                if (task.is_project && task.due_date) {
+                    dateGroups['DEADLINE'].push(task)
+                    return
                 }
 
-                if (!groups[groupName]) groups[groupName] = []
-                groups[groupName].push(task)
+                // 2. CALENDAR: Tasks with specific start/end times
+                // Assuming start_time is populated for calendar events. 
+                // Also check if it's explicitly set to be a calendar item if you have such a flag, but start_time is the standard indicator.
+                if (task.start_time || task.end_time) {
+                    dateGroups['CALENDAR'].push(task)
+                    return
+                }
+
+                // 3. ALL DAY: Everything else
+                dateGroups['ALL DAY'].push(task)
             })
 
-            // Ensure specific order of keys
+            // Filter out empty groups and return in specific order
             const orderedGroups: Record<string, TaskWithTags[]> = {}
-            const keys = ['Overdue', 'Today', 'Tomorrow', 'Later', 'No Date']
-            keys.forEach(k => {
-                if (groups[k] && groups[k].length > 0) orderedGroups[k] = groups[k]
-            })
+            if (dateGroups['DEADLINE'].length > 0) orderedGroups['DEADLINE'] = dateGroups['DEADLINE']
+            if (dateGroups['CALENDAR'].length > 0) orderedGroups['CALENDAR'] = dateGroups['CALENDAR']
+            if (dateGroups['ALL DAY'].length > 0) orderedGroups['ALL DAY'] = dateGroups['ALL DAY']
+
             return orderedGroups
         } else if (groupBy === 'priority') {
             filtered.forEach(task => {
