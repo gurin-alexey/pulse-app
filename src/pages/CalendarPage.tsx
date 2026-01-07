@@ -14,6 +14,7 @@ import { useState, useEffect, useRef, Fragment } from "react"
 import { generateRecurringInstances, addExDateToRRule, addUntilToRRule, updateDTStartInRRule } from "@/utils/recurrence"
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
 import { Menu, Transition } from "@headlessui/react"
+import { createPortal } from "react-dom"
 import { format } from "date-fns"
 import { useSwipeable } from "react-swipeable"
 import { motion, useMotionValue, useTransform, animate } from "framer-motion"
@@ -63,6 +64,11 @@ export function CalendarPage() {
             }
         }
     }, [isMobile])
+
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     const handleDateSelect = async (selectInfo: DateSelectArg) => {
         const calendarApi = selectInfo.view.calendar
@@ -394,92 +400,145 @@ export function CalendarPage() {
                 onConfirm={handleRecurrenceConfirm}
             />
 
-            {/* Unified Custom Header (Desktop + Mobile) */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 shrink-0 px-4 md:px-0">
-                {/* Left: Navigation & Title */}
-                <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
-                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-                        <button onClick={headerGoPrev} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
-                            <span className="sr-only">Prev</span>←
-                        </button>
-                        <button onClick={headerGoToday} className="px-3 py-1 text-sm font-semibold hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-700">
-                            Today
-                        </button>
-                        <button onClick={headerGoNext} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
-                            <span className="sr-only">Next</span>→
-                        </button>
-                    </div>
-
-                    <h2 className="text-xl font-bold text-gray-800 truncate">
-                        {currentTitle || (
-                            <span className="inline-block w-32 h-6 bg-gray-100 rounded animate-pulse" />
-                        )}
-                    </h2>
-                </div>
-
-                {/* Right: View Switcher & Settings */}
-                <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                    {!isMobile && (
-                        <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-                            <button
-                                onClick={() => headerChangeView('dayGridMonth')}
-                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'dayGridMonth' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                            >
-                                Month
+            {/* Unified Custom Header (Desktop Only) */}
+            {!isMobile && (
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 shrink-0 px-4 md:px-0">
+                    {/* Left: Navigation & Title */}
+                    <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
+                        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                            <button onClick={headerGoPrev} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
+                                <span className="sr-only">Prev</span>←
                             </button>
-                            <button
-                                onClick={() => headerChangeView('timeGridWeek')}
-                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridWeek' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                            >
-                                Week
+                            <button onClick={headerGoToday} className="px-3 py-1 text-sm font-semibold hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-700">
+                                Today
                             </button>
-                            <button
-                                onClick={() => headerChangeView('timeGridDay')}
-                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                            >
-                                Day
+                            <button onClick={headerGoNext} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
+                                <span className="sr-only">Next</span>→
                             </button>
                         </div>
-                    )}
 
-                    {/* Settings Menu */}
-                    <Menu as="div" className="relative inline-block text-left">
-                        <Menu.Button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200">
-                            <Settings size={20} />
-                        </Menu.Button>
-                        <Transition
-                            as={Fragment}
-                            enter="transition ease-out duration-100"
-                            enterFrom="transform opacity-0 scale-95"
-                            enterTo="transform opacity-100 scale-100"
-                            leave="transition ease-in duration-75"
-                            leaveFrom="transform opacity-100 scale-100"
-                            leaveTo="transform opacity-0 scale-95"
-                        >
-                            <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-xl ring-1 ring-black/5 focus:outline-none z-50">
-                                <div className="px-4 py-3 border-b border-gray-50">
-                                    <p className="text-sm font-semibold text-gray-900">View Settings</p>
-                                </div>
-                                <div className="p-2">
-                                    <Menu.Item>
-                                        {({ active }) => (
-                                            <button
-                                                onClick={() => setShowCompleted(!showCompleted)}
-                                                className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition-colors ${active ? 'bg-gray-50' : ''}`}
-                                            >
-                                                <span className="text-gray-700">Show completed</span>
-                                                <div className={`w-9 h-5 rounded-full relative transition-colors ${showCompleted ? 'bg-blue-500' : 'bg-gray-200'}`}>
-                                                    <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${showCompleted ? 'translate-x-4' : ''}`} />
-                                                </div>
-                                            </button>
-                                        )}
-                                    </Menu.Item>
-                                </div>
-                            </Menu.Items>
-                        </Transition>
-                    </Menu>
+                        <h2 className="text-xl font-bold text-gray-800 truncate">
+                            {currentTitle || (
+                                <span className="inline-block w-32 h-6 bg-gray-100 rounded animate-pulse" />
+                            )}
+                        </h2>
+                    </div>
+
+                    {/* Right: View Switcher & Settings */}
+                    <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                        {!isMobile && (
+                            <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+                                <button
+                                    onClick={() => headerChangeView('dayGridMonth')}
+                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'dayGridMonth' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                                >
+                                    Month
+                                </button>
+                                <button
+                                    onClick={() => headerChangeView('timeGridWeek')}
+                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridWeek' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                                >
+                                    Week
+                                </button>
+                                <button
+                                    onClick={() => headerChangeView('timeGridDay')}
+                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                                >
+                                    Day
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Settings Menu */}
+                        <Menu as="div" className="relative inline-block text-left">
+                            <Menu.Button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200">
+                                <Settings size={20} />
+                            </Menu.Button>
+                            <Transition
+                                as={Fragment}
+                                enter="transition ease-out duration-100"
+                                enterFrom="transform opacity-0 scale-95"
+                                enterTo="transform opacity-100 scale-100"
+                                leave="transition ease-in duration-75"
+                                leaveFrom="transform opacity-100 scale-100"
+                                leaveTo="transform opacity-0 scale-95"
+                            >
+                                <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-xl ring-1 ring-black/5 focus:outline-none z-50">
+                                    <div className="px-4 py-3 border-b border-gray-50">
+                                        <p className="text-sm font-semibold text-gray-900">View Settings</p>
+                                    </div>
+                                    <div className="p-2">
+                                        <Menu.Item>
+                                            {({ active }) => (
+                                                <button
+                                                    onClick={() => setShowCompleted(!showCompleted)}
+                                                    className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition-colors ${active ? 'bg-gray-50' : ''}`}
+                                                >
+                                                    <span className="text-gray-700">Show completed</span>
+                                                    <div className={`w-9 h-5 rounded-full relative transition-colors ${showCompleted ? 'bg-blue-500' : 'bg-gray-200'}`}>
+                                                        <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${showCompleted ? 'translate-x-4' : ''}`} />
+                                                    </div>
+                                                </button>
+                                            )}
+                                        </Menu.Item>
+                                    </div>
+                                </Menu.Items>
+                            </Transition>
+                        </Menu>
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* Mobile Header Portals */}
+            {isMobile && mounted && document.getElementById('mobile-header-title') && createPortal(
+                <button
+                    onClick={headerGoToday}
+                    className="text-lg truncate flex items-center gap-1.5 active:opacity-70 transition-opacity"
+                >
+                    <span className="font-medium text-gray-500">Today,</span>
+                    <span className="font-bold text-gray-900">{format(new Date(), 'MMMM d')}</span>
+                </button>,
+                document.getElementById('mobile-header-title')!
+            )}
+
+            {isMobile && mounted && document.getElementById('mobile-header-right') && createPortal(
+                <Menu as="div" className="relative inline-block text-left">
+                    <Menu.Button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                        <Settings size={20} />
+                    </Menu.Button>
+                    <Transition
+                        as={Fragment}
+                        enter="transition ease-out duration-100"
+                        enterFrom="transform opacity-0 scale-95"
+                        enterTo="transform opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="transform opacity-100 scale-100"
+                        leaveTo="transform opacity-0 scale-95"
+                    >
+                        <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-xl ring-1 ring-black/5 focus:outline-none z-[60]">
+                            <div className="px-4 py-3 border-b border-gray-50">
+                                <p className="text-sm font-semibold text-gray-900">View Settings</p>
+                            </div>
+                            <div className="p-2">
+                                <Menu.Item>
+                                    {({ active }) => (
+                                        <button
+                                            onClick={() => setShowCompleted(!showCompleted)}
+                                            className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition-colors ${active ? 'bg-gray-50' : ''}`}
+                                        >
+                                            <span className="text-gray-700">Show completed</span>
+                                            <div className={`w-9 h-5 rounded-full relative transition-colors ${showCompleted ? 'bg-blue-500' : 'bg-gray-200'}`}>
+                                                <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${showCompleted ? 'translate-x-4' : ''}`} />
+                                            </div>
+                                        </button>
+                                    )}
+                                </Menu.Item>
+                            </div>
+                        </Menu.Items>
+                    </Transition>
+                </Menu>,
+                document.getElementById('mobile-header-right')!
+            )}
 
             {isMobile && (
                 <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 shadow-xl bg-white p-1.5 rounded-2xl border border-gray-100 flex gap-1 w-auto min-w-[280px]">

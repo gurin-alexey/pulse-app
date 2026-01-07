@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical } from "lucide-react"
+import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
@@ -16,6 +16,7 @@ import { useUpdateProject } from "@/hooks/useUpdateProject"
 import { TaskItem } from "@/features/tasks/TaskItem"
 import { createPortal } from "react-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
+import { useCreateTask } from "@/hooks/useCreateTask"
 import { DndContext, useSensor, useSensors, MouseSensor, TouchSensor, KeyboardSensor, type DragEndEvent, closestCorners, closestCenter, DragOverlay } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Toaster } from "sonner"
@@ -24,7 +25,7 @@ import { useSettings } from "@/store/useSettings"
 import { usePrefetchData } from "@/hooks/usePrefetchData"
 import { useSelectionStore } from "@/store/useSelectionStore"
 import { BulkActionsPanel } from "@/features/tasks/BulkActionsPanel"
-import { ChatWidget } from "@/features/ai/ChatWidget"
+
 import { GlobalSearch } from "@/features/search/GlobalSearch"
 
 export function Layout() {
@@ -101,6 +102,22 @@ export function Layout() {
 
   // Global Mutations
   const { mutate: updateTask } = useUpdateTask()
+  const { mutate: createTask } = useCreateTask()
+
+  const handleCreateTask = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const newId = crypto.randomUUID()
+    setSearchParams({ task: newId, isNew: 'true' })
+
+    createTask({
+      id: newId,
+      title: '',
+      userId: user.id,
+      projectId: null
+    })
+  }
 
   // Drag state
   const [activeDragData, setActiveDragData] = useState<any>(null)
@@ -224,8 +241,14 @@ export function Layout() {
           >
             <Menu size={24} />
           </button>
-          <span className="font-bold text-xl text-blue-600">Pulse</span>
-          <div className="w-10"></div> {/* Spacer for symmetry */}
+
+          <div id="mobile-header-title" className="flex-1 flex justify-center items-center font-bold text-xl text-blue-600 truncate px-2">
+            {!isCalendarPage && "Pulse"}
+          </div>
+
+          <div id="mobile-header-right" className="w-10 flex justify-end items-center">
+            {/* Calendar Settings will be ported here */}
+          </div>
         </header>
 
         {/* Column A: Sidebar (Desktop) */}
@@ -359,7 +382,17 @@ export function Layout() {
         )}
 
         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-        <ChatWidget />
+
+
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleCreateTask}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-xl flex items-center justify-center z-50 transition-colors hover:bg-blue-700 active:bg-blue-800"
+        >
+          <Plus size={32} />
+        </motion.button>
+
         <GlobalSearch />
       </div>
 

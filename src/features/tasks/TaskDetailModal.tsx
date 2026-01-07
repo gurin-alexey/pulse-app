@@ -34,7 +34,7 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
         <Drawer.Root open={true} onOpenChange={(open) => !open && onClose()}>
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" />
-                <Drawer.Content className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 top-[10vh] z-50 focus:outline-none">
+                <Drawer.Content className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 top-[50vh] z-50 focus:outline-none">
                     {/* Drag Handle */}
                     <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-2" />
 
