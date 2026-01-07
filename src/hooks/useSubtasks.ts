@@ -16,6 +16,7 @@ export function useSubtasks(parentId: string | undefined) {
                 .from('tasks')
                 .select('*')
                 .eq('parent_id', parentId)
+                .is('deleted_at', null)
                 // Order by created_at. You might want to change this to index or is_completed later
                 .order('created_at', { ascending: true })
 

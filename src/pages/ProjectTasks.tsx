@@ -233,9 +233,18 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
 
         // Roots are items that:
         // 1. Have (parent_id === null OR are orphans)
-        // 2. Match the current container (section_id)
+        // 2. Either we are in a mode that ignores sections (Today/Inbox), OR we match the container section
         return activeTasks
-            .filter(t => (t.parent_id === null || isOrphan(t)) && (containerSectionId === null ? t.section_id === null : t.section_id === containerSectionId))
+            .filter(t => {
+                const isRootNode = t.parent_id === null || isOrphan(t)
+                if (!isRootNode) return false
+
+                // If sections are disabled (Today/Inbox), show everything in the main list
+                if (!showSections) return true
+
+                // Otherwise strictly match the section (null for main list, id for others)
+                return containerSectionId === null ? t.section_id === null : t.section_id === containerSectionId
+            })
             .sort((a, b) => {
                 if (sortBy === 'manual') {
                     const orderDiff = (a.sort_order || 0) - (b.sort_order || 0)
