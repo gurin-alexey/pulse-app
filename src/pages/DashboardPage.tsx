@@ -85,7 +85,7 @@ export function DashboardPage() {
                     <ProjectsWidget />
                 </div>
 
-                {/* 5. AI Assistant (Bottom-Right - Wide) */}
+                {/* 7. AI Assistant (Bottom-Right) */}
                 {layout.ai_chat && (
                     <div className="lg:col-span-2 h-[450px]">
                         <AIAssistantWidget />
