@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import type { DateSelectArg } from "@fullcalendar/core"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
 import clsx from 'clsx'
+import { useSettings } from "@/store/useSettings"
 
 // Manually define the type if it's missing or named differently in this version
 interface EventDropArg {
@@ -25,6 +26,8 @@ export function DailyPlanner() {
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const [_, setSearchParams] = useSearchParams()
+    const { settings } = useSettings()
+    const hideNightTime = settings?.preferences?.hide_night_time ?? false
 
     const [showCompleted, setShowCompleted] = useState(false)
     const [popup, setPopup] = useState<{ taskId: string, x: number, y: number } | null>(null)
@@ -265,6 +268,8 @@ export function DailyPlanner() {
                     eventResize={handleEventResize}
                     allDayText="All Day"
                     nowIndicator={true}
+                    slotMinTime={hideNightTime ? "07:00:00" : "00:00:00"}
+                    slotMaxTime={hideNightTime ? "23:00:00" : "24:00:00"}
                     scrollTime="08:00:00"
                     eventClassNames="text-xs font-medium rounded-md px-1 shadow-sm border-0"
                 />

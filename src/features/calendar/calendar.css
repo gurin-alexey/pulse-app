@@ -9,7 +9,7 @@
 }
 
 .daily-planner-wrapper .fc-timegrid-slot {
-    height: 3rem; /* Taller slots for better readability */
+    height: 1.5rem; /* Compact slots to fit day in screen */
 }
 
 /* Hide the "today" highlight to make it look cleaner */

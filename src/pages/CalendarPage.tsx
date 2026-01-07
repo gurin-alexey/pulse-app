@@ -1,5 +1,6 @@
 import { useAllTasks } from "@/hooks/useAllTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
+import { useSettings } from "@/store/useSettings"
 import { useCreateTask } from "@/hooks/useCreateTask"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
@@ -22,6 +23,8 @@ import { motion, useMotionValue, useTransform, animate } from "framer-motion"
 
 export function CalendarPage() {
     const { data: tasks, isLoading } = useAllTasks()
+    const { settings } = useSettings()
+    const hideNightTime = settings?.preferences?.hide_night_time ?? false
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const [_, setSearchParams] = useSearchParams()
@@ -625,6 +628,8 @@ export function CalendarPage() {
                     eventResize={handleEventResize}
                     eventClick={handleEventClickWrapper}
                     nowIndicator={true}
+                    slotMinTime={hideNightTime ? "07:00:00" : "00:00:00"}
+                    slotMaxTime={hideNightTime ? "23:00:00" : "24:00:00"}
                     slotDuration="01:00:00"
                     scrollTime="08:00:00"
                 />

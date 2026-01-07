@@ -68,6 +68,8 @@ export type UserSettings = {
         start_of_week?: 'monday' | 'sunday'
         language?: 'ru' | 'en'
         show_completed_tasks?: boolean
+        show_toast_hints?: boolean
+        hide_night_time?: boolean
         [key: string]: any
     }
     created_at: string

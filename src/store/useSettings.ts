@@ -34,6 +34,7 @@ const DEFAULT_SETTINGS: Omit<UserSettings, 'user_id' | 'created_at' | 'updated_a
         language: 'ru',
         show_completed_tasks: false,
         show_toast_hints: true,
+        hide_night_time: false,
     },
 };
 

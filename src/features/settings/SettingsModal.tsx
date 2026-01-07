@@ -236,6 +236,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                                                 <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                                                             </label>
                                                         </div>
+
+                                                        {/* Hide Night Time Toggle */}
+                                                        <div className="flex items-center justify-between py-2 border-t border-zinc-100 dark:border-zinc-800">
+                                                            <div>
+                                                                <h5 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Скрыть ночное время</h5>
+                                                                <p className="text-xs text-zinc-500">Показывать календарь только с 07:00 до 23:00</p>
+                                                            </div>
+                                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="sr-only peer"
+                                                                    checked={settings.preferences.hide_night_time === true}
+                                                                    onChange={(e) => updateSettings({
+                                                                        preferences: {
+                                                                            ...settings.preferences,
+                                                                            hide_night_time: e.target.checked
+                                                                        }
+                                                                    })}
+                                                                />
+                                                                <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                                            </label>
+                                                        </div>
                                                     </div>
                                                 </section>
 
