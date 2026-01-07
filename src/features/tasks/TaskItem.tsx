@@ -289,7 +289,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 <div
                     {...listeners}
                     {...attributes}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-gray-600 cursor-move transition-opacity -ml-1"
+                    className="hidden md:block opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-gray-600 cursor-move transition-opacity -ml-1"
                 >
                     <GripVertical size={14} />
                 </div>
