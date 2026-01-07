@@ -18,6 +18,41 @@ type UseTaskViewProps = {
     projects?: Project[]
 }
 
+// Helper to organize tasks hierarchically within a group
+const organizeByHierarchy = (roots: TaskWithTags[], allTasksMap?: Map<string, TaskWithTags>) => {
+    // If no global map provided, build one from the roots list (legacy behavior for other views)
+    const sourceMap = allTasksMap || new Map(roots.map(t => [t.id, t]))
+
+    // If using legacy behavior (no global map), we need to find roots within the provided list
+    // If global map provided, 'roots' are already assumed to be the top-level items for this group
+    const actualRoots = allTasksMap ? roots : roots.filter(t => !t.parent_id || !sourceMap.has(t.parent_id))
+
+    const result: any[] = []
+
+    // We need to look up children from the source of truth
+    // If allTasksMap is passed, we search ALL filtered tasks for children
+    // If not, we only search within the group
+    const potentialChildren = allTasksMap ? Array.from(allTasksMap.values()) : roots
+
+    const addChildren = (parentId: string, depth: number) => {
+        const children = potentialChildren.filter(t => t.parent_id === parentId)
+        // Sort children by sort_order or created_at to ensure consistent order
+        children.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+
+        children.forEach(child => {
+            result.push({ ...child, depth })
+            addChildren(child.id, depth + 1)
+        })
+    }
+
+    actualRoots.forEach(root => {
+        result.push({ ...root, depth: 0 })
+        addChildren(root.id, 1)
+    })
+
+    return result
+}
+
 export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects }: UseTaskViewProps) {
     const sortedAndGroupedTasks = useMemo(() => {
         if (!tasks) return {}
@@ -57,32 +92,50 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects }:
                 'CALENDAR': [],
                 'ALL DAY': []
             }
+            const date = new Date()
+            const todayStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
 
-            filtered.forEach(task => {
-                // 1. DEADLINE: Project tasks (multi-step) with a due date
-                // We use is_project logic as requested
-                if (task.is_project && task.due_date) {
+            // 1. Strict Filter: Only allow tasks implicitly scheduled for TODAY.
+            // Tasks without a date (even if subtasks of today's projects) are EXCLUDED.
+            const todaysTasks = filtered.filter(task => {
+                const hasDate = task.due_date && task.due_date.startsWith(todayStr)
+                const hasTime = task.start_time && task.start_time.startsWith(todayStr)
+                return hasDate || hasTime
+            })
+
+            const tasksMap = new Map(todaysTasks.map(t => [t.id, t]))
+
+            // 3. Partition
+            todaysTasks.forEach(task => {
+                // 1. DEADLINE: Projects (Multi-step)
+                if (task.is_project) {
                     dateGroups['DEADLINE'].push(task)
                     return
                 }
 
-                // 2. CALENDAR: Tasks with specific start/end times
-                // Assuming start_time is populated for calendar events. 
-                // Also check if it's explicitly set to be a calendar item if you have such a flag, but start_time is the standard indicator.
-                if (task.start_time || task.end_time) {
+                // 2. CALENDAR: Tasks with Time
+                if (task.start_time) {
                     dateGroups['CALENDAR'].push(task)
                     return
                 }
 
-                // 3. ALL DAY: Everything else
+                // 3. ALL DAY: Everything else (Tasks with Date but No Time)
                 dateGroups['ALL DAY'].push(task)
             })
 
-            // Filter out empty groups and return in specific order
+            // Sort CALENDAR roots by time
+            dateGroups['CALENDAR'].sort((a, b) => {
+                const timeA = a.start_time || a.end_time || ''
+                const timeB = b.start_time || b.end_time || ''
+                return timeA.localeCompare(timeB)
+            })
+
+            // Expand hierarchies
+            // Since tasksMap IS strict, generic children (no date) are naturally excluded from the hierarchy.
             const orderedGroups: Record<string, TaskWithTags[]> = {}
-            if (dateGroups['DEADLINE'].length > 0) orderedGroups['DEADLINE'] = dateGroups['DEADLINE']
-            if (dateGroups['CALENDAR'].length > 0) orderedGroups['CALENDAR'] = dateGroups['CALENDAR']
-            if (dateGroups['ALL DAY'].length > 0) orderedGroups['ALL DAY'] = dateGroups['ALL DAY']
+            if (dateGroups['DEADLINE'].length > 0) orderedGroups['DEADLINE'] = organizeByHierarchy(dateGroups['DEADLINE'], tasksMap)
+            if (dateGroups['CALENDAR'].length > 0) orderedGroups['CALENDAR'] = organizeByHierarchy(dateGroups['CALENDAR'], tasksMap)
+            if (dateGroups['ALL DAY'].length > 0) orderedGroups['ALL DAY'] = organizeByHierarchy(dateGroups['ALL DAY'], tasksMap)
 
             return orderedGroups
         } else if (groupBy === 'priority') {
@@ -97,7 +150,7 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects }:
             const orderedGroups: Record<string, TaskWithTags[]> = {}
             const keys = ['High', 'Medium', 'Low', 'None']
             keys.forEach(k => {
-                if (groups[k] && groups[k].length > 0) orderedGroups[k] = groups[k]
+                if (groups[k] && groups[k].length > 0) orderedGroups[k] = organizeByHierarchy(groups[k])
             })
             return orderedGroups
         } else if (groupBy === 'project') {
@@ -115,9 +168,9 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects }:
 
             // Default sort: Inbox first, then A-Z
             const orderedGroups: Record<string, TaskWithTags[]> = {}
-            if (groups['Inbox']) orderedGroups['Inbox'] = groups['Inbox']
+            if (groups['Inbox']) orderedGroups['Inbox'] = organizeByHierarchy(groups['Inbox'])
             const otherKeys = Object.keys(groups).filter(k => k !== 'Inbox').sort()
-            otherKeys.forEach(k => orderedGroups[k] = groups[k])
+            otherKeys.forEach(k => orderedGroups[k] = organizeByHierarchy(groups[k]))
 
             return orderedGroups
         } else if (groupBy === 'tag') {
@@ -135,8 +188,8 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects }:
 
             const orderedGroups: Record<string, TaskWithTags[]> = {}
             const keys = Object.keys(groups).filter(k => k !== 'No Tags').sort()
-            keys.forEach(k => orderedGroups[k] = groups[k])
-            if (groups['No Tags']) orderedGroups['No Tags'] = groups['No Tags']
+            keys.forEach(k => orderedGroups[k] = organizeByHierarchy(groups[k]))
+            if (groups['No Tags']) orderedGroups['No Tags'] = organizeByHierarchy(groups['No Tags'])
             return orderedGroups
         }
 

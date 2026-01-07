@@ -595,13 +595,16 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     }
 
     // Helper to render a single task item
-    const renderTaskItem = (task: any) => {
+    const renderTaskItem = (task: any, index?: number) => {
         const hasChildren = activeTasks.some(t => t.parent_id === task.id)
         const isDraggingThis = activeDragItem?.id === task.id
         const effectiveDepth = isDraggingThis && currentDragDepth !== null ? currentDragDepth : task.depth
 
+        // Use a composite key if index is provided (for duplicates in Groups view), otherwise standard ID
+        const uniqueKey = index !== undefined ? `${task.id}-${index}` : task.id
+
         return (
-            <SortableTaskItem key={task.id} task={task} depth={effectiveDepth} disabled={sortBy !== 'manual'}>
+            <SortableTaskItem key={uniqueKey} task={task} depth={effectiveDepth} disabled={sortBy !== 'manual'}>
                 {({ listeners, attributes }) => (
                     <TaskItem
                         task={task}
@@ -639,12 +642,32 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                         {/* Allow creating tasks in Inbox/Today even without projectId */}
                         <div className="mb-6"><CreateTaskInput projectId={projectId || null} /></div>
 
-                        {Object.entries(tasksForView).map(([groupName, groupTasks]) => (
-                            <div key={groupName} className="mb-8">
-                                <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">{groupName} ({groupTasks.length})</h3>
-                                {groupTasks.map(renderTaskItem)}
-                            </div>
-                        ))}
+                        {Object.entries(tasksForView).map(([groupName, groupTasks]) => {
+                            // Filter out children of collapsed parents
+                            const visibleTasks = []
+                            let hiddenUntilDepth = null
+
+                            for (const t of groupTasks) {
+                                const task = t as any
+                                if (hiddenUntilDepth !== null) {
+                                    if (task.depth > hiddenUntilDepth) continue
+                                    else hiddenUntilDepth = null
+                                }
+
+                                visibleTasks.push(task)
+
+                                if (collapsedTaskIds[task.id]) {
+                                    hiddenUntilDepth = task.depth
+                                }
+                            }
+
+                            return (
+                                <div key={groupName} className="mb-8">
+                                    <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">{groupName} ({visibleTasks.length})</h3>
+                                    {visibleTasks.map((task, index) => renderTaskItem(task, index))}
+                                </div>
+                            )
+                        })}
                         {Object.keys(tasksForView).length === 0 && <div className="text-gray-400 text-center mt-10">No active tasks</div>}
                     </div>
                 ) : (
