@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react"
-import { useTasks, TaskFilter } from "@/hooks/useTasks"
+import { useTasks, type TaskFilter } from "@/hooks/useTasks"
 import { useProjects } from "@/hooks/useProjects"
 import { Loader2, List, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react"
 import { useSearchParams } from "react-router-dom"

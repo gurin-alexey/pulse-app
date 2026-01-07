@@ -4,6 +4,7 @@ import type { Task, Tag } from '@/types/database'
 
 export type TaskWithTags = Task & {
     tags: Tag[]
+    subtasks_count?: number
 }
 
 export type TaskFilter =
@@ -19,6 +20,12 @@ export async function fetchTasks(filter: TaskFilter) {
     let query = supabase
         .from('tasks')
         .select('*, task_tags(tags(*))')
+
+    if (filter.type === 'is_project') {
+        query = supabase
+            .from('tasks')
+            .select('*, task_tags(tags(*)), subtasks:tasks!parent_id(count)')
+    }
 
     if (filter.type === 'trash') {
         query = query.order('deleted_at', { ascending: false })
@@ -90,7 +97,8 @@ export async function fetchTasks(filter: TaskFilter) {
     // Transform to flat structure
     return finalData.map(task => ({
         ...task,
-        tags: task.task_tags.map((tt: any) => tt.tags)
+        tags: task.task_tags.map((tt: any) => tt.tags),
+        subtasks_count: task.subtasks?.[0]?.count
     })) as TaskWithTags[]
 }
 

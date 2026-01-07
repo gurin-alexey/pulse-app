@@ -28,7 +28,7 @@ export function ProjectsWidget() {
         )
     }
 
-    const visibleProjects = projects?.filter(t => !t.is_completed) || []
+    const visibleProjects = projects?.filter(t => !t.is_completed && (t.subtasks_count || 0) > 0) || []
 
     const getDateColor = (dateStr: string) => {
         const days = differenceInCalendarDays(new Date(dateStr), new Date())
@@ -44,8 +44,8 @@ export function ProjectsWidget() {
         if (days === 1) return "ЗАВТРА"
         if (days === -1) return "ВЧЕРА"
 
-        if (days > 0) return `${days} ДН.`
-        return `${Math.abs(days)} ДН. НАЗАД`
+        if (days > 0) return `${days} дн.`
+        return `${Math.abs(days)} дн. назад`
     }
 
     return (
