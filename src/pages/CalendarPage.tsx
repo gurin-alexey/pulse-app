@@ -7,7 +7,7 @@ import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import multiMonthPlugin from "@fullcalendar/multimonth"
 import { useSearchParams } from "react-router-dom"
-import { Loader2, Settings } from "lucide-react"
+import { Loader2, Settings, ChevronLeft, ChevronRight } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
 import { useState, useEffect, useRef, Fragment } from "react"
@@ -16,6 +16,7 @@ import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditM
 import { Menu, Transition } from "@headlessui/react"
 import { createPortal } from "react-dom"
 import { format } from "date-fns"
+import { ru } from "date-fns/locale"
 import { useSwipeable } from "react-swipeable"
 import { motion, useMotionValue, useTransform, animate } from "framer-motion"
 
@@ -491,13 +492,30 @@ export function CalendarPage() {
 
             {/* Mobile Header Portals */}
             {isMobile && mounted && document.getElementById('mobile-header-title') && createPortal(
-                <button
-                    onClick={headerGoToday}
-                    className="text-lg truncate flex items-center gap-1.5 active:opacity-70 transition-opacity"
-                >
-                    <span className="font-medium text-gray-500">Today,</span>
-                    <span className="font-bold text-gray-900">{format(new Date(), 'MMMM d')}</span>
-                </button>,
+                <div className="flex items-center justify-center gap-1">
+                    <button
+                        onClick={headerGoPrev}
+                        className="p-1 text-gray-400 hover:text-gray-600 active:scale-95 transition-transform"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+
+                    <button
+                        onClick={headerGoToday}
+                        className="text-lg truncate flex items-center active:opacity-70 transition-opacity mx-1"
+                    >
+                        <span className="font-medium text-gray-500 mr-1.5">сегодня</span>
+                        <span className="font-bold text-gray-900">{format(new Date(), 'd MMMM', { locale: ru })}</span>
+                        <span className="font-medium text-gray-500">, {format(new Date(), 'EEEE', { locale: ru }).toLowerCase()}</span>
+                    </button>
+
+                    <button
+                        onClick={headerGoNext}
+                        className="p-1 text-gray-400 hover:text-gray-600 active:scale-95 transition-transform"
+                    >
+                        <ChevronRight size={20} />
+                    </button>
+                </div>,
                 document.getElementById('mobile-header-title')!
             )}
 
@@ -607,7 +625,7 @@ export function CalendarPage() {
                     eventResize={handleEventResize}
                     eventClick={handleEventClickWrapper}
                     nowIndicator={true}
-                    slotDuration="00:30:00"
+                    slotDuration="01:00:00"
                     scrollTime="08:00:00"
                 />
             </motion.div>
