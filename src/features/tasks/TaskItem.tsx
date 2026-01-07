@@ -154,11 +154,33 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     }
 
     const getRelativeDate = (dateStr: string) => {
+        // 1. If it has time (Calendar event), show time instead of generic date
+        if (task.start_time) {
+            // Helper to format ISO time strings to HH:mm
+            const formatTime = (isoString: string) => {
+                if (!isoString) return ''
+                if (isoString.includes('T')) {
+                    const date = new Date(isoString)
+                    const hours = date.getHours()
+                    const minutes = date.getMinutes()
+                    // Always render HH:mm
+                    return `${hours}:${minutes.toString().padStart(2, '0')}`
+                }
+                // Fallback but ensure HH:mm pattern if it was already short
+                return isoString
+            }
+
+            const timeStr = formatTime(task.start_time)
+            return <span className="text-blue-600 font-medium text-xs bg-blue-50 px-1.5 py-0.5 rounded">{timeStr}</span>
+        }
+
         const date = new Date(dateStr)
         const today = startOfToday()
         const diff = differenceInCalendarDays(date, today)
 
-        if (diff === 0) return <span className="text-green-600 font-medium">Сегодня</span>
+        // 2. Hide "Today" label as requested (it's redundant in Today view, and implied elsewhere)
+        if (diff === 0) return null
+
         if (diff === 1) return <span className="text-gray-500">Завтра</span>
         if (diff > 1) return <span className="text-gray-500">{diff} дн.</span>
         if (diff < 0) return <span className="text-red-500 font-medium">{diff} дн.</span>
@@ -313,12 +335,27 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
-                    <div className="flex items-center -space-x-1">
-                        {task.tags?.map((tag: any) => (
-                            <div key={tag.id} className="w-2 h-2 rounded-full ring-2 ring-white" style={{ backgroundColor: tag.color }} title={tag.name} />
-                        ))}
-                    </div>
+                    {/* Tags */}
+                    {task.tags && task.tags.length > 0 && (
+                        <div className="flex items-center gap-2">
+                            {task.tags.map((tag: any) => (
+                                <div
+                                    key={tag.id}
+                                    className="px-2 py-0.5 rounded text-[10px] font-medium transition-colors"
+                                    style={{
+                                        backgroundColor: `${tag.color}20`,
+                                        color: tag.color,
+                                        border: `1px solid ${tag.color}40`
+                                    }}
+                                    title={tag.name}
+                                >
+                                    {tag.name}
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
+                    {/* Date/Time */}
                     {task.due_date && (
                         <div
                             className="text-xs tabular-nums cursor-help"
@@ -328,6 +365,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                         </div>
                     )}
 
+                    {/* Chevron */}
                     <div
                         className={clsx(
                             "w-6 h-6 flex items-center justify-center cursor-pointer transition-transform hover:bg-gray-200 rounded shrink-0",
