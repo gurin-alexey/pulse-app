@@ -71,32 +71,49 @@ export const addExDateToRRule = (currentRule: string, dateToExclude: Date) => {
     const iso = dateToExclude.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
     const exLine = `EXDATE:${iso}`
 
-    let baseRule = currentRule
-    if (!baseRule.includes('RRULE:')) {
-        baseRule = `RRULE:${baseRule}`
-    }
+    // If empty, just return the exdate (though unlikely useful on its own)
+    if (!currentRule) return exLine
 
-    return `${baseRule}\n${exLine}`
+    return `${currentRule}\n${exLine}`
 }
 
 /**
- * Adds an UNTIL date to the recurrence rule string.
+ * Adds or updates an UNTIL date in the recurrence rule string.
  */
 export const addUntilToRRule = (currentRule: string, untilDate: Date) => {
-    // UNTIL must be in UTC iCal format
     const iso = untilDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+    const lines = currentRule.split('\n')
+    let ruleFound = false
 
-    let baseRule = currentRule
-    if (!baseRule.includes('RRULE:')) {
-        baseRule = `RRULE:${baseRule}`
+    const newLines = lines.map(line => {
+        if (line.startsWith('RRULE:') || (!line.includes(':') && line.includes('FREQ='))) {
+            ruleFound = true
+            let ruleContent = line
+            if (ruleContent.startsWith('RRULE:')) {
+                ruleContent = ruleContent.substring(6)
+            }
+
+            if (ruleContent.includes('UNTIL=')) {
+                ruleContent = ruleContent.replace(/UNTIL=[^;]+/, `UNTIL=${iso}`)
+            } else {
+                ruleContent = `${ruleContent};UNTIL=${iso}`
+            }
+
+            return line.startsWith('RRULE:') ? `RRULE:${ruleContent}` : ruleContent
+        }
+        return line
+    })
+
+    if (!ruleFound && currentRule.includes('FREQ=')) {
+        // Fallback: if single line without headers that wasn't caught above (unlikely given logic)
+        // or if it was empty?
+        if (currentRule.includes('UNTIL=')) {
+            return currentRule.replace(/UNTIL=[^;]+/, `UNTIL=${iso}`)
+        }
+        return `${currentRule};UNTIL=${iso}`
     }
 
-    // Replace or add UNTIL
-    if (baseRule.includes('UNTIL=')) {
-        return baseRule.replace(/UNTIL=[^; \n]+/, `UNTIL=${iso}`)
-    } else {
-        return baseRule + `;UNTIL=${iso}`
-    }
+    return newLines.join('\n')
 }
 
 /**
@@ -106,9 +123,16 @@ export const updateDTStartInRRule = (currentRule: string, newDtStart: Date) => {
     const iso = newDtStart.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
     const dtLine = `DTSTART:${iso}`
 
-    if (currentRule.includes('DTSTART:')) {
-        return currentRule.replace(/DTSTART:[^ \n]+/, dtLine)
+    if (!currentRule) return dtLine
+
+    const lines = currentRule.split('\n')
+    const dtStartIndex = lines.findIndex(line => line.startsWith('DTSTART:'))
+
+    if (dtStartIndex !== -1) {
+        lines[dtStartIndex] = dtLine
+        return lines.join('\n')
     } else {
         return `${dtLine}\n${currentRule}`
     }
 }
+

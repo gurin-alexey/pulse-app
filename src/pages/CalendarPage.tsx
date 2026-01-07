@@ -15,6 +15,8 @@ import { generateRecurringInstances, addExDateToRRule, addUntilToRRule, updateDT
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
 import { Menu, Transition } from "@headlessui/react"
 import { format } from "date-fns"
+import { useSwipeable } from "react-swipeable"
+import { motion, useMotionValue, useTransform, animate } from "framer-motion"
 
 export function CalendarPage() {
     const { data: tasks, isLoading } = useAllTasks()
@@ -26,6 +28,7 @@ export function CalendarPage() {
     const [currentTitle, setCurrentTitle] = useState('')
     const [currentViewType, setCurrentViewType] = useState('timeGridDay')
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+    const [isSwiping, setIsSwiping] = useState(false)
 
     // Recurrence Edit Modal State
     const [recurrenceModal, setRecurrenceModal] = useState<{
@@ -322,9 +325,66 @@ export function CalendarPage() {
     const headerGoNext = () => calendarRef.current?.getApi().next()
     const headerGoToday = () => calendarRef.current?.getApi().today()
     const headerChangeView = (view: string) => calendarRef.current?.getApi().changeView(view)
+    const x = useMotionValue(0)
+    const opacity = useTransform(x, [-200, 0, 200], [0.5, 1, 0.5])
+
+    // Helper to animate slide transition
+    const handleSwipeComplete = async (direction: 'left' | 'right') => {
+        const targetX = direction === 'left' ? -window.innerWidth : window.innerWidth
+
+        // Animate out
+        await animate(x, targetX, { duration: 0.2 }).then(() => {
+            // Update calendar view
+            if (direction === 'left') {
+                headerGoNext()
+            } else {
+                headerGoPrev()
+            }
+
+            // Instantly jump to other side
+            x.set(-targetX)
+
+            // Animate in
+            animate(x, 0, { duration: 0.3, type: "spring", stiffness: 300, damping: 30 })
+            setIsSwiping(false)
+        })
+    }
+
+    const handlers = useSwipeable({
+        onSwiping: (e) => {
+            // Only handle horizontal swipe if it's the dominant direction
+            if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                setIsSwiping(true)
+                x.set(e.deltaX)
+            }
+        },
+        onSwipedLeft: () => handleSwipeComplete('left'),
+        onSwipedRight: () => handleSwipeComplete('right'),
+        onSwiped: (e) => {
+            // Snap back if threshold not met or if it wasn't a horizontal swipe
+            if (Math.abs(e.deltaX) < 100 || Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                animate(x, 0, { type: "spring", stiffness: 400, damping: 40 })
+                setIsSwiping(false)
+            }
+        },
+        delta: 10,
+        preventScrollOnSwipe: false, // Allow vertical scrolling
+        trackMouse: false,
+        trackTouch: true
+    })
+
+    const handleDateSelectWrapper = (arg: any) => {
+        if (isSwiping) return
+        handleDateSelect(arg)
+    }
+
+    const handleEventClickWrapper = (arg: any) => {
+        if (isSwiping) return
+        handleEventClick(arg)
+    }
 
     return (
-        <div className="h-full flex flex-col bg-white p-0 md:p-4 relative">
+        <div className="h-full flex flex-col bg-white p-0 md:p-4 relative overflow-hidden">
             <RecurrenceEditModal
                 isOpen={recurrenceModal.isOpen}
                 onClose={() => {
@@ -359,26 +419,28 @@ export function CalendarPage() {
 
                 {/* Right: View Switcher & Settings */}
                 <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                    <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-                        <button
-                            onClick={() => headerChangeView('dayGridMonth')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'dayGridMonth' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                        >
-                            Month
-                        </button>
-                        <button
-                            onClick={() => headerChangeView('timeGridWeek')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridWeek' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                        >
-                            Week
-                        </button>
-                        <button
-                            onClick={() => headerChangeView('timeGridDay')}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                        >
-                            Day
-                        </button>
-                    </div>
+                    {!isMobile && (
+                        <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+                            <button
+                                onClick={() => headerChangeView('dayGridMonth')}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'dayGridMonth' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                            >
+                                Month
+                            </button>
+                            <button
+                                onClick={() => headerChangeView('timeGridWeek')}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridWeek' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                            >
+                                Week
+                            </button>
+                            <button
+                                onClick={() => headerChangeView('timeGridDay')}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                            >
+                                Day
+                            </button>
+                        </div>
+                    )}
 
                     {/* Settings Menu */}
                     <Menu as="div" className="relative inline-block text-left">
@@ -419,7 +481,34 @@ export function CalendarPage() {
                 </div>
             </div>
 
-            <div className="flex-1 min-h-0 relative">
+            {isMobile && (
+                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 shadow-xl bg-white p-1.5 rounded-2xl border border-gray-100 flex gap-1 w-auto min-w-[280px]">
+                    <button
+                        onClick={() => headerChangeView('timeGridDay')}
+                        className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentViewType === 'timeGridDay' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                    >
+                        1 Day
+                    </button>
+                    <button
+                        onClick={() => headerChangeView('threeDay')}
+                        className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentViewType === 'threeDay' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                    >
+                        3 Days
+                    </button>
+                    <button
+                        onClick={() => headerChangeView('timeGridWeek')}
+                        className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentViewType === 'timeGridWeek' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                    >
+                        7 Days
+                    </button>
+                </div>
+            )}
+
+            <motion.div
+                className="flex-1 min-h-0 relative touch-pan-y"
+                {...handlers}
+                style={{ x, opacity }}
+            >
                 <FullCalendar
                     ref={calendarRef}
                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin]}
@@ -447,7 +536,7 @@ export function CalendarPage() {
                     editable={true}
                     selectable={true}
                     selectMirror={true}
-                    select={handleDateSelect}
+                    select={handleDateSelectWrapper}
                     datesSet={(arg) => {
                         setCurrentTitle(arg.view.title)
                         setCurrentViewType(arg.view.type)
@@ -457,12 +546,12 @@ export function CalendarPage() {
                     events={handleFetchEvents}
                     eventDrop={handleEventDrop}
                     eventResize={handleEventResize}
-                    eventClick={handleEventClick}
+                    eventClick={handleEventClickWrapper}
                     nowIndicator={true}
                     slotDuration="00:30:00"
                     scrollTime="08:00:00"
                 />
-            </div>
+            </motion.div>
         </div>
     )
 }
