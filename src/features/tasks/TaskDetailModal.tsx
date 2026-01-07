@@ -8,6 +8,12 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
     // Simple media query for mobile check
     const isMobile = useMediaQuery("(max-width: 768px)")
 
+    // Controlled snap state
+    const [snap, setSnap] = React.useState<number | string | null>(0.5)
+
+    // Memoize snapPoints to prevent unwanted re-renders/looping in Vaul
+    const snapPoints = React.useMemo(() => [0.5, 1], [])
+
     if (!taskId) return null
 
     // Desktop: Standard Centered Modal (Existing Logic)
@@ -34,12 +40,19 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
         <Drawer.Root
             open={true}
             onOpenChange={(open) => !open && onClose()}
-            snapPoints={[0.5, 1]}
+            snapPoints={snapPoints}
+            activeSnapPoint={snap}
+            setActiveSnapPoint={setSnap}
+            fadeFromIndex={0}
         >
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" />
                 <Drawer.Content
                     className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 h-[100dvh] z-50 focus:outline-none"
+                    onFocusCapture={() => {
+                        // When input is focused (keyboard opens), expand to full screen
+                        setSnap(1)
+                    }}
                 >
                     {/* Drag Handle */}
                     <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-2" />
