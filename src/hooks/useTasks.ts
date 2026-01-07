@@ -55,7 +55,9 @@ export async function fetchTasks(filter: TaskFilter) {
         const targetDateStr = localDate.toISOString().split('T')[0]
         query = query.eq('due_date', targetDateStr)
     } else if (filter.type === 'is_project') {
-        query = query.eq('is_project', true)
+        query = query
+            .eq('is_project', true)
+            .not('due_date', 'is', null)
     }
 
     const { data: initialData, error } = await query
