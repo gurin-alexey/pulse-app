@@ -9,6 +9,7 @@ export type TaskWithTags = Task & {
 export type TaskFilter =
     | { type: 'inbox', includeSubtasks?: boolean }
     | { type: 'today', includeSubtasks?: boolean }
+    | { type: 'tomorrow', includeSubtasks?: boolean }
     | { type: 'project', projectId: string, includeSubtasks?: boolean }
     | { type: 'trash' }
     | { type: 'all', includeSubtasks?: boolean }
@@ -35,11 +36,18 @@ export async function fetchTasks(filter: TaskFilter) {
         query = query.eq('project_id', filter.projectId)
     } else if (filter.type === 'inbox') {
         query = query.is('project_id', null)
-    } else if (filter.type === 'today') {
-        // Use local date for 'today' calculation to match user's perspective
+    } else if (filter.type === 'today' || filter.type === 'tomorrow') {
+        // Calculate date
         const date = new Date()
-        const today = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-        query = query.eq('due_date', today)
+        // Adjust to local time representation
+        const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
+
+        if (filter.type === 'tomorrow') {
+            localDate.setDate(localDate.getDate() + 1)
+        }
+
+        const targetDateStr = localDate.toISOString().split('T')[0]
+        query = query.eq('due_date', targetDateStr)
     }
 
     const { data: initialData, error } = await query
@@ -48,8 +56,8 @@ export async function fetchTasks(filter: TaskFilter) {
 
     let finalData = initialData as any[]
 
-    // Special handling for 'today' view: Fetch subtasks of the found tasks (even if they don't have today's date)
-    if (filter.type === 'today' && filter.includeSubtasks && finalData.length > 0) {
+    // Special handling for 'today'/'tomorrow' view: Fetch subtasks of the found tasks
+    if ((filter.type === 'today' || filter.type === 'tomorrow') && filter.includeSubtasks && finalData.length > 0) {
         const parentIds = finalData.map(t => t.id)
 
         // Fetch children

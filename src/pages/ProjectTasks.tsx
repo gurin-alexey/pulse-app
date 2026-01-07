@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useSelectionStore } from "@/store/useSelectionStore"
 import { useParams, useSearchParams } from "react-router-dom"
 import { useTasks } from "@/hooks/useTasks"
@@ -100,7 +100,7 @@ import { useProjects } from "@/hooks/useProjects"
 
 // ... imports remain the same ...
 
-export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
+export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }) {
     const { projectId } = useParams<{ projectId: string }>()
     const [searchParams, setSearchParams] = useSearchParams()
 
@@ -110,8 +110,8 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     // Determine filter
     const filter: TaskFilter = mode === 'inbox'
         ? { type: 'inbox', includeSubtasks: true }
-        : mode === 'today'
-            ? { type: 'today', includeSubtasks: true }
+        : (mode === 'today' || mode === 'tomorrow')
+            ? { type: mode, includeSubtasks: true }
             : { type: 'project', projectId: projectId!, includeSubtasks: true }
 
     // Data Hooks
@@ -124,9 +124,28 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
         ? 'Inbox'
         : mode === 'today'
             ? 'Today'
-            : currentProject?.name || 'Tasks'
+            : mode === 'tomorrow'
+                ? 'Tomorrow'
+                : currentProject?.name || 'Tasks'
 
     const showSections = !mode // Only show sections for specific projects
+
+    // Calculate target date for "Today"/"Tomorrow" views
+    // This ensures we view the correct "day" in the date-grouped view logic
+    const targetDate = useMemo(() => {
+        if (mode === 'tomorrow') {
+            const d = new Date()
+            d.setDate(d.getDate() + 1)
+            const local = new Date(d.getTime() - (d.getTimezoneOffset() * 60000))
+            return local.toISOString().split('T')[0]
+        }
+        if (mode === 'today') {
+            const d = new Date()
+            const local = new Date(d.getTime() - (d.getTimezoneOffset() * 60000))
+            return local.toISOString().split('T')[0]
+        }
+        return undefined
+    }, [mode])
 
     // Mutation Hooks
     const { mutate: updateTask } = useUpdateTask()
@@ -138,7 +157,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
     // View State
     // ... State declarations remain ...
     const [sortBy, setSortBy] = useState<SortOption>('manual')
-    const [groupBy, setGroupBy] = useState<GroupOption>(mode === 'today' ? 'date' : 'none')
+    const [groupBy, setGroupBy] = useState<GroupOption>((mode === 'today' || mode === 'tomorrow') ? 'date' : 'none')
     const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false)
     const [isAddingSection, setIsAddingSection] = useState(false)
     const [newSectionName, setNewSectionName] = useState("")
@@ -273,7 +292,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
         return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
     })
 
-    const tasksForView = useTaskView({ tasks: sortedActiveTasks, showCompleted: false, sortBy, groupBy, projects: allProjects })
+    const tasksForView = useTaskView({ tasks: sortedActiveTasks, showCompleted: false, sortBy, groupBy, projects: allProjects, targetDate })
     const renderMode = groupBy === 'none' ? 'sections' : 'groups'
 
     const handleTaskClick = (taskId: string) => {
@@ -640,7 +659,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                     // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
                     <div className="mt-4">
                         {/* Allow creating tasks in Inbox/Today even without projectId */}
-                        <div className="mb-6"><CreateTaskInput projectId={projectId || null} /></div>
+                        <div className="mb-6"><CreateTaskInput projectId={projectId || null} defaultDueDate={targetDate} /></div>
 
                         {Object.entries(tasksForView).map(([groupName, groupTasks]) => {
                             // Filter out children of collapsed parents
@@ -683,9 +702,9 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                                 )}
                             >
                                 {projectId ? (
-                                    <CreateTaskInput projectId={projectId} sectionId={null} />
+                                    <CreateTaskInput projectId={projectId} sectionId={null} defaultDueDate={targetDate} />
                                 ) : (
-                                    <CreateTaskInput projectId={projectId || null} sectionId={null} />
+                                    <CreateTaskInput projectId={projectId || null} sectionId={null} defaultDueDate={targetDate} />
                                 )}
 
                                 <SortableContext items={getFlattenedTasks(null).map((t: any) => t.id)} strategy={verticalListSortingStrategy}>
@@ -765,7 +784,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                                                                     </div>
                                                                 </SortableContext>
                                                                 <div className="mt-2 border-t border-gray-50/50 pt-2">
-                                                                    {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." />}
+                                                                    {projectId && <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." defaultDueDate={targetDate} />}
                                                                 </div>
                                                             </div>
                                                         )}

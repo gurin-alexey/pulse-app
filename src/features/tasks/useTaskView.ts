@@ -16,6 +16,7 @@ type UseTaskViewProps = {
     sortBy: SortOption
     groupBy: GroupOption
     projects?: Project[]
+    targetDate?: string
 }
 
 // Helper to organize tasks hierarchically within a group
@@ -53,7 +54,7 @@ const organizeByHierarchy = (roots: TaskWithTags[], allTasksMap?: Map<string, Ta
     return result
 }
 
-export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects }: UseTaskViewProps) {
+export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects, targetDate }: UseTaskViewProps) {
     const sortedAndGroupedTasks = useMemo(() => {
         if (!tasks) return {}
 
@@ -92,21 +93,26 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects }:
                 'CALENDAR': [],
                 'ALL DAY': []
             }
-            const date = new Date()
-            const todayStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
 
-            // 1. Strict Filter: Only allow tasks implicitly scheduled for TODAY.
-            // Tasks without a date (even if subtasks of today's projects) are EXCLUDED.
-            const todaysTasks = filtered.filter(task => {
-                const hasDate = task.due_date && task.due_date.startsWith(todayStr)
-                const hasTime = task.start_time && task.start_time.startsWith(todayStr)
+            // Determine target date string (default to Today if not provided)
+            let targetStr = targetDate
+            if (!targetStr) {
+                const date = new Date()
+                targetStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+            }
+
+            // 1. Strict Filter: Only allow tasks implicitly scheduled for TARGET DATE.
+            // Tasks without a date (even if subtasks of projects) are EXCLUDED.
+            const targetTasks = filtered.filter(task => {
+                const hasDate = task.due_date && task.due_date.startsWith(targetStr)
+                const hasTime = task.start_time && task.start_time.startsWith(targetStr)
                 return hasDate || hasTime
             })
 
-            const tasksMap = new Map(todaysTasks.map(t => [t.id, t]))
+            const tasksMap = new Map(targetTasks.map(t => [t.id, t]))
 
             // 3. Partition
-            todaysTasks.forEach(task => {
+            targetTasks.forEach(task => {
                 // 1. DEADLINE: Projects (Multi-step)
                 if (task.is_project) {
                     dateGroups['DEADLINE'].push(task)

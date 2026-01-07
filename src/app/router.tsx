@@ -44,6 +44,10 @@ export const router = createBrowserRouter([
             element: <ProjectTasks mode="today" />,
           },
           {
+            path: "tomorrow",
+            element: <ProjectTasks mode="tomorrow" />,
+          },
+          {
             path: "projects/:projectId",
             element: <ProjectTasks />,
           },

@@ -7,9 +7,10 @@ type CreateTaskInputProps = {
     projectId: string | null
     sectionId?: string | null
     placeholder?: string
+    defaultDueDate?: string | null
 }
 
-export function CreateTaskInput({ projectId, sectionId, placeholder = "New task" }: CreateTaskInputProps) {
+export function CreateTaskInput({ projectId, sectionId, placeholder = "New task", defaultDueDate }: CreateTaskInputProps) {
     const [title, setTitle] = useState('')
     const { mutate, isPending } = useCreateTask()
     const inputRef = useRef<HTMLInputElement>(null)
@@ -25,7 +26,7 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
         }
 
         mutate(
-            { id: crypto.randomUUID(), title: taskTitle.trim(), projectId, userId: user.id, sectionId: sectionId },
+            { id: crypto.randomUUID(), title: taskTitle.trim(), projectId, userId: user.id, sectionId: sectionId, due_date: defaultDueDate },
             {
                 onError: (error) => {
                     console.error('Failed to create task:', error)

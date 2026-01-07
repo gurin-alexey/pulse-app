@@ -15,7 +15,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useDeleteProject } from "@/hooks/useDeleteProject"
 import { useAllTasks } from "@/hooks/useAllTasks"
 import { useTags } from "@/hooks/useTags"
-import { isToday, parseISO } from "date-fns"
+import { isToday, isTomorrow, parseISO } from "date-fns"
 import { useCommandStore } from "@/store/useCommandStore"
 
 type SidebarProps = {
@@ -311,6 +311,13 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
             path: "/today",
             icon: Sun,
             count: allTasks?.filter(t => !t.is_completed && t.due_date && isToday(parseISO(t.due_date))).length,
+            droppable: false
+        },
+        {
+            label: "Tomorrow",
+            path: "/tomorrow",
+            icon: Sun, // Keeping Sun for consistency with 'day' specific views, or change if preferred
+            count: allTasks?.filter(t => !t.is_completed && t.due_date && isTomorrow(parseISO(t.due_date))).length,
             droppable: false
         },
         { label: "Calendar", path: "/calendar", icon: Calendar, droppable: false },
