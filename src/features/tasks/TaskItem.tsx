@@ -15,6 +15,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useSettings } from "@/store/useSettings"
 import { useTrashActions } from "@/hooks/useTrashActions"
 import { ContextMenu } from "@/shared/components/ContextMenu"
+import { useSwipeable } from "react-swipeable"
 
 interface TaskItemProps {
     task: any
@@ -26,10 +27,12 @@ interface TaskItemProps {
     isCollapsed?: boolean
     onToggleCollapse?: () => void
     disableAnimation?: boolean
+    onIndent?: () => void
+    onOutdent?: () => void
     onShiftClick?: (id: string) => void
 }
 
-export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onShiftClick }: TaskItemProps) {
+export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onShiftClick, onIndent, onOutdent }: TaskItemProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
@@ -49,6 +52,20 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     const [title, setTitle] = useState(task.title)
     const [isEditing, setIsEditing] = useState(false)
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
+
+    // Swipe Logic
+    const swipeHandlers = useSwipeable({
+        onSwipedRight: () => {
+            if (isMobile && onIndent) onIndent()
+        },
+        onSwipedLeft: () => {
+            if (isMobile && onOutdent) onOutdent()
+        },
+        trackMouse: false,
+        trackTouch: true,
+        preventScrollOnSwipe: false,
+        delta: 30
+    })
 
     // Sync title if task updates externally
     useEffect(() => {
@@ -188,7 +205,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                         <div
                             className={clsx(
                                 "w-2 h-2 rounded-full",
-                                isAttached ? "ring-2 ring-offset-2 ring-blue-400" : ""
+                                "ring-2 ring-offset-2 ring-blue-400"
                             )}
                             style={{ backgroundColor: tag.color }}
                         />
@@ -240,6 +257,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 onClick={handleTaskClick}
                 {...(isMobile ? listeners : {})}
                 {...(isMobile ? attributes : {})}
+                {...(isMobile ? swipeHandlers : {})} // Attach swipe handlers
                 className={clsx(
                     "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent",
                     isSelected ? "bg-blue-50 dark:bg-blue-900/20 !border-blue-100" : (isActive ? "bg-gray-100" : "hover:bg-gray-100/60"),

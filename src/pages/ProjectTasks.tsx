@@ -544,6 +544,47 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
 
     // ...
 
+    // Swipe Logic for Indent/Outdent on Mobile
+    const handleSwipeIndent = (task: any) => {
+        // Can only indent if sorting is manual
+        if (sortBy !== 'manual') return
+
+        const currentSectionId = task.section_id
+        const items = getFlattenedTasks(currentSectionId)
+        const index = items.findIndex((t: any) => t.id === task.id)
+
+        if (index <= 0) return // First item cannot be indented
+
+        const prevItem = items[index - 1]
+
+        // Optimistic update: Parent becomes prevItem
+        updateTask({
+            taskId: task.id,
+            updates: {
+                parent_id: prevItem.id
+            }
+        })
+
+        // Expand previous item if it was collapsed
+        if (collapsedTaskIds[prevItem.id]) {
+            setCollapsedTaskIds(prev => ({ ...prev, [prevItem.id]: false }))
+        }
+    }
+
+    const handleSwipeOutdent = (task: any) => {
+        if (!task.parent_id) return // Already root
+
+        const parentTask = activeTasks.find(t => t.id === task.parent_id)
+        const newParentId = parentTask ? parentTask.parent_id : null
+
+        updateTask({
+            taskId: task.id,
+            updates: {
+                parent_id: newParentId
+            }
+        })
+    }
+
     // Helper to render a single task item
     const renderTaskItem = (task: any) => {
         const hasChildren = activeTasks.some(t => t.parent_id === task.id)
@@ -563,6 +604,8 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                         isCollapsed={!!collapsedTaskIds[task.id]}
                         onToggleCollapse={() => setCollapsedTaskIds(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
                         onShiftClick={handleShiftClick}
+                        onIndent={() => handleSwipeIndent(task)}
+                        onOutdent={() => handleSwipeOutdent(task)}
                     />
                 )}
             </SortableTaskItem>
