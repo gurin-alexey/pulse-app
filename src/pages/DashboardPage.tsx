@@ -2,6 +2,7 @@ import { GreetingWidget } from "@/features/dashboard/GreetingWidget"
 import { AIAssistantWidget } from "@/features/dashboard/AIAssistantWidget"
 import { QuickCaptureWidget } from "@/features/dashboard/QuickCaptureWidget"
 import { DeadlineTasksWidget } from "@/features/dashboard/DeadlineTasksWidget"
+import { ProjectsWidget } from "@/features/dashboard/ProjectsWidget"
 import { WeatherRatesWidget } from "@/features/dashboard/WeatherRatesWidget"
 import { Plus, LayoutGrid } from "lucide-react"
 import { toast } from "sonner"
@@ -78,6 +79,11 @@ export function DashboardPage() {
                         <DeadlineTasksWidget />
                     </div>
                 )}
+
+                {/* 5. Projects (Multi-step Tasks) */}
+                <div className="lg:col-span-2 h-[450px]">
+                    <ProjectsWidget />
+                </div>
 
                 {/* 5. AI Assistant (Bottom-Right - Wide) */}
                 {layout.ai_chat && (

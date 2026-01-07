@@ -294,8 +294,8 @@ export function Layout() {
           )}
         </main>
 
-        {/* Modal for Calendar Page OR Mobile List View */}
-        {taskId && (isCalendarPage || !isDesktop) && (
+        {/* Modal for Calendar Page OR Mobile List View OR Dashboard Page */}
+        {taskId && (isCalendarPage || isDashboardPage || !isDesktop) && (
           <TaskDetailModal taskId={taskId} onClose={closeModal} />
         )}
 

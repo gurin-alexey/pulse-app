@@ -54,15 +54,48 @@ export function DailyPlanner() {
         let start = task.start_time || task.due_date
         let end = task.end_time
 
+        // Match CalendarPage Priority Colors
+        let bg = ''
+        let border = ''
+        let text = ''
+
+        if (task.is_completed) {
+            bg = '#f3f4f6'
+            border = '#e5e7eb'
+            text = '#9ca3af'
+        } else {
+            switch (task.priority) {
+                case 'high':
+                    bg = '#fee2e2' // red-100
+                    border = '#f87171' // red-400
+                    text = '#b91c1c' // red-700
+                    break
+                case 'medium':
+                    bg = '#ffedd5' // orange-100
+                    border = '#fb923c' // orange-400
+                    text = '#c2410c' // orange-700
+                    break
+                case 'low':
+                    bg = '#dbeafe' // blue-100
+                    border = '#60a5fa' // blue-400
+                    text = '#1d4ed8' // blue-700
+                    break
+                default: // none/normal
+                    bg = '#f3f4f6' // gray-100
+                    border = '#9ca3af' // gray-400
+                    text = '#374151' // gray-700
+            }
+        }
+
         return {
             id: task.id,
             title: task.title,
             start: start || undefined,
             end: end || undefined,
             allDay: !task.start_time,
-            backgroundColor: task.is_completed ? '#f3f4f6' : '#3b82f6',
-            borderColor: task.is_completed ? '#e5e7eb' : '#2563eb',
-            textColor: task.is_completed ? '#9ca3af' : '#ffffff',
+            backgroundColor: bg,
+            borderColor: border,
+            textColor: text,
             classNames: clsx(task.is_completed && "opacity-75 line-through decoration-gray-400")
         }
     })

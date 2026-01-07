@@ -283,7 +283,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 className={clsx(
                     "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent",
                     isSelected ? "bg-blue-50 dark:bg-blue-900/20 !border-blue-100" : (isActive ? "bg-gray-100" : "hover:bg-gray-100/60"),
-                    task.is_completed && "opacity-50"
+                    task.is_completed && "opacity-80"
                 )}
             >
                 <div
@@ -296,7 +296,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
                 <button
                     onClick={toggleStatus}
-                    className={clsx("transition-colors", task.is_completed ? "text-gray-400" : "text-gray-300 hover:text-gray-500")}
+                    className={clsx("transition-colors", task.is_completed ? "text-gray-500" : "text-gray-300 hover:text-gray-500")}
                 >
                     {task.is_completed ? <CheckSquare size={18} /> : <Square size={18} />}
                 </button>
@@ -307,7 +307,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                             className={clsx(
                                 "w-full bg-transparent border-0 p-0 leading-tight",
                                 "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
-                                task.is_completed ? "text-gray-400 line-through" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
+                                task.is_completed ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
                             )}
                         >
                             {task.title}
@@ -327,7 +327,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                             className={clsx(
                                 "w-full bg-transparent border-0 outline-none focus:ring-0 p-0 leading-tight resize-none",
                                 "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
-                                task.is_completed ? "text-gray-400 line-through" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
+                                task.is_completed ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
                             )}
                             spellCheck={false}
                         />

@@ -13,12 +13,18 @@ export type TaskFilter =
     | { type: 'project', projectId: string, includeSubtasks?: boolean }
     | { type: 'trash' }
     | { type: 'all', includeSubtasks?: boolean }
+    | { type: 'is_project' }
 
 export async function fetchTasks(filter: TaskFilter) {
     let query = supabase
         .from('tasks')
         .select('*, task_tags(tags(*))')
-        .order('created_at', { ascending: false })
+
+    if (filter.type === 'trash') {
+        query = query.order('deleted_at', { ascending: false })
+    } else {
+        query = query.order('created_at', { ascending: false })
+    }
 
     // Filter parent_id unless includeSubtasks is true
     // @ts-ignore
@@ -48,6 +54,8 @@ export async function fetchTasks(filter: TaskFilter) {
 
         const targetDateStr = localDate.toISOString().split('T')[0]
         query = query.eq('due_date', targetDateStr)
+    } else if (filter.type === 'is_project') {
+        query = query.eq('is_project', true)
     }
 
     const { data: initialData, error } = await query

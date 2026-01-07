@@ -173,6 +173,13 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     const [activeDragItem, setActiveDragItem] = useState<any | null>(null) // Track active drag item for Overlay
     const activeTaskId = searchParams.get('task')
 
+    const isDesktop = useMediaQuery("(min-width: 768px)")
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
+
+    useEffect(() => {
+        setPortalTarget(document.getElementById('mobile-header-right'))
+    }, [])
+
     // Initial load: collapse all sections by default if not set? 
     useEffect(() => {
         if (sections) {
@@ -648,12 +655,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     if (tasksLoading || sectionsLoading) return <div className="flex items-center justify-center h-full text-gray-400"><Loader2 className="animate-spin mr-2" />Loading...</div>
     if (tasksError) return <div className="flex items-center justify-center h-full text-red-500"><AlertCircle className="mr-2" />Error loading tasks</div>
 
-    const isDesktop = useMediaQuery("(min-width: 768px)")
-    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
 
-    useEffect(() => {
-        setPortalTarget(document.getElementById('mobile-header-right'))
-    }, [])
 
 
     // Simplified Render: No DndContext, just children content. The Layout DndContext provides the context.
@@ -678,7 +680,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
             <div className="flex-1 pl-4 pr-0 pt-4 md:p-4 overflow-y-auto pb-20">
                 {renderMode === 'groups' ? (
                     // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
-                    <div className="mt-4">
+                    <div className="flex flex-col min-h-full mt-4">
                         {/* Allow creating tasks in Inbox/Today even without projectId */}
 
                         {Object.entries(tasksForView).map(([groupName, groupTasks]) => {
@@ -708,6 +710,40 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                             )
                         })}
                         {Object.keys(tasksForView).length === 0 && <div className="text-gray-400 text-center mt-10">No active tasks</div>}
+
+                        {/* COMPLETED TASKS SECTION FOR GROUPS VIEW (Today/Tomorrow) */}
+                        {completedTasks.length > 0 && (
+                            <div className="mt-auto border-t border-gray-100 pt-6">
+                                <button
+                                    onClick={() => setCompletedAccordionOpen(!completedAccordionOpen)}
+                                    className="flex items-center gap-2 text-gray-500 font-semibold text-sm hover:text-gray-700 transition-colors mb-4"
+                                >
+                                    <ChevronRight size={16} className={clsx("transition-transform", completedAccordionOpen && "rotate-90")} />
+                                    Completed ({completedTasks.length})
+                                </button>
+
+                                <AnimatePresence>
+                                    {completedAccordionOpen && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: "auto", opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="space-y-1">
+                                                {completedTasks.map(task => (
+                                                    <TaskItem
+                                                        key={task.id}
+                                                        task={task}
+                                                        isActive={activeTaskId === task.id}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     // SECTIONS VIEW with Drag & Drop
@@ -849,7 +885,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                                             exit={{ height: 0, opacity: 0 }}
                                             className="overflow-hidden"
                                         >
-                                            <div className="space-y-1 opacity-60">
+                                            <div className="space-y-1">
                                                 {completedTasks.map(task => (
                                                     <TaskItem
                                                         key={task.id}
