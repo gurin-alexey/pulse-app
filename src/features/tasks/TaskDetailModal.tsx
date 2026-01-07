@@ -48,7 +48,7 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" />
                 <Drawer.Content
-                    className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 h-[100dvh] z-50 focus:outline-none"
+                    className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 h-[96dvh] z-50 focus:outline-none"
                     onFocusCapture={() => {
                         // When input is focused (keyboard opens), expand to full screen
                         setSnap(1)
