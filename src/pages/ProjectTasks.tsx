@@ -752,46 +752,44 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' }) {
                                 )}
                             </div>
                         )}
-                    </div>
-                )}
 
-                {/* COMPLETED ACCORDION */}
-                {completedTasks.length > 0 && (
-                    <div className="mt-12 border-t border-gray-100 pt-6">
-                        <button
-                            onClick={() => setCompletedAccordionOpen(!completedAccordionOpen)}
-                            className="flex items-center gap-2 text-gray-500 font-semibold text-sm hover:text-gray-700 transition-colors mb-4"
-                        >
-                            <ChevronRight size={16} className={clsx("transition-transform", completedAccordionOpen && "rotate-90")} />
-                            Completed ({completedTasks.length})
-                        </button>
-
-                        <AnimatePresence>
-                            {completedAccordionOpen && (
-                                <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden"
+                        {/* COMPLETED ACCORDION - Pushed to bottom */}
+                        {completedTasks.length > 0 && (
+                            <div className="mt-auto border-t border-gray-100 pt-6 pb-6 w-full">
+                                <button
+                                    onClick={() => setCompletedAccordionOpen(!completedAccordionOpen)}
+                                    className="flex items-center gap-2 text-gray-500 font-semibold text-sm hover:text-gray-700 transition-colors mb-4"
                                 >
-                                    <div className="space-y-1 opacity-60">
-                                        {completedTasks.map(task => (
-                                            <TaskItem
-                                                key={task.id}
-                                                task={task}
-                                                isActive={activeTaskId === task.id}
-                                            />
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                                    <ChevronRight size={16} className={clsx("transition-transform", completedAccordionOpen && "rotate-90")} />
+                                    Completed ({completedTasks.length})
+                                </button>
+
+                                <AnimatePresence>
+                                    {completedAccordionOpen && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: "auto", opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="space-y-1 opacity-60">
+                                                {completedTasks.map(task => (
+                                                    <TaskItem
+                                                        key={task.id}
+                                                        task={task}
+                                                        isActive={activeTaskId === task.id}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
                     </div>
                 )}
-
             </div>
             {/* Portal Overlay for smooth dragging across containers */}
-
         </div>
     )
 }
