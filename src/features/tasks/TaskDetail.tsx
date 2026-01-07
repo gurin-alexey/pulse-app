@@ -68,6 +68,10 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const titleRef = useRef(title)
     const descriptionRef = useRef(description)
 
+    // Track if this was opened as a new task
+    const isNew = searchParams.get('isNew') === 'true'
+    const isNewRef = useRef(isNew)
+
     useEffect(() => {
         titleRef.current = title
         descriptionRef.current = description
@@ -77,10 +81,16 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     useEffect(() => {
         return () => {
             const currentParams = new URLSearchParams(window.location.search)
+            // If the URL param 'task' is gone, we are effectively closing the view
+            // OR if we are in a popup (DailyPlanner) and unmounting, we also want to check logic
+            // But relying on URL for popup validity is tricky. 
+            // However, the CRITICAL fix is checking isNewRef.
+
             const closing = !currentParams.get('task')
             const isEmpty = !titleRef.current.trim() && !descriptionRef.current.trim()
 
-            if (closing && isEmpty) {
+            // Only delete if it was explicitly marked as NEW and is empty
+            if (closing && isEmpty && isNewRef.current) {
                 deleteTask(taskId)
             }
         }
