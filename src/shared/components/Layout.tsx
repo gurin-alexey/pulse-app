@@ -251,8 +251,8 @@ export function Layout() {
                 key="calendar-view"
                 initial={{ x: "100%" }}
                 animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
+                exit={isCalendarPage ? { x: "100%", zIndex: 50, transition: { duration: 1.2, ease: [0.16, 1, 0.3, 1] } } : { opacity: 1, zIndex: 1, transition: { duration: 1.2 } }}
+                transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
                 className="absolute inset-0 z-50 bg-white"
               >
                 {currentOutlet}

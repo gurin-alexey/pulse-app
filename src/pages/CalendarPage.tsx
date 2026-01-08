@@ -8,6 +8,7 @@ import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import multiMonthPlugin from "@fullcalendar/multimonth"
 import listPlugin from "@fullcalendar/list"
+import ruLocale from '@fullcalendar/core/locales/ru'
 import { useSearchParams, useNavigate } from "react-router-dom"
 import { Loader2, Settings, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowLeft, ArrowRight } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
@@ -479,7 +480,7 @@ export function CalendarPage() {
                                 <span className="sr-only">Prev</span>←
                             </button>
                             <button onClick={headerGoToday} className="px-3 py-1 text-sm font-semibold hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-700">
-                                Today
+                                Сегодня
                             </button>
                             <button onClick={headerGoNext} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
                                 <span className="sr-only">Next</span>→
@@ -518,7 +519,7 @@ export function CalendarPage() {
                             >
                                 <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-xl ring-1 ring-black/5 focus:outline-none z-50">
                                     <div className="px-4 py-3 border-b border-gray-50">
-                                        <p className="text-sm font-semibold text-gray-900">View Settings</p>
+                                        <p className="text-sm font-semibold text-gray-900">Настройки отображения</p>
                                     </div>
                                     <div className="p-2">
                                         <Menu.Item>
@@ -527,7 +528,7 @@ export function CalendarPage() {
                                                     onClick={() => setShowCompleted(!showCompleted)}
                                                     className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition-colors ${active ? 'bg-gray-50' : ''}`}
                                                 >
-                                                    <span className="text-gray-700">Show completed</span>
+                                                    <span className="text-gray-700">Показать завершенные</span>
                                                     <div className={`w-9 h-5 rounded-full relative transition-colors ${showCompleted ? 'bg-blue-500' : 'bg-gray-200'}`}>
                                                         <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${showCompleted ? 'translate-x-4' : ''}`} />
                                                     </div>
@@ -587,7 +588,7 @@ export function CalendarPage() {
                     >
                         <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-xl ring-1 ring-black/5 focus:outline-none z-[60]">
                             <div className="px-4 py-3 border-b border-gray-50">
-                                <p className="text-sm font-semibold text-gray-900">View Settings</p>
+                                <p className="text-sm font-semibold text-gray-900">Настройки отображения</p>
                             </div>
                             <div className="p-2">
                                 <Menu.Item>
@@ -596,7 +597,7 @@ export function CalendarPage() {
                                             onClick={() => setShowCompleted(!showCompleted)}
                                             className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition-colors ${active ? 'bg-gray-50' : ''}`}
                                         >
-                                            <span className="text-gray-700">Show completed</span>
+                                            <span className="text-gray-700">Показать завершенные</span>
                                             <div className={`w-9 h-5 rounded-full relative transition-colors ${showCompleted ? 'bg-blue-500' : 'bg-gray-200'}`}>
                                                 <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${showCompleted ? 'translate-x-4' : ''}`} />
                                             </div>
@@ -616,19 +617,19 @@ export function CalendarPage() {
                         onClick={() => headerChangeView('timeGridDay')}
                         className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentViewType === 'timeGridDay' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
                     >
-                        1 Day
+                        1 День
                     </button>
                     <button
                         onClick={() => headerChangeView('threeDay')}
                         className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentViewType === 'threeDay' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
                     >
-                        3 Days
+                        3 Дня
                     </button>
                     <button
                         onClick={() => headerChangeView('timeGridWeek')}
                         className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentViewType === 'timeGridWeek' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
                     >
-                        7 Days
+                        Неделя
                     </button>
                 </div>
             )}
@@ -643,6 +644,7 @@ export function CalendarPage() {
                     ref={calendarRef}
                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin, listPlugin]}
                     headerToolbar={false}
+                    locale={ruLocale}
                     views={{
                         dayGridMonth: { // Ensure this exists for the separate button
                             titleFormat: { month: 'long', year: 'numeric' }
@@ -650,7 +652,7 @@ export function CalendarPage() {
                         threeDay: {
                             type: 'timeGrid',
                             duration: { days: 3 },
-                            buttonText: '3 Days',
+                            buttonText: '3 Дня',
                             titleFormat: { month: 'short', day: 'numeric' }
                         },
                         timeGridDay: {
@@ -681,6 +683,7 @@ export function CalendarPage() {
                     eventResize={handleEventResize}
                     eventClick={handleEventClickWrapper}
                     nowIndicator={true}
+                    allDayText="Весь день"
                     slotMinTime={hideNightTime ? "07:00:00" : "00:00:00"}
                     slotMaxTime={hideNightTime ? "23:00:00" : "24:00:00"}
                     slotDuration={ZOOM_LEVELS[zoomIndex]}
