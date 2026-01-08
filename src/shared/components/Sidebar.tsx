@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Search } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Search, Sunrise } from "lucide-react"
 
 // ... existing code ...
 
@@ -316,7 +316,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         {
             label: "Tomorrow",
             path: "/tomorrow",
-            icon: Sun, // Keeping Sun for consistency with 'day' specific views, or change if preferred
+            icon: Sunrise, // Distinct icon for Tomorrow
             count: allTasks?.filter(t => !t.is_completed && t.due_date && isTomorrow(parseISO(t.due_date))).length,
             droppable: false
         },
