@@ -437,6 +437,8 @@ export function CalendarPage() {
         trackTouch: true
     })
 
+    const { ref: swipeRef, ...swipeHandlers } = handlers
+
     const handleDateSelectWrapper = (arg: any) => {
         if (isSwiping) return
         handleDateSelect(arg)
@@ -635,9 +637,14 @@ export function CalendarPage() {
             )}
 
             <motion.div
-                ref={containerRef}
+                ref={(node) => {
+                    // Merge refs: react-swipeable needs the ref, and we need it for zoom
+                    swipeRef(node)
+                    // @ts-ignore
+                    containerRef.current = node
+                }}
                 className="flex-1 min-h-0 relative touch-pan-y"
-                {...handlers}
+                {...swipeHandlers}
                 style={{ x, opacity }}
             >
                 <FullCalendar
