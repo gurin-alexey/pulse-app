@@ -7,8 +7,9 @@ import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import multiMonthPlugin from "@fullcalendar/multimonth"
-import { useSearchParams } from "react-router-dom"
-import { Loader2, Settings, ChevronLeft, ChevronRight } from "lucide-react"
+import listPlugin from "@fullcalendar/list"
+import { useSearchParams, useNavigate } from "react-router-dom"
+import { Loader2, Settings, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowLeft, ArrowRight } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
 import { useState, useEffect, useRef, Fragment } from "react"
@@ -28,12 +29,38 @@ export function CalendarPage() {
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const [_, setSearchParams] = useSearchParams()
+    const navigate = useNavigate()
     const calendarRef = useRef<FullCalendar>(null)
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
     const [currentTitle, setCurrentTitle] = useState('')
-    const [currentViewType, setCurrentViewType] = useState('timeGridDay')
+    const [currentViewType, setCurrentViewType] = useState('timeGridWeek')
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
     const [isSwiping, setIsSwiping] = useState(false)
+
+    // Zoom State
+    const ZOOM_LEVELS = ['00:15:00', '00:30:00', '01:00:00', '02:00:00', '04:00:00']
+    const [zoomIndex, setZoomIndex] = useState(2) // Default 01:00:00
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        const container = containerRef.current
+        if (!container) return
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.ctrlKey) {
+                e.preventDefault()
+                const direction = e.deltaY > 0 ? 1 : -1
+                setZoomIndex(prev => {
+                    const next = prev + direction
+                    if (next >= 0 && next < ZOOM_LEVELS.length) return next
+                    return prev
+                })
+            }
+        }
+
+        container.addEventListener('wheel', handleWheel, { passive: false })
+        return () => container.removeEventListener('wheel', handleWheel)
+    }, [])
 
     // Recurrence Edit Modal State
     const [recurrenceModal, setRecurrenceModal] = useState<{
@@ -62,9 +89,13 @@ export function CalendarPage() {
         const calendarApi = calendarRef.current?.getApi()
         if (calendarApi) {
             if (isMobile) {
-                calendarApi.changeView('timeGridDay')
+                if (currentViewType !== 'timeGridDay' && currentViewType !== 'listWeek') {
+                    calendarApi.changeView('timeGridDay')
+                }
             } else {
-                calendarApi.changeView('timeGridWeek')
+                if (currentViewType === 'timeGridDay') {
+                    calendarApi.changeView('timeGridWeek')
+                }
             }
         }
     }, [isMobile])
@@ -331,14 +362,36 @@ export function CalendarPage() {
         setSearchParams(params)
     }
 
-    const headerGoPrev = () => calendarRef.current?.getApi().prev()
-    const headerGoNext = () => calendarRef.current?.getApi().next()
-    const headerGoToday = () => calendarRef.current?.getApi().today()
-    const headerChangeView = (view: string) => calendarRef.current?.getApi().changeView(view)
     const x = useMotionValue(0)
     const opacity = useTransform(x, [-200, 0, 200], [0.5, 1, 0.5])
 
-    // Helper to animate slide transition
+    // Helper to animate view switches
+    const animateViewSwitch = async (newView: string, direction: 'left' | 'right') => {
+        const targetX = direction === 'left' ? -window.innerWidth : window.innerWidth
+
+        // Animate out
+        await animate(x, targetX, { duration: 0.2 }).then(() => {
+            calendarRef.current?.getApi().changeView(newView)
+
+            // Set starting position for animation in (from opposite side)
+            x.set(-targetX)
+
+            // Animate in
+            animate(x, 0, { duration: 0.3, type: "spring", stiffness: 300, damping: 30 })
+        })
+    }
+
+    const headerGoPrev = () => calendarRef.current?.getApi().prev()
+    const headerGoNext = () => calendarRef.current?.getApi().next()
+    const headerGoToday = () => calendarRef.current?.getApi().today()
+    const headerChangeView = (view: string) => {
+        if (view === currentViewType) return
+
+        // Simple transition for standard view switches
+        calendarRef.current?.getApi().changeView(view)
+    }
+
+    // Swipe handling
     const handleSwipeComplete = async (direction: 'left' | 'right') => {
         const targetX = direction === 'left' ? -window.innerWidth : window.innerWidth
 
@@ -406,10 +459,22 @@ export function CalendarPage() {
 
             {/* Unified Custom Header (Desktop Only) */}
             {!isMobile && (
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 shrink-0 px-4 md:px-0">
-                    {/* Left: Navigation & Title */}
-                    <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
-                        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                <div className="flex items-center justify-between gap-4 mb-4 shrink-0 px-4 md:px-0 relative min-h-[40px]">
+                    {/* Left: Collapse Button */}
+                    <div className="flex items-center z-10">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-all"
+                            title="Collapse"
+                        >
+                            <span>Свернуть календарь</span>
+                            <ArrowRight size={16} />
+                        </button>
+                    </div>
+
+                    {/* Center: Navigation & Title */}
+                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-4 z-0 pointer-events-none">
+                        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg pointer-events-auto shadow-sm">
                             <button onClick={headerGoPrev} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
                                 <span className="sr-only">Prev</span>←
                             </button>
@@ -421,38 +486,22 @@ export function CalendarPage() {
                             </button>
                         </div>
 
-                        <h2 className="text-xl font-bold text-gray-800 truncate">
-                            {currentTitle || (
-                                <span className="inline-block w-32 h-6 bg-gray-100 rounded animate-pulse" />
-                            )}
-                        </h2>
+
+
+                        {/* Special Show Week Button for List View */}
+                        {currentViewType === 'listWeek' && (
+                            <button
+                                onClick={() => animateViewSwitch('timeGridWeek', 'left')}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-sm font-semibold transition-colors animate-in fade-in pointer-events-auto"
+                            >
+                                <CalendarIcon size={16} />
+                                Показать неделю
+                            </button>
+                        )}
                     </div>
 
-                    {/* Right: View Switcher & Settings */}
-                    <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-                        {!isMobile && (
-                            <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-                                <button
-                                    onClick={() => headerChangeView('dayGridMonth')}
-                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'dayGridMonth' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                                >
-                                    Month
-                                </button>
-                                <button
-                                    onClick={() => headerChangeView('timeGridWeek')}
-                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridWeek' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                                >
-                                    Week
-                                </button>
-                                <button
-                                    onClick={() => headerChangeView('timeGridDay')}
-                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${currentViewType === 'timeGridDay' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
-                                >
-                                    Day
-                                </button>
-                            </div>
-                        )}
-
+                    {/* Right: Settings Only */}
+                    <div className="flex items-center justify-end z-10 w-10">
                         {/* Settings Menu */}
                         <Menu as="div" className="relative inline-block text-left">
                             <Menu.Button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200">
@@ -585,16 +634,16 @@ export function CalendarPage() {
             )}
 
             <motion.div
+                ref={containerRef}
                 className="flex-1 min-h-0 relative touch-pan-y"
                 {...handlers}
                 style={{ x, opacity }}
             >
                 <FullCalendar
                     ref={calendarRef}
-                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin]}
+                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin, listPlugin]}
                     headerToolbar={false}
                     views={{
-                        // ... existing views ...
                         dayGridMonth: { // Ensure this exists for the separate button
                             titleFormat: { month: 'long', year: 'numeric' }
                         },
@@ -609,6 +658,9 @@ export function CalendarPage() {
                         },
                         timeGridWeek: {
                             titleFormat: { month: 'short', day: 'numeric' }
+                        },
+                        listWeek: {
+                            titleFormat: { month: 'short', day: 'numeric' }
                         }
                     }}
                     initialView={isMobile ? "timeGridDay" : "timeGridWeek"}
@@ -616,6 +668,7 @@ export function CalendarPage() {
                     editable={true}
                     selectable={true}
                     selectMirror={true}
+                    expandRows={true}
                     select={handleDateSelectWrapper}
                     datesSet={(arg) => {
                         setCurrentTitle(arg.view.title)
@@ -630,7 +683,7 @@ export function CalendarPage() {
                     nowIndicator={true}
                     slotMinTime={hideNightTime ? "07:00:00" : "00:00:00"}
                     slotMaxTime={hideNightTime ? "23:00:00" : "24:00:00"}
-                    slotDuration="01:00:00"
+                    slotDuration={ZOOM_LEVELS[zoomIndex]}
                     scrollTime="08:00:00"
                     slotLabelFormat={{
                         hour: '2-digit',

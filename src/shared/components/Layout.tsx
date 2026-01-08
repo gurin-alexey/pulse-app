@@ -1,7 +1,7 @@
-import { Link, Outlet, useLocation, useNavigate, useSearchParams, matchPath } from "react-router-dom"
+import { Link, Outlet, useLocation, useNavigate, useSearchParams, matchPath, useOutlet } from "react-router-dom"
 import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus } from "lucide-react"
 import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import clsx from "clsx"
 import { supabase } from "@/lib/supabase"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
@@ -34,6 +34,7 @@ export function Layout() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const taskId = searchParams.get('task')
+  const currentOutlet = useOutlet()
 
   const { fetchSettings } = useSettings()
 
@@ -126,7 +127,7 @@ export function Layout() {
       <div className="p-4 border-t border-gray-100 mt-auto space-y-1">
         <button
           onClick={() => setIsSettingsOpen(true)}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-blue-600 w-full transition-colors"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all"
         >
           <Settings size={20} />
           <span className="whitespace-nowrap transition-opacity font-medium">Settings</span>
@@ -243,55 +244,64 @@ export function Layout() {
         )}
 
 
-        <main className={clsx(
-          "flex-1 flex overflow-hidden",
-          isCalendarPage ? "" :
-            isDashboardPage ? "lg:grid lg:grid-cols-[1fr_350px]" : // Dashboard: 2 cols (Wide Content + Planner)
-              "lg:grid lg:grid-cols-[minmax(350px,1fr)_minmax(450px,1fr)_350px]" // Standard: 3 cols
-        )}>
+        <main className="relative flex-1 overflow-hidden">
+          <AnimatePresence initial={false}>
+            {isCalendarPage ? (
+              <motion.div
+                key="calendar-view"
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
+                className="absolute inset-0 z-50 bg-white"
+              >
+                {currentOutlet}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="standard-view"
+                initial={{ opacity: 1 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 1 }}
+                className="h-full w-full bg-white"
+              >
+                <div className={clsx(
+                  "h-full",
+                  isDashboardPage
+                    ? "lg:grid lg:grid-cols-[1fr_350px]"
+                    : "lg:grid lg:grid-cols-[minmax(350px,1fr)_minmax(450px,1fr)_350px]"
+                )}>
+                  {/* List/Dashboard Column */}
+                  <section className={clsx(
+                    "bg-white overflow-y-auto border-r border-gray-200 h-full",
+                    isDashboardPage ? "col-span-1" : "flex-1 lg:flex-none"
+                  )}>
+                    {currentOutlet}
+                  </section>
 
-          {/* List Column (Takes up first slot. If Dashboard, takes up slot 1 which is 1fr wide) */}
-          <section className={clsx(
-            "bg-white overflow-y-auto border-r border-gray-200 h-full",
-            isCalendarPage ? "w-full" :
-              isDashboardPage ? "col-span-1" :
-                "flex-1 lg:flex-none"
-          )}>
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.15 }}
-              className="h-full"
-            >
-              <Outlet />
-            </motion.div>
-          </section>
+                  {/* Detail Column (Standard Only) */}
+                  {!isDashboardPage && (
+                    <section className="border-r border-gray-200 bg-white overflow-y-auto h-full hidden lg:block">
+                      {selectedIds.size > 1 ? (
+                        <BulkActionsPanel />
+                      ) : taskId ? (
+                        <TaskDetail taskId={taskId} />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                          Select a task to view details
+                        </div>
+                      )}
+                    </section>
+                  )}
 
-          {/* Detail Column (Desktop Only as a col, unless task is selected) */}
-          {/* HIDE this column on Dashboard Page since Dashboard takes that space */}
-          {(!isCalendarPage && !isDashboardPage) && (
-            <section className={clsx(
-              "border-r border-gray-200 bg-white overflow-y-auto h-full hidden lg:block"
-            )}>
-              {selectedIds.size > 1 ? (
-                <BulkActionsPanel />
-              ) : taskId ? (
-                <TaskDetail taskId={taskId} />
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-                  Select a task to view details
+                  {/* Planner Column (Always visible in Standard/Dashboard view, on the right) */}
+                  <section className="bg-white overflow-hidden border-l border-gray-200 hidden xl:block w-[350px]">
+                    <DailyPlanner />
+                  </section>
                 </div>
-              )}
-            </section>
-          )}
-
-          {/* Planner Column (Desktop Only) */}
-          {!isCalendarPage && (
-            <section className="bg-white overflow-hidden border-l border-gray-200 hidden xl:block w-[350px]">
-              <DailyPlanner />
-            </section>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
 
         {/* Modal for Calendar Page OR Mobile List View OR Dashboard Page */}

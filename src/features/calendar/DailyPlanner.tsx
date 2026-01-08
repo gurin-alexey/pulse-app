@@ -3,10 +3,10 @@ import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { useAllTasks } from '@/hooks/useAllTasks'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Calendar, ArrowLeft } from 'lucide-react'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useCreateTask } from '@/hooks/useCreateTask'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import type { DateSelectArg } from "@fullcalendar/core"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
@@ -26,6 +26,7 @@ export function DailyPlanner() {
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const [_, setSearchParams] = useSearchParams()
+    const navigate = useNavigate()
     const { settings } = useSettings()
     const hideNightTime = settings?.preferences?.hide_night_time ?? false
 
@@ -225,7 +226,15 @@ export function DailyPlanner() {
     return (
         <div className="h-full flex flex-col bg-white overflow-hidden relative">
             {/* Toolbar */}
-            <div className="flex items-center justify-end px-3 py-2 border-b border-gray-100 z-10 shrink-0">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 z-10 shrink-0">
+                <button
+                    onClick={() => navigate('/calendar')}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all"
+                >
+                    <ArrowLeft size={16} />
+                    Неделя
+                </button>
+
                 <button
                     onClick={() => setShowCompleted(!showCompleted)}
                     className={clsx(
