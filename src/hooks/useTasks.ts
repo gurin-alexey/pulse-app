@@ -12,7 +12,7 @@ export type TaskFilter =
     | { type: 'today', includeSubtasks?: boolean }
     | { type: 'tomorrow', includeSubtasks?: boolean }
     | { type: 'project', projectId: string, includeSubtasks?: boolean }
-    | { type: 'trash' }
+    | { type: 'trash', includeSubtasks?: boolean }
     | { type: 'all', includeSubtasks?: boolean }
     | { type: 'is_project' }
 

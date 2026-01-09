@@ -2,14 +2,14 @@ import { useState } from "react"
 import { useTasks } from "@/hooks/useTasks"
 import { useTrashProjects } from "@/hooks/useTrashProjects"
 import { useTrashActions } from "@/hooks/useTrashActions"
-import { Loader2, Trash2, RotateCcw, AlertTriangle, Folder, CheckSquare } from "lucide-react"
+import { Loader2, Trash2, RotateCcw, AlertTriangle, Folder, CheckSquare, RefreshCw } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import clsx from "clsx"
 
 export function TrashPage() {
     const [activeTab, setActiveTab] = useState<'tasks' | 'projects'>('tasks')
-    const { data: tasks, isLoading: tasksLoading, isError: tasksError, error: tError } = useTasks({ type: 'trash' })
-    const { data: projects, isLoading: projectsLoading, isError: projectsError, error: pError } = useTrashProjects()
+    const { data: tasks, isLoading: tasksLoading, isError: tasksError, error: tError, refetch: refetchTasks } = useTasks({ type: 'trash', includeSubtasks: true })
+    const { data: projects, isLoading: projectsLoading, isError: projectsError, error: pError, refetch: refetchProjects } = useTrashProjects()
     const { restoreTask, deleteForever, restoreProject, deleteProjectForever, emptyTrash } = useTrashActions()
 
     const isLoading = tasksLoading || projectsLoading
@@ -55,6 +55,11 @@ export function TrashPage() {
         }
     }
 
+    const handleRefresh = () => {
+        refetchTasks()
+        refetchProjects()
+    }
+
     const itemCount = activeTab === 'tasks' ? (tasks?.length || 0) : (projects?.length || 0)
 
     return (
@@ -66,15 +71,25 @@ export function TrashPage() {
                         <h2 className="font-bold text-lg text-gray-800">Trash</h2>
                     </div>
 
-                    {(tasks?.length || 0) + (projects?.length || 0) > 0 && (
+                    <div className="flex items-center gap-2">
                         <button
-                            onClick={handleEmptyTrash}
-                            className="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2"
+                            onClick={handleRefresh}
+                            className="text-gray-500 hover:bg-gray-100 px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2"
+                            title="Refresh list"
                         >
-                            <Trash2 size={16} />
-                            Empty Trash
+                            <RefreshCw size={16} />
                         </button>
-                    )}
+
+                        {(tasks?.length || 0) + (projects?.length || 0) > 0 && (
+                            <button
+                                onClick={handleEmptyTrash}
+                                className="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-2"
+                            >
+                                <Trash2 size={16} />
+                                Empty Trash
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex gap-4">
