@@ -209,7 +209,7 @@ export function Layout() {
           <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
             <span className="font-extrabold text-2xl text-blue-600 italic uppercase tracking-tight">Pulse</span>
           </div>
-          <nav className="flex-1 space-y-1 mt-6">
+          <nav className="flex-1 space-y-1 mt-8">
             <Sidebar activePath={location.pathname} />
           </nav>
           {renderSidebarFooter()}

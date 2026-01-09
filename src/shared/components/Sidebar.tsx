@@ -392,7 +392,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             to={item.path}
                             onClick={onItemClick}
                             className={clsx(
-                                "flex items-center gap-3 px-5 py-1 transition-colors",
+                                "flex items-center gap-3 px-4 py-1 transition-colors",
                                 isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600")
                             )}
                         >
@@ -410,7 +410,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
 
                     if (item.droppable) {
                         return (
-                            <DroppableNavItem key={item.path} label={item.label} className="w-full hover:bg-gray-50/50">
+                            <DroppableNavItem key={item.path} label={item.label} className="w-full hover:bg-gray-50/50 border-l-4 border-transparent">
                                 {(isOver) => renderLink(isOver)}
                             </DroppableNavItem>
                         )
