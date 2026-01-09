@@ -409,13 +409,13 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
                         {/* Breadcrumbs (Moved here) */}
                         {t.parent_id && parentTask && (
-                            <div className="mb-3 pl-0">
+                            <div className="mb-4 pl-0">
                                 <div
                                     onClick={handleBreadcrumbClick}
-                                    className="flex items-center gap-2 px-2 py-1 -ml-2 rounded-md text-gray-500 hover:bg-gray-100 hover:text-blue-600 cursor-pointer w-fit transition-all group"
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-500 hover:bg-white hover:border-gray-300 hover:text-blue-600 hover:shadow-sm cursor-pointer w-fit transition-all group"
                                 >
-                                    <ArrowUp size={14} className="text-gray-400 group-hover:text-blue-500" />
-                                    <span className="font-medium text-xs truncate max-w-[300px]">Return to {parentTask.title}</span>
+                                    <ArrowUp size={14} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                    <span className="font-medium text-xs truncate max-w-[300px]">Return to <span className="font-semibold text-gray-700 group-hover:text-blue-700 uppercase">{parentTask.title}</span></span>
                                 </div>
                             </div>
                         )}
