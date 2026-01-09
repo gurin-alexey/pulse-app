@@ -22,6 +22,7 @@ import { useSelectionStore } from "@/store/useSelectionStore"
 import { useProjects } from "@/hooks/useProjects"
 import { BulkActionsPanel } from "@/features/tasks/BulkActionsPanel"
 import { useAppDragAndDrop } from "@/hooks/useAppDragAndDrop"
+import Logo from "@/assets/pulse_logo.jpg"
 
 import { GlobalSearch } from "@/features/search/GlobalSearch"
 import { useCommandStore } from "@/store/useCommandStore"
@@ -206,7 +207,8 @@ export function Layout() {
 
         {/* Column A: Sidebar (Desktop) */}
         <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col overflow-y-auto shrink-0">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-start gap-3 h-16 shrink-0 sticky top-0 bg-white z-10">
+            <img src={Logo} alt="Pulse Logo" className="w-8 h-8" />
             <span className="font-extrabold text-2xl text-blue-600 italic uppercase tracking-tight">Pulse</span>
           </div>
           <nav className="flex-1 space-y-1 mt-8">
@@ -224,7 +226,10 @@ export function Layout() {
             />
             <aside className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 md:hidden flex flex-col animate-in slide-in-from-left duration-300">
               <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 pt-[env(safe-area-inset-top)]">
-                <span className="font-extrabold text-2xl text-blue-600 italic uppercase tracking-tight">Pulse</span>
+                <div className="flex items-center gap-3">
+                  <img src={Logo} alt="Pulse Logo" className="w-8 h-8" />
+                  <span className="font-extrabold text-2xl text-blue-600 italic uppercase tracking-tight">Pulse</span>
+                </div>
                 <button
                   onClick={() => setIsSidebarOpen(false)}
                   className="p-2 -ml-2 text-gray-400"
