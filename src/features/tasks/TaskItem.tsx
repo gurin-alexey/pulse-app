@@ -10,7 +10,7 @@ import { motion } from "framer-motion"
 import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } from "date-fns"
 import { toast } from "sonner"
 
-import { useSelectionStore } from "@/store/useSelectionStore"
+
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useSettings } from "@/store/useSettings"
 import { useTrashActions } from "@/hooks/useTrashActions"
@@ -29,10 +29,10 @@ interface TaskItemProps {
     disableAnimation?: boolean
     onIndent?: () => void
     onOutdent?: () => void
-    onShiftClick?: (id: string) => void
+
 }
 
-export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onShiftClick, onIndent, onOutdent }: TaskItemProps) {
+export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent }: TaskItemProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
@@ -44,8 +44,6 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const showToasts = settings?.preferences.show_toast_hints !== false
 
-    const { selectedIds, select, toggle } = useSelectionStore()
-    const isSelected = selectedIds.has(task.id)
     const isMobile = useMediaQuery("(max-width: 768px)")
 
     // Local state for inline editing
@@ -74,27 +72,6 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const handleTaskClick = (e: React.MouseEvent) => {
         if (isEditing) return
-
-        if (e.ctrlKey || e.metaKey) {
-            e.preventDefault()
-            toggle(task.id)
-            return
-        }
-
-        if (e.shiftKey && onShiftClick) {
-            e.preventDefault()
-            const selection = window.getSelection()
-            if (selection) selection.removeAllRanges()
-            onShiftClick(task.id)
-            return
-        }
-
-        if (selectedIds.size > 1) {
-            select(task.id)
-        } else {
-            if (!selectedIds.has(task.id)) select(task.id)
-        }
-
         setSearchParams({ task: task.id })
     }
 
@@ -282,7 +259,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 {...(isMobile ? swipeHandlers : {})} // Attach swipe handlers
                 className={clsx(
                     "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent",
-                    isSelected ? "bg-blue-50 dark:bg-blue-900/20 !border-blue-100" : (isActive ? "bg-gray-100" : "hover:bg-gray-100/60"),
+                    isActive ? "bg-gray-100" : "hover:bg-gray-100/60",
                     task.is_completed && "opacity-80"
                 )}
             >
