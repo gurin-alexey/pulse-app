@@ -258,7 +258,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 {...(isMobile ? attributes : {})}
                 {...(isMobile ? swipeHandlers : {})} // Attach swipe handlers
                 className={clsx(
-                    "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent",
+                    "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent relative", // Added relative
                     isActive ? "bg-gray-100" : "hover:bg-gray-100/60",
                     task.is_completed && "opacity-80"
                 )}
@@ -266,7 +266,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 <div
                     {...listeners}
                     {...attributes}
-                    className="hidden md:block opacity-0 group-hover:opacity-100 p-0.5 text-gray-300 hover:text-gray-600 cursor-move transition-opacity -ml-1"
+                    className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-gray-600 cursor-move transition-opacity items-center justify-center"
                 >
                     <GripVertical size={14} />
                 </div>

@@ -102,10 +102,17 @@ export async function fetchTasks(filter: TaskFilter) {
     })) as TaskWithTags[]
 }
 
+import { useAuth } from './useAuth'
+
 export function useTasks(filter: TaskFilter) {
+    const { user } = useAuth()
+
     return useQuery({
-        queryKey: ['tasks', filter],
-        queryFn: () => fetchTasks(filter),
-        enabled: true // Always enabled for these generic filters
+        queryKey: ['tasks', filter, user?.id],
+        queryFn: async () => {
+            if (!user) return []
+            return fetchTasks(filter)
+        },
+        enabled: !!user // Only fetch when we have a user
     })
 }
