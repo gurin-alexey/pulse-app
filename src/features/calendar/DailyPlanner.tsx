@@ -248,7 +248,7 @@ export function DailyPlanner() {
             <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 z-10 shrink-0">
                 <button
                     onClick={() => navigate('/calendar')}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border border-blue-100 shadow-sm hover:bg-blue-100 transition-all"
                 >
                     <ArrowLeft size={16} />
                     Показать неделю

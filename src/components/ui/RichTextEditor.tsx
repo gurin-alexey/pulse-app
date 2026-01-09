@@ -2,9 +2,9 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Link from '@tiptap/extension-link'
-import { Bold, Italic, List, ListOrdered, Code, Quote, Link as LinkIcon, Minus } from 'lucide-react'
+import { Bold, Italic, List, ListOrdered, Code, Quote, Link as LinkIcon, Minus, Type } from 'lucide-react'
 import clsx from 'clsx'
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 
 type RichTextEditorProps = {
     content: string
@@ -40,6 +40,8 @@ const MenuButton = ({
 )
 
 export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a description...", className, editable = true }: RichTextEditorProps) {
+    const [showToolbar, setShowToolbar] = useState(false)
+
     const editor = useEditor({
         extensions: [
             StarterKit,
@@ -100,76 +102,92 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
     }
 
     return (
-        <div className={clsx("w-full transition-all", className)}>
+        <div className={clsx("w-full transition-all relative group", className)}>
+
+            {/* Toggle Toolbar Button */}
+            <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                    onClick={() => setShowToolbar(!showToolbar)}
+                    className={clsx(
+                        "p-1.5 rounded-md hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600",
+                        showToolbar && "bg-gray-100 text-gray-600"
+                    )}
+                    title="Toggle Formatting"
+                >
+                    <Type size={16} />
+                </button>
+            </div>
 
             {/* Toolbar */}
-            <div className="flex items-center gap-1 border-b border-gray-100 pb-2 mb-2 px-1 flex-wrap">
-                <MenuButton
-                    onClick={() => editor.chain().focus().toggleBold().run()}
-                    isActive={editor.isActive('bold')}
-                    title="Bold"
-                >
-                    <Bold size={16} />
-                </MenuButton>
-                <MenuButton
-                    onClick={() => editor.chain().focus().toggleItalic().run()}
-                    isActive={editor.isActive('italic')}
-                    title="Italic"
-                >
-                    <Italic size={16} />
-                </MenuButton>
+            {showToolbar && (
+                <div className="flex items-center gap-1 border-b border-gray-100 pb-2 mb-2 px-1 flex-wrap animate-in slide-in-from-top-1 fade-in duration-200">
+                    <MenuButton
+                        onClick={() => editor.chain().focus().toggleBold().run()}
+                        isActive={editor.isActive('bold')}
+                        title="Bold"
+                    >
+                        <Bold size={16} />
+                    </MenuButton>
+                    <MenuButton
+                        onClick={() => editor.chain().focus().toggleItalic().run()}
+                        isActive={editor.isActive('italic')}
+                        title="Italic"
+                    >
+                        <Italic size={16} />
+                    </MenuButton>
 
-                <div className="w-px h-4 bg-gray-200 mx-1" />
+                    <div className="w-px h-4 bg-gray-200 mx-1" />
 
-                <MenuButton
-                    onClick={() => editor.chain().focus().toggleBulletList().run()}
-                    isActive={editor.isActive('bulletList')}
-                    title="Bullet List"
-                >
-                    <List size={16} />
-                </MenuButton>
-                <MenuButton
-                    onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                    isActive={editor.isActive('orderedList')}
-                    title="Ordered List"
-                >
-                    <ListOrdered size={16} />
-                </MenuButton>
+                    <MenuButton
+                        onClick={() => editor.chain().focus().toggleBulletList().run()}
+                        isActive={editor.isActive('bulletList')}
+                        title="Bullet List"
+                    >
+                        <List size={16} />
+                    </MenuButton>
+                    <MenuButton
+                        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                        isActive={editor.isActive('orderedList')}
+                        title="Ordered List"
+                    >
+                        <ListOrdered size={16} />
+                    </MenuButton>
 
-                <div className="w-px h-4 bg-gray-200 mx-1" />
+                    <div className="w-px h-4 bg-gray-200 mx-1" />
 
-                <MenuButton
-                    onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                    isActive={editor.isActive('blockquote')}
-                    title="Quote"
-                >
-                    <Quote size={16} />
-                </MenuButton>
-                <MenuButton
-                    onClick={() => editor.chain().focus().toggleCode().run()}
-                    isActive={editor.isActive('code')}
-                    title="Code"
-                >
-                    <Code size={16} />
-                </MenuButton>
+                    <MenuButton
+                        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                        isActive={editor.isActive('blockquote')}
+                        title="Quote"
+                    >
+                        <Quote size={16} />
+                    </MenuButton>
+                    <MenuButton
+                        onClick={() => editor.chain().focus().toggleCode().run()}
+                        isActive={editor.isActive('code')}
+                        title="Code"
+                    >
+                        <Code size={16} />
+                    </MenuButton>
 
-                <div className="w-px h-4 bg-gray-200 mx-1" />
+                    <div className="w-px h-4 bg-gray-200 mx-1" />
 
-                <MenuButton
-                    onClick={setLink}
-                    isActive={editor.isActive('link')}
-                    title="Link"
-                >
-                    <LinkIcon size={16} />
-                </MenuButton>
-                <MenuButton
-                    onClick={() => editor.chain().focus().setHorizontalRule().run()}
-                    isActive={false}
-                    title="Horizontal Rule"
-                >
-                    <Minus size={16} />
-                </MenuButton>
-            </div>
+                    <MenuButton
+                        onClick={setLink}
+                        isActive={editor.isActive('link')}
+                        title="Link"
+                    >
+                        <LinkIcon size={16} />
+                    </MenuButton>
+                    <MenuButton
+                        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+                        isActive={false}
+                        title="Horizontal Rule"
+                    >
+                        <Minus size={16} />
+                    </MenuButton>
+                </div>
+            )}
 
             <div className="px-1 pb-1">
                 <EditorContent editor={editor} className="min-h-[80px]" />

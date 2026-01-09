@@ -357,20 +357,15 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             <Menu as="div" className="relative">
                                 <Menu.Button
                                     className={clsx(
-                                        "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all hover:bg-gray-50",
-                                        t.priority === 'high' ? "bg-red-50 border-red-200 text-red-600" :
-                                            t.priority === 'medium' ? "bg-amber-50 border-amber-200 text-amber-600" :
-                                                t.priority === 'low' ? "bg-blue-50 border-blue-200 text-blue-600" :
-                                                    "bg-white border-gray-200 text-gray-400 hover:text-gray-600"
+                                        "p-2 rounded-md transition-colors hover:bg-gray-100",
+                                        t.priority === 'high' ? "text-red-500" :
+                                            t.priority === 'medium' ? "text-amber-500" :
+                                                t.priority === 'low' ? "text-blue-500" :
+                                                    "text-gray-400 hover:text-gray-600"
                                     )}
                                     title={`Priority: ${t.priority || 'Normal'}`}
                                 >
-                                    <Flag size={16} className={clsx(t.priority && "fill-current opacity-20")} />
-                                    <span className="text-xs font-bold uppercase tracking-wider">
-                                        {t.priority === 'high' ? 'High' :
-                                            t.priority === 'medium' ? 'Medium' :
-                                                t.priority === 'low' ? 'Low' : 'Normal'}
-                                    </span>
+                                    <Flag size={18} className={clsx(t.priority && t.priority !== 'none' && "fill-current")} />
                                 </Menu.Button>
 
                                 <Transition
