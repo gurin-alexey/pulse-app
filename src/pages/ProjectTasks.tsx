@@ -644,7 +644,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
             <div className="flex-1 pl-4 pr-0 pt-4 md:p-4 overflow-y-auto pb-20">
                 {renderMode === 'groups' ? (
                     // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
-                    <div className="flex flex-col min-h-full mt-4">
+                    <div className="flex flex-col">
                         {/* Allow creating tasks in Inbox/Today even without projectId */}
 
                         {Object.entries(tasksForView).map(([groupName, groupTasks]) => {
