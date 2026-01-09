@@ -1,5 +1,6 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise, RefreshCw } from "lucide-react"
+import { useQueryClient, useIsFetching } from "@tanstack/react-query" // Import react-query hooks
 
 // ... existing code ...
 
@@ -189,7 +190,7 @@ function DroppableZone({ id, data, children, className }: { id: string, data?: a
     )
 }
 
-export function DroppableNavItem({ label, children }: { label: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
+export function DroppableNavItem({ label, children, className }: { label: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode), className?: string }) {
     const { setNodeRef, isOver } = useDroppable({
         id: `nav-${label.toLowerCase()}`,
         data: { type: 'Nav', label }
@@ -199,8 +200,9 @@ export function DroppableNavItem({ label, children }: { label: string, children:
         <div
             ref={setNodeRef}
             className={clsx(
-                "transition-all duration-200 border-l-4 border-transparent w-full",
-                isOver ? "bg-blue-600 border-blue-400 shadow-lg scale-[1.02] z-20" : "hover:bg-gray-50/50"
+                "transition-all duration-200",
+                isOver ? "bg-blue-600 border-blue-400 shadow-lg scale-[1.02] z-20" : "",
+                className
             )}
         >
             {typeof children === 'function' ? children(isOver) : children}
@@ -408,7 +410,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
 
                     if (item.droppable) {
                         return (
-                            <DroppableNavItem key={item.path} label={item.label}>
+                            <DroppableNavItem key={item.path} label={item.label} className="w-full hover:bg-gray-50/50">
                                 {(isOver) => renderLink(isOver)}
                             </DroppableNavItem>
                         )
@@ -607,6 +609,8 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                 </div>
 
             </div>
+
+
         </div>
     )
 }

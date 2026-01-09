@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams, matchPath, useOutlet } from "react-router-dom"
-import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus } from "lucide-react"
+import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus, RefreshCw } from "lucide-react"
 import { useState, useEffect } from "react"
+import { useQueryClient, useIsFetching } from "@tanstack/react-query" // Import hooks
 import { motion, AnimatePresence } from "framer-motion"
 import clsx from "clsx"
 import { supabase } from "@/lib/supabase"
@@ -27,6 +28,8 @@ import { useCommandStore } from "@/store/useCommandStore"
 import { Search } from "lucide-react"
 
 export function Layout() {
+  const queryClient = useQueryClient()
+  const isFetching = useIsFetching()
   const isDesktop = useMediaQuery("(min-width: 768px)")
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -127,14 +130,14 @@ export function Layout() {
   function renderSidebarFooter() {
     return (
       <div className="p-2 border-t border-gray-100 mt-auto flex items-center justify-around">
-        <DroppableNavItem label="Trash">
+        <DroppableNavItem label="Trash" className="rounded-lg border-none">
           {(isOver) => (
             <Link
               to="/trash"
               onClick={() => setIsSidebarOpen(false)}
               className={clsx(
-                "p-2 rounded-lg transition-colors",
-                isOver ? "bg-red-100 text-red-600" : (location.pathname === '/trash' ? "text-red-600 bg-red-50" : "text-gray-400 hover:text-red-500 hover:bg-red-50")
+                "p-2 rounded-lg transition-colors flex items-center justify-center w-10 h-10",
+                isOver ? "bg-red-100 text-red-600" : (location.pathname === '/trash' ? "text-red-600" : "text-gray-400 hover:text-red-500 hover:bg-red-50")
               )}
               title="Trash"
             >
@@ -142,6 +145,18 @@ export function Layout() {
             </Link>
           )}
         </DroppableNavItem>
+
+        <button
+          onClick={() => queryClient.invalidateQueries()}
+          className={clsx(
+            "p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors",
+            isFetching > 0 && "animate-spin text-blue-600 bg-blue-50"
+          )}
+          title="Sync"
+          disabled={isFetching > 0}
+        >
+          <RefreshCw size={20} />
+        </button>
 
         <button
           onClick={() => setIsSettingsOpen(true)}
