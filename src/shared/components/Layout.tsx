@@ -23,6 +23,8 @@ import { BulkActionsPanel } from "@/features/tasks/BulkActionsPanel"
 import { useAppDragAndDrop } from "@/hooks/useAppDragAndDrop"
 
 import { GlobalSearch } from "@/features/search/GlobalSearch"
+import { useCommandStore } from "@/store/useCommandStore"
+import { Search } from "lucide-react"
 
 export function Layout() {
   const isDesktop = useMediaQuery("(min-width: 768px)")
@@ -122,22 +124,39 @@ export function Layout() {
     })
   }
 
-  function renderLogout() {
+  function renderSidebarFooter() {
     return (
-      <div className="p-4 border-t border-gray-100 mt-auto space-y-1">
+      <div className="p-2 border-t border-gray-100 mt-auto flex items-center justify-around">
+        <DroppableNavItem label="Trash">
+          {(isOver) => (
+            <Link
+              to="/trash"
+              onClick={() => setIsSidebarOpen(false)}
+              className={clsx(
+                "p-2 rounded-lg transition-colors",
+                isOver ? "bg-red-100 text-red-600" : (location.pathname === '/trash' ? "text-red-600 bg-red-50" : "text-gray-400 hover:text-red-500 hover:bg-red-50")
+              )}
+              title="Trash"
+            >
+              <Trash2 size={20} />
+            </Link>
+          )}
+        </DroppableNavItem>
+
         <button
           onClick={() => setIsSettingsOpen(true)}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all"
+          className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          title="Settings"
         >
           <Settings size={20} />
-          <span className="whitespace-nowrap transition-opacity font-medium">Settings</span>
         </button>
+
         <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-red-600 w-full transition-colors"
+          onClick={() => useCommandStore.getState().toggle()}
+          className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+          title="Search"
         >
-          <LogOut size={20} />
-          <span className="whitespace-nowrap transition-opacity font-medium">Logout</span>
+          <Search size={20} />
         </button>
       </div>
     )
@@ -177,25 +196,8 @@ export function Layout() {
           </div>
           <nav className="flex-1 space-y-1">
             <Sidebar activePath={location.pathname} />
-            <div className="mt-auto pt-4 pb-2">
-              <DroppableNavItem label="Trash">
-                {(isOver) => (
-                  <Link
-                    to="/trash"
-                    onClick={() => setIsSidebarOpen(false)}
-                    className={clsx(
-                      "flex items-center gap-3 px-5 py-2.5 transition-colors",
-                      isOver ? "text-white bg-red-500" : (location.pathname === '/trash' ? "text-red-600 bg-red-50" : "text-gray-500 hover:text-red-600 hover:bg-red-50")
-                    )}
-                  >
-                    <Trash2 size={20} />
-                    <span className="whitespace-nowrap font-semibold">Trash</span>
-                  </Link>
-                )}
-              </DroppableNavItem>
-            </div>
           </nav>
-          {renderLogout()}
+          {renderSidebarFooter()}
         </aside>
 
         {/* Mobile Sidebar Overlay + Drawer */}
@@ -220,25 +222,8 @@ export function Layout() {
                   activePath={location.pathname}
                   onItemClick={() => setIsSidebarOpen(false)}
                 />
-                <div className="mt-auto pt-4 pb-2">
-                  <DroppableNavItem label="Trash">
-                    {(isOver) => (
-                      <Link
-                        to="/trash"
-                        onClick={() => setIsSidebarOpen(false)}
-                        className={clsx(
-                          "flex items-center gap-3 px-5 py-2.5 transition-colors",
-                          isOver ? "text-white bg-red-500" : (location.pathname === '/trash' ? "text-red-600 bg-red-50" : "text-gray-500 hover:text-red-600 hover:bg-red-50")
-                        )}
-                      >
-                        <Trash2 size={20} />
-                        <span className="whitespace-nowrap font-semibold">Trash</span>
-                      </Link>
-                    )}
-                  </DroppableNavItem>
-                </div>
               </nav>
-              {renderLogout()}
+              {renderSidebarFooter()}
             </aside>
           </>
         )}

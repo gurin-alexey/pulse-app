@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Search, Sunrise } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise } from "lucide-react"
 
 // ... existing code ...
 
@@ -16,7 +16,6 @@ import { useDeleteProject } from "@/hooks/useDeleteProject"
 import { useAllTasks } from "@/hooks/useAllTasks"
 import { useTags } from "@/hooks/useTags"
 import { isToday, isTomorrow, parseISO } from "date-fns"
-import { useCommandStore } from "@/store/useCommandStore"
 
 type SidebarProps = {
     activePath: string
@@ -327,7 +326,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             to={`/projects/${project.id}`}
                             onClick={onItemClick}
                             className={clsx(
-                                "flex items-center gap-2 px-5 py-1 transition-colors text-sm",
+                                "flex items-center gap-2 px-3 py-1 transition-colors text-sm",
                                 isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600"),
                                 "font-medium"
                             )}
@@ -336,11 +335,6 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
                                 {project.name}
                             </span>
-                            {(allTasks?.filter(t => !t.is_completed && t.project_id === project.id).length || 0) > 0 && (
-                                <span className="text-xs text-gray-400 group-hover/project:text-gray-500 transition-colors mr-2">
-                                    {allTasks?.filter(t => !t.is_completed && t.project_id === project.id).length}
-                                </span>
-                            )}
 
                             <ProjectActionsMenu
                                 project={project}
@@ -383,20 +377,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
 
     return (
         <div className="space-y-1">
-            <div className="px-5 mb-2">
-                <button
-                    onClick={() => useCommandStore.getState().toggle()}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-500 bg-gray-100 hover:bg-gray-200/80 rounded-lg transition-colors border border-transparent hover:border-gray-300/50 group"
-                >
-                    <Search size={16} className="text-gray-400 group-hover:text-gray-600" />
-                    <span className="flex-1 text-left">Search...</span>
-                    <div className="flex gap-0.5">
-                        <kbd className="hidden sm:inline-flex h-4 items-center gap-1 rounded border bg-white px-1 font-mono text-[10px] font-medium text-gray-400">
-                            <span className="text-[10px]">Ctrl</span>K
-                        </kbd>
-                    </div>
-                </button>
-            </div>
+
 
             {/* Main Navigation */}
             <div className="space-y-1">
@@ -497,7 +478,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                         "group/header relative border-l-4 border-transparent transition-all",
                                         "rounded-r-lg"
                                     )}>
-                                        <div className="px-5 mb-1 flex items-center justify-between group/title">
+                                        <div className="px-3 mb-1 flex items-center justify-between group/title">
                                             <button
                                                 onClick={() => toggleGroup(group.id)}
                                                 className="flex items-center gap-1 text-sm font-bold text-gray-700 hover:text-gray-900 outline-none flex-1 truncate py-1"
@@ -507,7 +488,6 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                                     className={clsx("text-gray-400 transition-transform duration-200", !isCollapsed && "rotate-90")}
                                                 />
                                                 <span className="truncate">{group.name}</span>
-                                                <span className="text-xs text-gray-400 font-normal ml-1">({groupProjects?.length})</span>
                                             </button>
 
                                             {/* Group Actions */}
@@ -521,7 +501,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                     </div>
 
                                     {!isCollapsed && (
-                                        <div className="pl-2 space-y-0.5 min-h-[10px]">
+                                        <div className="pl-6 space-y-0.5 min-h-[10px]">
                                             {isCreatingProjectIn === group.id && (
                                                 <form onSubmit={(e) => handleCreateProjectSubmit(e, group.id)} className="px-3 py-1 mb-1">
                                                     <input
@@ -606,7 +586,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                         to={`/tags/${tag.id}`}
                                         onClick={onItemClick}
                                         className={clsx(
-                                            "flex items-center gap-2 px-5 py-1 transition-colors text-sm",
+                                            "flex items-center gap-2 px-3 py-1 transition-colors text-sm",
                                             activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-600 hover:bg-gray-50/50"
                                         )}
                                     >
@@ -614,11 +594,6 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                         <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
                                             {tag.name}
                                         </span>
-                                        {count > 0 && (
-                                            <span className="text-xs text-gray-400">
-                                                {count}
-                                            </span>
-                                        )}
                                     </Link>
                                 )
                             })}
