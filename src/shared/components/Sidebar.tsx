@@ -76,6 +76,64 @@ function ProjectActionsMenu({ project, onRename, onDelete, isOver }: any) {
     )
 }
 
+function GroupActionsMenu({ group, onAddProject, onRename, onDelete }: any) {
+    const [isOpen, setIsOpen] = useState(false)
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setIsOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    return (
+        <div className="relative" ref={menuRef} onClick={e => e.preventDefault()}>
+            <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen) }}
+                className={clsx(
+                    "opacity-0 group-hover/title:opacity-100 p-1 rounded transition-all text-gray-400 hover:bg-gray-100 hover:text-gray-700",
+                    isOpen && "opacity-100 bg-gray-100/20"
+                )}
+                title="Folder Options"
+            >
+                <MoreHorizontal size={16} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 shadow-xl rounded-md z-50 py-1 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onAddProject() }}
+                        className="text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-full transition-colors"
+                    >
+                        <Plus size={13} className="text-gray-400" />
+                        Add Project
+                    </button>
+                    <div className="h-px bg-gray-50 my-0.5" />
+                    <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onRename() }}
+                        className="text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-full transition-colors"
+                    >
+                        <Edit2 size={13} className="text-gray-400" />
+                        Rename
+                    </button>
+                    <div className="h-px bg-gray-50 my-0.5" />
+                    <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onDelete() }}
+                        className="text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 w-full transition-colors"
+                    >
+                        <Trash2 size={13} className="text-red-500" />
+                        Delete
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+}
+
 function DraggableProject({ project, activePath, children }: { project: any, activePath: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
     const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
         id: project.id,
@@ -269,7 +327,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             to={`/projects/${project.id}`}
                             onClick={onItemClick}
                             className={clsx(
-                                "flex items-center gap-2 px-5 py-2.5 transition-colors text-sm",
+                                "flex items-center gap-2 px-5 py-1 transition-colors text-sm",
                                 isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600"),
                                 "font-medium"
                             )}
@@ -324,7 +382,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     ]
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-1">
             <div className="px-5 mb-2">
                 <button
                     onClick={() => useCommandStore.getState().toggle()}
@@ -351,7 +409,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             to={item.path}
                             onClick={onItemClick}
                             className={clsx(
-                                "flex items-center gap-3 px-5 py-2.5 transition-colors",
+                                "flex items-center gap-3 px-5 py-1 transition-colors",
                                 isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600")
                             )}
                         >
@@ -383,10 +441,10 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                 })}
             </div>
 
-            <div className="mt-6 space-y-6">
+            <div className="mt-8 space-y-0.5">
 
                 {/* Header with Actions */}
-                <div className="px-5 flex items-center justify-between group/main-header">
+                <div className="px-5 flex items-center justify-between group/main-header mb-1">
                     <button
                         onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
                         className="flex items-center gap-1.5 focus:outline-none group/title"
@@ -420,7 +478,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
 
                 {/* Content List */}
                 {isProjectsExpanded && (
-                    <div className="space-y-4">
+                    <div className="space-y-1">
                         {/* 1. Groups */}
                         {groups?.map(group => {
                             const groupProjects = projects?.filter(p => p.group_id === group.id)
@@ -453,17 +511,12 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                             </button>
 
                                             {/* Group Actions */}
-                                            <div className="opacity-0 group-hover/title:opacity-100 flex items-center gap-1 transition-opacity">
-                                                <button
-                                                    onClick={() => startCreatingProject(group.id)}
-                                                    className="p-1 hover:bg-blue-50 text-blue-500 rounded"
-                                                    title="Add Project to Folder"
-                                                >
-                                                    <Plus size={12} />
-                                                </button>
-                                                <button onClick={() => handleRenameGroup(group)} className="p-1 hover:bg-gray-200 rounded text-gray-500"><Edit2 size={12} /></button>
-                                                <button onClick={() => handleDeleteGroup(group.id)} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 size={12} /></button>
-                                            </div>
+                                            <GroupActionsMenu
+                                                group={group}
+                                                onAddProject={() => startCreatingProject(group.id)}
+                                                onRename={() => handleRenameGroup(group)}
+                                                onDelete={() => handleDeleteGroup(group.id)}
+                                            />
                                         </div>
                                     </div>
 
@@ -553,7 +606,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                         to={`/tags/${tag.id}`}
                                         onClick={onItemClick}
                                         className={clsx(
-                                            "flex items-center gap-2 px-5 py-2 transition-colors text-sm",
+                                            "flex items-center gap-2 px-5 py-1 transition-colors text-sm",
                                             activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-600 hover:bg-gray-50/50"
                                         )}
                                     >
