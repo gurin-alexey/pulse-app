@@ -721,13 +721,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                                     dragOverSectionId === 'main-list' && "bg-blue-50/60 ring-2 ring-blue-100"
                                 )}
                             >
-                                <div className="hidden md:block">
-                                    {projectId ? (
-                                        <CreateTaskInput projectId={projectId} sectionId={null} defaultDueDate={targetDate} />
-                                    ) : (
-                                        <CreateTaskInput projectId={projectId || null} sectionId={null} defaultDueDate={targetDate} />
-                                    )}
-                                </div>
+
 
                                 <SortableContext items={getFlattenedTasks(null).map((t: any) => t.id)} strategy={verticalListSortingStrategy}>
                                     <div className="mt-4 space-y-2">

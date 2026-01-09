@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useCreateTask } from '@/hooks/useCreateTask'
 import { Plus } from 'lucide-react'
+import clsx from 'clsx'
 
 type CreateTaskInputProps = {
     projectId: string | null
@@ -12,6 +13,7 @@ type CreateTaskInputProps = {
 
 export function CreateTaskInput({ projectId, sectionId, placeholder = "New task", defaultDueDate }: CreateTaskInputProps) {
     const [title, setTitle] = useState('')
+    const [isFocused, setIsFocused] = useState(false)
     const { mutate, isPending } = useCreateTask()
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -40,7 +42,9 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
         e.preventDefault()
         await createTask(title)
         setTitle('')
-        inputRef.current?.focus()
+        // Keep focus? Usually yes for rapid entry
+        // But if user wants to collapse, they click away.
+        // isFocused will handle style.
     }
 
     const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -53,38 +57,16 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
 
         if (lines.length > 1) {
             if (window.confirm(`Do you want to create ${lines.length} tasks from the pasted text?`)) {
-
-                // Batch create
-                // Reverse lines so the FIRST line in text becomes the LAST created task (Newest),
-                // so it appears at the TOP of the list (which is sorted by Newest First).
                 const linesToProcess = [...lines].reverse()
 
                 for (const line of linesToProcess) {
                     await createTask(line)
                 }
-
-                // We don't clear title here because we prevented default paste, 
-                // and the input might have had existing text. 
-                // Actually, if we just created tasks from the paste, we probably 
-                // don't want to add the text to the input anymore.
-                // But the user might have typed "Important: " and then pasted.
-                // If we create tasks, we "consumed" the pasted text. 
-                // The existing text in input remains? 
-                // If I am typing "Some prefix " and paste 5 lines.
-                // If I say "Yes" -> 5 tasks created. What happens to "Some prefix "?
-                // Standard expectation: The pasted content became tasks. The input stays as is? 
-                // Or maybe the input should be cleared? 
-                // Let's assume the user purely wanted to paste tasks. 
-                // But if they had partial text, it's ambiguous.
-                // For now, let's just create the tasks from *pasted* text and leave the input field alone (preserving whatever was there).
-
             } else {
-                // User said NO, treat as single task (replace newlines with spaces)
                 const singleLineText = lines.join(' ')
                 insertTextAtCursor(singleLineText)
             }
         } else if (lines.length === 1) {
-            // Just one line effectively (maybe just a trailing newline), treat normally
             insertTextAtCursor(lines[0])
         }
     }
@@ -98,7 +80,6 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
         const newTitle = title.substring(0, start) + text + title.substring(end)
         setTitle(newTitle)
 
-        // Restore cursor position
         setTimeout(() => {
             if (inputRef.current) {
                 inputRef.current.selectionStart = inputRef.current.selectionEnd = start + text.length
@@ -106,10 +87,13 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
         }, 0)
     }
 
+    // New styles logic
+    const isExpanded = isFocused || title.length > 0
+
     return (
-        <form onSubmit={handleSubmit}>
-            <div className="relative flex items-center">
-                <div className="absolute left-3 text-gray-400">
+        <form onSubmit={handleSubmit} className={clsx("transition-all duration-300", isExpanded ? "w-full" : "w-48 inline-block")}>
+            <div className={clsx("relative flex items-center transition-all duration-300 rounded-lg overflow-hidden", isExpanded ? "w-full" : "w-48")}>
+                <div className={clsx("absolute top-0 bottom-0 left-0 w-10 flex items-center justify-center transition-colors z-10 bg-blue-50 text-blue-600 border-r border-blue-100")}>
                     <Plus size={20} />
                 </div>
                 <input
@@ -117,9 +101,16 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
                     onPaste={handlePaste}
                     placeholder={placeholder}
-                    className="w-full py-3 pl-10 pr-4 bg-gray-50 border border-transparent rounded-lg focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-gray-400"
+                    className={clsx(
+                        "w-full py-2.5 pl-12 pr-4 outline-none transition-all placeholder:font-medium text-sm",
+                        isExpanded
+                            ? "bg-white border border-blue-200 text-gray-900 shadow-sm ring-4 ring-blue-50/50 placeholder:text-gray-400 rounded-lg"
+                            : "bg-gray-50 border border-transparent text-gray-600 hover:bg-white hover:shadow-sm hover:border-gray-200 cursor-text placeholder:text-gray-500 rounded-lg"
+                    )}
                 />
             </div>
         </form>

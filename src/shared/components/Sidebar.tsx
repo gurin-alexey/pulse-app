@@ -422,10 +422,10 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                 })}
             </div>
 
-            <div className="mt-8 space-y-0.5">
+            <div className="mt-12 space-y-0.5">
 
                 {/* Header with Actions */}
-                <div className="px-5 flex items-center justify-between group/main-header mb-1">
+                <div className="px-3 flex items-center justify-between group/main-header mb-1">
                     <button
                         onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
                         className="flex items-center gap-1.5 focus:outline-none group/title"
@@ -559,8 +559,8 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                 )}
 
                 {/* Tags Section */}
-                <div>
-                    <div className="px-5 flex items-center justify-between group/tags-header mb-2">
+                <div className="mt-8">
+                    <div className="px-3 flex items-center justify-between group/tags-header mb-2">
                         <button
                             onClick={() => setIsTagsExpanded(!isTagsExpanded)}
                             className="flex items-center gap-1.5 focus:outline-none group/title"

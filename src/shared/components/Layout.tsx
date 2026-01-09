@@ -192,9 +192,9 @@ export function Layout() {
         {/* Column A: Sidebar (Desktop) */}
         <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col overflow-y-auto shrink-0">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
-            <span className="font-bold text-xl text-blue-600">Pulse</span>
+            <span className="font-extrabold text-2xl text-blue-600 italic uppercase tracking-tight">Pulse</span>
           </div>
-          <nav className="flex-1 space-y-1">
+          <nav className="flex-1 space-y-1 mt-6">
             <Sidebar activePath={location.pathname} />
           </nav>
           {renderSidebarFooter()}
@@ -209,7 +209,7 @@ export function Layout() {
             />
             <aside className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 md:hidden flex flex-col animate-in slide-in-from-left duration-300">
               <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 pt-[env(safe-area-inset-top)]">
-                <span className="font-bold text-xl text-blue-600">Pulse</span>
+                <span className="font-extrabold text-2xl text-blue-600 italic uppercase tracking-tight">Pulse</span>
                 <button
                   onClick={() => setIsSidebarOpen(false)}
                   className="p-2 -ml-2 text-gray-400"
@@ -217,7 +217,7 @@ export function Layout() {
                   <ChevronRight size={24} className="rotate-180" />
                 </button>
               </div>
-              <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+              <nav className="flex-1 p-2 space-y-1 overflow-y-auto mt-2">
                 <Sidebar
                   activePath={location.pathname}
                   onItemClick={() => setIsSidebarOpen(false)}
