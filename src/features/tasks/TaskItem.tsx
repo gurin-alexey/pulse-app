@@ -3,10 +3,10 @@ import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
-import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal } from "lucide-react"
+import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput } from "lucide-react"
 import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import clsx from "clsx"
-import { motion } from "framer-motion"
+import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion"
 import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } from "date-fns"
 import { toast } from "sonner"
 
@@ -15,7 +15,6 @@ import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useSettings } from "@/store/useSettings"
 import { useTrashActions } from "@/hooks/useTrashActions"
 import { ContextMenu } from "@/shared/components/ContextMenu"
-import { useSwipeable } from "react-swipeable"
 
 interface TaskItemProps {
     task: any
@@ -29,7 +28,6 @@ interface TaskItemProps {
     disableAnimation?: boolean
     onIndent?: () => void
     onOutdent?: () => void
-
 }
 
 export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent }: TaskItemProps) {
@@ -51,19 +49,44 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     const [isEditing, setIsEditing] = useState(false)
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
 
-    // Swipe Logic
-    const swipeHandlers = useSwipeable({
-        onSwipedRight: () => {
-            if (isMobile && onIndent) onIndent()
-        },
-        onSwipedLeft: () => {
-            if (isMobile && onOutdent) onOutdent()
-        },
-        trackMouse: false,
-        trackTouch: true,
-        preventScrollOnSwipe: false,
-        delta: 30
-    })
+    // --- SWIPE LOGIC ---
+    const controls = useAnimation()
+    const x = useMotionValue(0)
+    // Background opacity/scale effects based on drag
+    // 0 to 50px -> opacity 0 to 1
+    const leftActionOpacity = useTransform(x, [0, 50], [0, 1])
+    const rightActionOpacity = useTransform(x, [0, -50], [0, 1])
+
+    // Scale effect for icons
+    const leftIconScale = useTransform(x, [0, 80], [0.5, 1])
+    const rightIconScale = useTransform(x, [0, -80], [0.5, 1])
+
+    // Track if we are swiping to disable conflicting interactions
+    const [isSwiping, setIsSwiping] = useState(false)
+
+    const handleDragEnd = async (event: any, info: PanInfo) => {
+        const offset = info.offset.x
+        const velocity = info.velocity.x
+
+        // Thresholds for activation
+        if (offset < -80 || (offset < -10 && velocity < -200)) {
+            // Swiped Left -> Reveal Right Actions (Delete)
+            await controls.start({ x: -120, transition: { type: "spring", stiffness: 300, damping: 30 } })
+        } else if (offset > 80 || (offset > 10 && velocity > 200)) {
+            // Swiped Right -> Reveal Left Actions (Move/Edit)
+            await controls.start({ x: 120, transition: { type: "spring", stiffness: 300, damping: 30 } })
+        } else {
+            // Reset to closed
+            await controls.start({ x: 0, transition: { type: "spring", stiffness: 400, damping: 40 } })
+        }
+        setIsSwiping(false)
+    }
+
+    const resetSwipe = () => {
+        controls.start({ x: 0 })
+    }
+    // --- END SWIPE LOGIC ---
+
 
     // Sync title if task updates externally
     useEffect(() => {
@@ -72,6 +95,8 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const handleTaskClick = (e: React.MouseEvent) => {
         if (isEditing) return
+        // Ignore click if swiped/swiping significantly
+        if (Math.abs(x.get()) > 10) return
         setSearchParams({ task: task.id })
     }
 
@@ -131,22 +156,17 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     }
 
     const getRelativeDate = (dateStr: string) => {
-        // 1. If it has time (Calendar event), show time instead of generic date
         if (task.start_time) {
-            // Helper to format ISO time strings to HH:mm
             const formatTime = (isoString: string) => {
                 if (!isoString) return ''
                 if (isoString.includes('T')) {
                     const date = new Date(isoString)
                     const hours = date.getHours()
                     const minutes = date.getMinutes()
-                    // Always render HH:mm
                     return `${hours}:${minutes.toString().padStart(2, '0')}`
                 }
-                // Fallback but ensure HH:mm pattern if it was already short
                 return isoString
             }
-
             const timeStr = formatTime(task.start_time)
             return <span className="text-blue-600 font-medium text-xs bg-blue-50 px-1.5 py-0.5 rounded">{timeStr}</span>
         }
@@ -155,13 +175,33 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
         const today = startOfToday()
         const diff = differenceInCalendarDays(date, today)
 
-        // 2. Hide "Today" label as requested (it's redundant in Today view, and implied elsewhere)
         if (diff === 0) return null
-
         if (diff === 1) return <span className="text-gray-500">Завтра</span>
         if (diff > 1) return <span className="text-gray-500">{diff} дн.</span>
         if (diff < 0) return <span className="text-red-500 font-medium">{diff} дн.</span>
         return null
+    }
+
+    const startMove = (e: any) => {
+        e.stopPropagation()
+        resetSwipe()
+        window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
+    }
+
+    const handleDelete = (e: any) => {
+        e.stopPropagation()
+        resetSwipe()
+        deleteTask(task.id)
+        if (showToasts) {
+            toast.message("Задача удалена", {
+                description: "Вы можете найти её в корзине",
+                duration: 4000,
+                action: {
+                    label: 'Отменить',
+                    onClick: () => restoreTask.mutate(task.id)
+                }
+            })
+        }
     }
 
     const menuItems = [
@@ -216,9 +256,8 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
         { type: 'separator' as const },
         {
             label: 'Добавить в проект',
-            icon: <MoreHorizontal size={14} className="text-gray-500" />, // Using MoreHorizontal as placeholder or maybe a Folder icon
+            icon: <MoreHorizontal size={14} className="text-gray-500" />,
             onClick: () => {
-                // Trigger GlobalSearch in Move Mode
                 window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
             }
         },
@@ -227,21 +266,16 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             label: 'Удалить',
             icon: <Trash2 size={14} />,
             variant: 'danger' as const,
-            onClick: () => {
-                deleteTask(task.id)
-                if (showToasts) {
-                    toast.message("Задача удалена", {
-                        description: "Вы можете найти её в корзине",
-                        duration: 4000,
-                        action: {
-                            label: 'Отменить',
-                            onClick: () => restoreTask.mutate(task.id)
-                        }
-                    })
-                }
-            }
+            onClick: () => handleDelete({})
         }
     ]
+
+    // Determine opacity/style for completed
+    const containerClasses = clsx(
+        "relative flex items-center gap-2 px-2 h-9 bg-white transition-colors w-full select-none box-border border border-transparent z-10",
+        isActive ? "bg-gray-100 placeholder:bg-gray-100" : "hover:bg-gray-100/60",
+        task.is_completed && "opacity-80"
+    )
 
     return (
         <motion.div
@@ -252,113 +286,156 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             style={{ marginLeft: `${depth * 24}px` }}
             onContextMenu={handleContextMenu}
         >
-            <div
-                onClick={handleTaskClick}
-                {...(isMobile ? listeners : {})}
-                {...(isMobile ? attributes : {})}
-                {...(isMobile ? swipeHandlers : {})} // Attach swipe handlers
-                className={clsx(
-                    "flex items-center gap-2 px-2 h-9 rounded-md transition-colors w-full select-none box-border border border-transparent relative", // Added relative
-                    isActive ? "bg-gray-100" : "hover:bg-gray-100/60",
-                    task.is_completed && "opacity-80"
-                )}
-            >
-                <div
-                    {...listeners}
-                    {...attributes}
-                    className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-gray-600 cursor-move transition-opacity items-center justify-center"
+            {/* SWIPE CONTAINER */}
+            <div className="relative rounded-md overflow-hidden">
+
+                {/* --- BACKGROUND ACTIONS --- */}
+                {/* Left Action (For Swipe Right) - Move/Edit */}
+                <motion.div
+                    style={{ opacity: leftActionOpacity }}
+                    className="absolute inset-y-0 left-0 w-[50%] bg-blue-500 flex items-center justify-start px-4 text-white rounded-l-md"
                 >
-                    <GripVertical size={14} />
-                </div>
-
-                <button
-                    onClick={toggleStatus}
-                    className={clsx("transition-colors", task.is_completed ? "text-gray-500" : "text-gray-300 hover:text-gray-500")}
-                >
-                    {task.is_completed ? <CheckSquare size={18} /> : <Square size={18} />}
-                </button>
-
-                <div className="flex-1 min-w-0 flex items-center self-stretch">
-                    {isMobile ? (
-                        <span
-                            className={clsx(
-                                "w-full bg-transparent border-0 p-0 leading-tight",
-                                "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
-                                task.is_completed ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
-                            )}
-                        >
-                            {task.title}
-                        </span>
-                    ) : (
-                        <TextareaAutosize
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            onBlur={saveTitle}
-                            onKeyDown={handleKeyDown}
-                            onFocus={() => {
-                                setIsEditing(true)
-                                setSearchParams({ task: task.id })
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            minRows={1}
-                            className={clsx(
-                                "w-full bg-transparent border-0 outline-none focus:ring-0 p-0 leading-tight resize-none",
-                                "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
-                                task.is_completed ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
-                            )}
-                            spellCheck={false}
-                        />
-                    )}
-                </div>
-
-                <div className="flex items-center gap-3 shrink-0">
-                    {/* Tags */}
-                    {task.tags && task.tags.length > 0 && (
-                        <div className="flex items-center gap-2">
-                            {task.tags.map((tag: any) => (
-                                <div
-                                    key={tag.id}
-                                    className="px-2 py-0.5 rounded text-[10px] font-medium transition-colors"
-                                    style={{
-                                        backgroundColor: `${tag.color}20`,
-                                        color: tag.color,
-                                        border: `1px solid ${tag.color}40`
-                                    }}
-                                    title={tag.name}
-                                >
-                                    {isMobile ? tag.name.slice(0, 4) : tag.name}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Date/Time */}
-                    {task.due_date && (
-                        <div
-                            className="text-xs tabular-nums cursor-help"
-                            title={format(new Date(task.due_date), 'dd MMM yyyy')}
-                        >
-                            {getRelativeDate(task.due_date)}
-                        </div>
-                    )}
-
-                    {/* Chevron */}
-                    <div
-                        className={clsx(
-                            "w-6 h-6 flex items-center justify-center cursor-pointer transition-transform hover:bg-gray-200 rounded shrink-0",
-                            !hasChildren && "invisible pointer-events-none",
-                            isCollapsed ? "" : "rotate-90"
-                        )}
-                        onClick={(e) => {
-                            if (hasChildren && onToggleCollapse) {
-                                e.stopPropagation()
-                                onToggleCollapse()
-                            }
-                        }}
+                    <motion.button
+                        style={{ scale: leftIconScale }}
+                        onClick={startMove} className="flex flex-col items-center gap-1 min-w-[50px]"
                     >
-                        <ChevronRight size={16} className="text-gray-400" />
+                        <FolderInput size={20} />
+                        <span className="text-[10px] font-bold">Move</span>
+                    </motion.button>
+                </motion.div>
+
+                {/* Right Action (For Swipe Left) - Delete */}
+                <motion.div
+                    style={{ opacity: rightActionOpacity }}
+                    className="absolute inset-y-0 right-0 w-[50%] bg-red-500 flex items-center justify-end px-4 text-white rounded-r-md"
+                >
+                    <motion.button
+                        style={{ scale: rightIconScale }}
+                        onClick={handleDelete} className="flex flex-col items-center gap-1 min-w-[50px]"
+                    >
+                        <Trash2 size={20} />
+                        <span className="text-[10px] font-bold">Delete</span>
+                    </motion.button>
+                </motion.div>
+
+                {/* --- FOREGROUND CONTENT (SWIPEABLE) --- */}
+                <motion.div
+                    drag={isMobile ? "x" : false} // Only swipe on mobile
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.1}
+                    onDragStart={() => setIsSwiping(true)}
+                    onDragEnd={handleDragEnd}
+                    animate={controls}
+                    style={{ x }}
+                    className={containerClasses}
+                >
+
+                    {/* Drag Handle (Desktop) */}
+                    <div
+                        {...listeners}
+                        {...attributes}
+                        className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-gray-600 cursor-move transition-opacity items-center justify-center"
+                    >
+                        <GripVertical size={14} />
                     </div>
-                </div>
+
+                    {/* Completion Checkbox */}
+                    <button
+                        onClick={toggleStatus}
+                        className={clsx("transition-colors cursor-pointer", task.is_completed ? "text-gray-500" : "text-gray-300 hover:text-gray-500")}
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        {task.is_completed ? <CheckSquare size={18} /> : <Square size={18} />}
+                    </button>
+
+                    {/* Title & Input */}
+                    <div
+                        className="flex-1 min-w-0 flex items-center self-stretch cursor-pointer"
+                        onClick={handleTaskClick}
+                        {...(isMobile ? listeners : {})}
+                        {...(isMobile ? attributes : {})}
+                    >
+                        {isMobile ? (
+                            <span
+                                className={clsx(
+                                    "w-full bg-transparent border-0 p-0 leading-tight",
+                                    "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
+                                    task.is_completed ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
+                                )}
+                            >
+                                {task.title}
+                            </span>
+                        ) : (
+                            <TextareaAutosize
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                onBlur={saveTitle}
+                                onKeyDown={handleKeyDown}
+                                onFocus={() => {
+                                    setIsEditing(true)
+                                    setSearchParams({ task: task.id })
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                minRows={1}
+                                className={clsx(
+                                    "w-full bg-transparent border-0 outline-none focus:ring-0 p-0 leading-tight resize-none",
+                                    "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
+                                    task.is_completed ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
+                                )}
+                                spellCheck={false}
+                            />
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                        {/* Tags */}
+                        {task.tags && task.tags.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                {task.tags.map((tag: any) => (
+                                    <div
+                                        key={tag.id}
+                                        className="px-2 py-0.5 rounded text-[10px] font-medium transition-colors"
+                                        style={{
+                                            backgroundColor: `${tag.color}20`,
+                                            color: tag.color,
+                                            border: `1px solid ${tag.color}40`
+                                        }}
+                                        title={tag.name}
+                                    >
+                                        {isMobile ? tag.name.slice(0, 4) : tag.name}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Date/Time */}
+                        {task.due_date && (
+                            <div
+                                className="text-xs tabular-nums cursor-help"
+                                title={format(new Date(task.due_date), 'dd MMM yyyy')}
+                            >
+                                {getRelativeDate(task.due_date)}
+                            </div>
+                        )}
+
+                        {/* Chevron */}
+                        <div
+                            className={clsx(
+                                "w-6 h-6 flex items-center justify-center cursor-pointer transition-transform hover:bg-gray-200 rounded shrink-0",
+                                !hasChildren && "invisible pointer-events-none",
+                                isCollapsed ? "" : "rotate-90"
+                            )}
+                            onClick={(e) => {
+                                if (hasChildren && onToggleCollapse) {
+                                    e.stopPropagation()
+                                    onToggleCollapse()
+                                }
+                            }}
+                        >
+                            <ChevronRight size={16} className="text-gray-400" />
+                        </div>
+                    </div>
+                </motion.div>
             </div>
 
             {contextMenu && (
