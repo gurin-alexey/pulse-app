@@ -10,6 +10,7 @@ import { TrashPage } from "@/pages/TrashPage";
 
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { Login } from "@/pages/Login";
+import { HomeRedirect } from "@/pages/HomeRedirect";
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,10 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
+            element: <HomeRedirect />,
+          },
+          {
+            path: "dashboard",
             element: <DashboardPage />,
           },
           {

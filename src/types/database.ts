@@ -71,6 +71,7 @@ export type UserSettings = {
         show_completed_tasks?: boolean
         show_toast_hints?: boolean
         hide_night_time?: boolean
+        default_page?: 'dashboard' | 'today' | 'calendar'
         [key: string]: any
     }
     created_at: string

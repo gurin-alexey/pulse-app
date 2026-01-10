@@ -35,6 +35,7 @@ const DEFAULT_SETTINGS: Omit<UserSettings, 'user_id' | 'created_at' | 'updated_a
         show_completed_tasks: false,
         show_toast_hints: true,
         hide_night_time: false,
+        default_page: 'today',
         dashboard_widget_order: ['greeting', 'weather', 'quick_capture', 'projects', 'ai_chat'],
     },
 };

@@ -356,7 +356,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     }
 
     const navItems = [
-        { label: "Dashboard", path: "/", icon: LayoutDashboard, droppable: false },
+        { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, droppable: false },
         {
             label: "Inbox",
             path: "/inbox",
