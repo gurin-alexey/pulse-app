@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { isToday, isTomorrow, isBefore, startOfToday, format, parseISO } from 'date-fns'
 import type { TaskWithTags } from '@/hooks/useTasks'
 import type { SortOption, GroupOption } from './ViewOptions'
 import type { Project } from '@/types/database'
@@ -88,60 +89,101 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects, t
         const groups: Record<string, TaskWithTags[]> = {}
 
         if (groupBy === 'date') {
-            const dateGroups: Record<string, TaskWithTags[]> = {
-                'DEADLINE': [],
-                'CALENDAR': [],
-                'ALL DAY': []
-            }
-
-            // Determine target date string (default to Today if not provided)
-            let targetStr = targetDate
-            if (!targetStr) {
-                const date = new Date()
-                targetStr = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-            }
-
-            // 1. Strict Filter: Only allow tasks implicitly scheduled for TARGET DATE.
-            // Tasks without a date (even if subtasks of projects) are EXCLUDED.
-            const targetTasks = filtered.filter(task => {
-                const hasDate = task.due_date && task.due_date.startsWith(targetStr)
-                const hasTime = task.start_time && task.start_time.startsWith(targetStr)
-                return hasDate || hasTime
-            })
-
-            const tasksMap = new Map(targetTasks.map(t => [t.id, t]))
-
-            // 3. Partition
-            targetTasks.forEach(task => {
-                // 1. DEADLINE: Projects (Multi-step)
-                if (task.is_project) {
-                    dateGroups['DEADLINE'].push(task)
-                    return
+            // Case 1: Single Day View (e.g. Today/Tomorrow pages)
+            if (targetDate) {
+                const dateGroups: Record<string, TaskWithTags[]> = {
+                    'DEADLINE': [],
+                    'CALENDAR': [],
+                    'ALL DAY': []
                 }
 
-                // 2. CALENDAR: Tasks with Time
-                if (task.start_time) {
-                    dateGroups['CALENDAR'].push(task)
-                    return
+                // 1. Strict Filter: Only allow tasks implicitly scheduled for TARGET DATE.
+                const targetTasks = filtered.filter(task => {
+                    const hasDate = task.due_date && task.due_date.startsWith(targetDate)
+                    const hasTime = task.start_time && task.start_time.startsWith(targetDate)
+                    return hasDate || hasTime
+                })
+
+                const tasksMap = new Map(targetTasks.map(t => [t.id, t]))
+
+                // 2. Partition
+                targetTasks.forEach(task => {
+                    if (task.is_project) {
+                        dateGroups['DEADLINE'].push(task)
+                        return
+                    }
+                    if (task.start_time) {
+                        dateGroups['CALENDAR'].push(task)
+                        return
+                    }
+                    dateGroups['ALL DAY'].push(task)
+                })
+
+                // Sort CALENDAR roots by time
+                dateGroups['CALENDAR'].sort((a, b) => {
+                    const timeA = a.start_time || a.end_time || ''
+                    const timeB = b.start_time || b.end_time || ''
+                    return timeA.localeCompare(timeB)
+                })
+
+                const orderedGroups: Record<string, TaskWithTags[]> = {}
+                if (dateGroups['DEADLINE'].length > 0) orderedGroups['DEADLINE'] = organizeByHierarchy(dateGroups['DEADLINE'], tasksMap)
+                if (dateGroups['CALENDAR'].length > 0) orderedGroups['CALENDAR'] = organizeByHierarchy(dateGroups['CALENDAR'], tasksMap)
+                if (dateGroups['ALL DAY'].length > 0) orderedGroups['ALL DAY'] = organizeByHierarchy(dateGroups['ALL DAY'], tasksMap)
+
+                return orderedGroups
+            }
+
+            // Case 2: General View (e.g. Project/Inbox grouped by Date)
+            const groups: Record<string, TaskWithTags[]> = {}
+            const today = startOfToday()
+
+            // Helper to get group key and sort value
+            const getGroupInfo = (task: TaskWithTags) => {
+                if (!task.due_date) return { key: 'No Date', sort: 9999999999999 } // End of list
+
+                const date = parseISO(task.due_date)
+
+                if (isBefore(date, today)) return { key: 'Overdue', sort: -1 }
+                if (isToday(date)) return { key: 'Today', sort: 0 }
+                if (isTomorrow(date)) return { key: 'Tomorrow', sort: 1 }
+
+                // Future dates
+                return {
+                    key: format(date, 'd MMM • EEEE'),
+                    sort: date.getTime()
                 }
+            }
 
-                // 3. ALL DAY: Everything else (Tasks with Date but No Time)
-                dateGroups['ALL DAY'].push(task)
+            filtered.forEach(task => {
+                const { key } = getGroupInfo(task)
+                if (!groups[key]) groups[key] = []
+                groups[key].push(task)
             })
 
-            // Sort CALENDAR roots by time
-            dateGroups['CALENDAR'].sort((a, b) => {
-                const timeA = a.start_time || a.end_time || ''
-                const timeB = b.start_time || b.end_time || ''
-                return timeA.localeCompare(timeB)
-            })
-
-            // Expand hierarchies
-            // Since tasksMap IS strict, generic children (no date) are naturally excluded from the hierarchy.
+            // Sort groups
             const orderedGroups: Record<string, TaskWithTags[]> = {}
-            if (dateGroups['DEADLINE'].length > 0) orderedGroups['DEADLINE'] = organizeByHierarchy(dateGroups['DEADLINE'], tasksMap)
-            if (dateGroups['CALENDAR'].length > 0) orderedGroups['CALENDAR'] = organizeByHierarchy(dateGroups['CALENDAR'], tasksMap)
-            if (dateGroups['ALL DAY'].length > 0) orderedGroups['ALL DAY'] = organizeByHierarchy(dateGroups['ALL DAY'], tasksMap)
+
+            // Get all unique keys and sort them using a sample task or re-deriving sort val
+            // Easier: just sort the keys based on our known logic
+            const sortedKeys = Object.keys(groups).sort((a, b) => {
+                const getSortVal = (k: string) => {
+                    if (k === 'No Date') return 9999999999999
+                    if (k === 'Overdue') return -1
+                    if (k === 'Today') return 0
+                    if (k === 'Tomorrow') return 1
+                    // Parse formatted date back? Tricky.
+                    // Better: Find a representative task for this group and use its date
+                    const task = groups[k][0]
+                    if (task && task.due_date) return parseISO(task.due_date).getTime()
+                    return 999
+                }
+                return getSortVal(a) - getSortVal(b)
+            })
+
+            sortedKeys.forEach(key => {
+                orderedGroups[key] = organizeByHierarchy(groups[key]) // Use simple hierarchy
+            })
 
             return orderedGroups
         } else if (groupBy === 'priority') {
