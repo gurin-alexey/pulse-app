@@ -115,7 +115,7 @@ export function TagTasks() {
 
     return (
         <div className="h-full flex flex-col">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-10">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 sticky top-0 bg-white z-30">
                 <div className="flex items-center gap-3">
                     <div
                         className="w-4 h-4 rounded-full"

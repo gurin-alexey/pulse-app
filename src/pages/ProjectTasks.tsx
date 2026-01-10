@@ -631,7 +631,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 portalTarget
             )}
 
-            <div className="px-4 py-3 border-b border-gray-100 hidden md:flex items-center gap-4 min-h-[4rem] shrink-0 sticky top-0 bg-white z-10">
+            <div className="px-4 py-3 border-b border-gray-100 hidden md:flex items-center gap-4 min-h-[4rem] shrink-0 sticky top-0 bg-white z-30">
                 <h2 className="font-bold text-lg text-gray-800 shrink-0">{pageTitle}</h2>
                 <div className="flex-1 max-w-2xl">
                     <CreateTaskInput projectId={projectId || null} defaultDueDate={targetDate} placeholder="Add a task..." />
