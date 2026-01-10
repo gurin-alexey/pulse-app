@@ -1,21 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { MapPin, Zap, Clock, Users, Plus, Check } from 'lucide-react'
+import { Plus, Check } from 'lucide-react'
 import { useTags, useTaskTags, useCreateTag, useToggleTaskTag } from '@/hooks/useTags'
 import clsx from 'clsx'
+import { CATEGORIES, type CategoryType } from '@/constants/categories'
 
 type CategoryTagsProps = {
     taskId: string
     readOnly?: boolean
 }
-
-type CategoryType = 'place' | 'energy' | 'time' | 'people'
-
-const CATEGORIES: { id: CategoryType; label: string; icon: React.ElementType; color: string }[] = [
-    { id: 'place', label: 'Место', icon: MapPin, color: 'text-red-500' },
-    { id: 'energy', label: 'Энергия', icon: Zap, color: 'text-yellow-500' },
-    { id: 'time', label: 'Время', icon: Clock, color: 'text-blue-500' },
-    { id: 'people', label: 'Люди', icon: Users, color: 'text-purple-500' },
-]
 
 export function CategoryTags({ taskId, readOnly }: CategoryTagsProps) {
     const { data: allTags } = useTags()

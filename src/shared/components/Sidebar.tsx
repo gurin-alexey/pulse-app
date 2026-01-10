@@ -17,6 +17,7 @@ import { useDeleteProject } from "@/hooks/useDeleteProject"
 import { useAllTasks } from "@/hooks/useAllTasks"
 import { useTags } from "@/hooks/useTags"
 import { isToday, isTomorrow, parseISO } from "date-fns"
+import { CATEGORIES } from "@/constants/categories"
 
 type SidebarProps = {
     activePath: string
@@ -578,27 +579,65 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                     </div>
 
                     {isTagsExpanded && (
-                        <div className="space-y-0.5">
-                            {tags?.map(tag => {
-                                const count = allTasks?.filter(t => !t.is_completed && (t as any).task_tags?.some((tt: any) => tt.tag_id === tag.id)).length || 0
+                        <div className="space-y-3 pl-2">
+                            {/* 1. Categorized Tags */}
+                            {CATEGORIES.map(category => {
+                                const categoryTags = tags?.filter(t => t.category === category.id) || []
+                                if (categoryTags.length === 0) return null
+
+                                const CatIcon = category.icon
 
                                 return (
-                                    <Link
-                                        key={tag.id}
-                                        to={`/tags/${tag.id}`}
-                                        onClick={onItemClick}
-                                        className={clsx(
-                                            "flex items-center gap-2 px-3 py-1 transition-colors text-sm",
-                                            activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-600 hover:bg-gray-50/50"
-                                        )}
-                                    >
-                                        <TagIcon size={16} style={{ color: tag.color }} />
-                                        <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
-                                            {tag.name}
-                                        </span>
-                                    </Link>
+                                    <div key={category.id} className="space-y-0.5">
+                                        <div className="flex items-center gap-2 px-2 py-1 text-xs font-semibold text-gray-500">
+                                            <CatIcon size={12} className={category.color} />
+                                            {category.label}
+                                        </div>
+                                        {categoryTags.map(tag => (
+                                            <Link
+                                                key={tag.id}
+                                                to={`/tags/${tag.id}`}
+                                                onClick={onItemClick}
+                                                className={clsx(
+                                                    "flex items-center gap-2 px-3 py-1 transition-colors text-sm rounded-md ml-1",
+                                                    activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-600 hover:bg-gray-50/50"
+                                                )}
+                                            >
+                                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
+                                                <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
+                                                    {tag.name}
+                                                </span>
+                                            </Link>
+                                        ))}
+                                    </div>
                                 )
                             })}
+
+                            {/* 2. Uncategorized Tags */}
+                            {tags?.some(t => !t.category) && (
+                                <div className="space-y-0.5">
+                                    <div className="px-2 py-1 text-xs font-semibold text-gray-400">
+                                        Other
+                                    </div>
+                                    {tags?.filter(t => !t.category).map(tag => (
+                                        <Link
+                                            key={tag.id}
+                                            to={`/tags/${tag.id}`}
+                                            onClick={onItemClick}
+                                            className={clsx(
+                                                "flex items-center gap-2 px-3 py-1 transition-colors text-sm rounded-md ml-1",
+                                                activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-600 hover:bg-gray-50/50"
+                                            )}
+                                        >
+                                            <TagIcon size={14} className="text-gray-400" />
+                                            <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
+                                                {tag.name}
+                                            </span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+
                             {tags?.length === 0 && (
                                 <div className="px-5 py-2 text-xs text-gray-300 italic">
                                     No tags yet
