@@ -315,6 +315,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                     animate={controls}
                     style={{ x }}
                     className={containerClasses}
+                    data-task-swipe-area="true"
                 >
 
                     {/* Drag Handle (Desktop) */}

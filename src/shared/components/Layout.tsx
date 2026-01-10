@@ -1,8 +1,8 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams, matchPath, useOutlet } from "react-router-dom"
-import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus, RefreshCw } from "lucide-react"
+import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus, RefreshCw, Search } from "lucide-react"
 import { useState, useEffect } from "react"
-import { useQueryClient, useIsFetching } from "@tanstack/react-query" // Import hooks
-import { motion, AnimatePresence } from "framer-motion"
+import { useQueryClient, useIsFetching } from "@tanstack/react-query"
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion"
 import clsx from "clsx"
 import { supabase } from "@/lib/supabase"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
@@ -26,7 +26,7 @@ import Logo from "@/assets/pulse_logo.jpg"
 
 import { GlobalSearch } from "@/features/search/GlobalSearch"
 import { useCommandStore } from "@/store/useCommandStore"
-import { Search } from "lucide-react"
+import { useSwipeable } from 'react-swipeable'
 
 export function Layout() {
   const queryClient = useQueryClient()
@@ -55,6 +55,59 @@ export function Layout() {
 
   // Prefetching Strategy
   usePrefetchData()
+
+  // Motion & Swipe Logic for Sidebar
+  const drawerWidth = 280
+  const sidebarX = useMotionValue(-drawerWidth)
+  const backdropOpacity = useTransform(sidebarX, [-drawerWidth, 0], [0, 1])
+  const backdropPointerEvents = useTransform(sidebarX, (v) => v > -drawerWidth + 10 ? 'auto' : 'none')
+
+  // Sync state -> animation
+  useEffect(() => {
+    if (isDesktop) return
+    const targetX = isSidebarOpen ? 0 : -drawerWidth
+    animate(sidebarX, targetX, {
+      type: "spring",
+      stiffness: 400,
+      damping: 40
+    })
+  }, [isSidebarOpen, isDesktop])
+
+  const swipeHandlers = useSwipeable({
+    onSwiping: (e) => {
+      if (isDesktop) return
+      const target = e.event.target as HTMLElement
+      // Prevent sidebar swipe if interacting with a task or if dragging section
+      if (target.closest('[data-task-swipe-area="true"]')) return
+
+      // Disable swipe if task detail is open
+      if (taskId) return
+
+      // Ignore vertical swipes to prevent accidental sidebar movement during scroll
+      if (e.dir === 'Up' || e.dir === 'Down') return
+
+      // Calculate new X based on start state
+      // We assume if isOpen=true, base is 0. If false, base is -280.
+      const base = isSidebarOpen ? 0 : -drawerWidth
+      const nextX = Math.min(0, Math.max(-drawerWidth, base + e.deltaX))
+      sidebarX.set(nextX)
+    },
+    onSwiped: (e) => {
+      if (isDesktop) return
+      const target = e.event.target as HTMLElement
+      if (target.closest('[data-task-swipe-area="true"]')) return
+      if (taskId) return
+
+      const currentX = sidebarX.get()
+      const shouldOpen = currentX > -(drawerWidth / 2) || e.velocity > 0.4
+
+      setIsSidebarOpen(shouldOpen)
+      // The useEffect will trigger the snap animation
+    },
+    trackMouse: false,
+    trackTouch: true,
+    delta: 10 // Minimum distance to start tracking
+  })
 
   const isCalendarPage = location.pathname.startsWith('/calendar')
   const isDashboardPage = location.pathname === '/'
@@ -186,7 +239,7 @@ export function Layout() {
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
     >
-      <div className="flex h-screen overflow-hidden bg-gray-50 flex-col md:flex-row">
+      <div {...swipeHandlers} className="flex h-screen overflow-hidden bg-gray-50 flex-col md:flex-row">
         {/* Mobile Top Header */}
         <header className="md:hidden h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-30 pt-[env(safe-area-inset-top)]">
           <button
@@ -218,13 +271,18 @@ export function Layout() {
         </aside>
 
         {/* Mobile Sidebar Overlay + Drawer */}
-        {(isSidebarOpen && !isDesktop) && (
+        {/* Mobile Sidebar (Permanent but animated) */}
+        {!isDesktop && (
           <>
-            <div
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
+            <motion.div
+              style={{ opacity: backdropOpacity, pointerEvents: backdropPointerEvents }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
               onClick={() => setIsSidebarOpen(false)}
             />
-            <aside className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 md:hidden flex flex-col animate-in slide-in-from-left duration-300">
+            <motion.aside
+              style={{ x: sidebarX }}
+              className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 md:hidden flex flex-col shadow-2xl"
+            >
               <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 pt-[env(safe-area-inset-top)]">
                 <div className="flex items-center gap-3">
                   <img src={Logo} alt="Pulse Logo" className="w-8 h-8" />
@@ -233,6 +291,7 @@ export function Layout() {
                 <button
                   onClick={() => setIsSidebarOpen(false)}
                   className="p-2 -ml-2 text-gray-400"
+                  title="Close Menu"
                 >
                   <ChevronRight size={24} className="rotate-180" />
                 </button>
@@ -244,7 +303,7 @@ export function Layout() {
                 />
               </nav>
               {renderSidebarFooter()}
-            </aside>
+            </motion.aside>
           </>
         )}
 
