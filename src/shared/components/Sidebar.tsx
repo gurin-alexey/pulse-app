@@ -235,6 +235,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const [newProjectName, setNewProjectName] = useState("")
     const [isProjectsExpanded, setIsProjectsExpanded] = useState(false)
     const [isTagsExpanded, setIsTagsExpanded] = useState(false)
+    const [activeCategory, setActiveCategory] = useState<string | null>(null)
 
     const { data: tags } = useTags()
 
@@ -425,6 +426,67 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                 })}
             </div>
 
+            {/* Category Icons Row */}
+            <div className="px-4 py-3 border-t border-gray-100 mt-2 flex justify-between items-center relative gap-1">
+                {CATEGORIES.map(category => {
+                    const CatIcon = category.icon
+                    const isActive = activeCategory === category.id
+                    const categoryTags = tags?.filter(t => t.category === category.id) || []
+
+                    return (
+                        <div key={category.id} className="relative">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setActiveCategory(isActive ? null : category.id)
+                                }}
+                                className={clsx(
+                                    "p-2 rounded-lg transition-colors",
+                                    isActive ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                                )}
+                                title={category.label}
+                            >
+                                <CatIcon size={18} />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {isActive && (
+                                <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 shadow-xl rounded-lg z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-left">
+                                    <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                        {category.label}
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto py-1">
+                                        {categoryTags.length > 0 ? (
+                                            categoryTags.map(tag => (
+                                                <Link
+                                                    key={tag.id}
+                                                    to={`/tags/${tag.id}`}
+                                                    onClick={() => {
+                                                        setActiveCategory(null)
+                                                        if (onItemClick) onItemClick()
+                                                    }}
+                                                    className={clsx(
+                                                        "flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors",
+                                                        activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-700"
+                                                    )}
+                                                >
+                                                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                                                    <span className="truncate">{tag.name}</span>
+                                                </Link>
+                                            ))
+                                        ) : (
+                                            <div className="px-3 py-2 text-xs text-gray-400 italic text-center">
+                                                No tags
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )
+                })}
+            </div>
+
             <div className="mt-12 space-y-0.5">
 
                 {/* Header with Actions */}
@@ -560,83 +622,6 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                         </DroppableZone>
                     </div>
                 )}
-
-                {/* Tags Section */}
-                <div className="mt-8">
-                    <div className="px-3 flex items-center justify-between group/tags-header mb-2">
-                        <button
-                            onClick={() => setIsTagsExpanded(!isTagsExpanded)}
-                            className="flex items-center gap-1.5 focus:outline-none group/title"
-                        >
-                            <ChevronRight
-                                size={14}
-                                className={clsx("text-gray-400 transition-transform duration-200", isTagsExpanded && "rotate-90")}
-                            />
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest group-hover/title:text-gray-600 transition-colors">
-                                Tags
-                            </span>
-                        </button>
-                    </div>
-
-                    {isTagsExpanded && (
-                        <div className="space-y-1 pl-2">
-                            {/* 1. Categorized Tags */}
-                            {CATEGORIES.map(category => {
-                                const categoryTags = tags?.filter(t => t.category === category.id) || []
-                                if (categoryTags.length === 0) return null
-
-                                const CatIcon = category.icon
-                                const isCatExpanded = collapsedGroups[`cat-${category.id}`] // Using existing collapsedGroups state for simplicity, or create new if needed.
-
-                                // Actually, use a proper state for this. I'll add a new toggle function below inside the return to keep it simple or reuse toggleGroup if safely namespaced.
-                                // Let's assume we use toggleGroup with a prefix 'cat-'
-
-                                return (
-                                    <div key={category.id} className="space-y-0.5">
-                                        <button
-                                            onClick={() => toggleGroup(`cat-${category.id}`)}
-                                            className="flex items-center gap-2 px-2 py-1 text-xs font-semibold text-gray-500 hover:text-gray-700 w-full text-left transition-colors"
-                                        >
-                                            <ChevronRight
-                                                size={12}
-                                                className={clsx("text-gray-400 transition-transform duration-200", collapsedGroups[`cat-${category.id}`] && "rotate-90")}
-                                            />
-                                            <CatIcon size={12} className={category.color} />
-                                            {category.label}
-                                        </button>
-
-                                        {collapsedGroups[`cat-${category.id}`] && (
-                                            <div className="pl-3 space-y-0.5 animate-in slide-in-from-top-1 fade-in duration-200">
-                                                {categoryTags.map(tag => (
-                                                    <Link
-                                                        key={tag.id}
-                                                        to={`/tags/${tag.id}`}
-                                                        onClick={onItemClick}
-                                                        className={clsx(
-                                                            "flex items-center gap-2 px-3 py-1 transition-colors text-sm rounded-md",
-                                                            activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-600 hover:bg-gray-50/50"
-                                                        )}
-                                                    >
-                                                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
-                                                        <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
-                                                            {tag.name}
-                                                        </span>
-                                                    </Link>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )
-                            })}
-
-                            {tags?.length === 0 && (
-                                <div className="px-5 py-2 text-xs text-gray-300 italic">
-                                    No tags yet
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
 
             </div>
 
