@@ -386,7 +386,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
 
 
             {/* Main Navigation */}
-            <div className="space-y-1">
+            <div className="space-y-2">
                 {navItems.map((item) => {
                     const Icon = item.icon
                     const isActive = activePath === item.path
@@ -396,7 +396,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             to={item.path}
                             onClick={onItemClick}
                             className={clsx(
-                                "flex items-center gap-3 px-4 py-1 transition-colors",
+                                "flex items-center gap-3 px-4 py-1.5 transition-colors",
                                 isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600")
                             )}
                         >

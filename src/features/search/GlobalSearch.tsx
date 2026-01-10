@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
-import { Search, FileText, CheckCircle2, Calendar, Layout, ArrowRight } from 'lucide-react'
+import { Search, FileText, CheckCircle2, Calendar, Layout, ArrowRight, History } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTasks } from '@/hooks/useTasks'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
@@ -11,7 +11,6 @@ import clsx from 'clsx'
 import { useSearchParams } from 'react-router-dom'
 
 import { useCommandStore } from '@/store/useCommandStore'
-// ...
 
 export function GlobalSearch() {
     const { isOpen, setOpen, toggle } = useCommandStore()
@@ -20,6 +19,29 @@ export function GlobalSearch() {
 
     const { data: tasks } = useTasks({ type: 'all', includeSubtasks: true })
     const { data: projects } = useProjects()
+
+    // Search & History State
+    const [search, setSearch] = useState('')
+    const [history, setHistory] = useState<string[]>([])
+
+    // Load history
+    useEffect(() => {
+        const saved = localStorage.getItem('pulse_search_history')
+        if (saved) {
+            try {
+                setHistory(JSON.parse(saved))
+            } catch (e) {
+                console.error("Failed to parse search history", e)
+            }
+        }
+    }, [])
+
+    const addToHistory = (term: string) => {
+        if (!term.trim()) return
+        const newHistory = [term, ...history.filter(h => h !== term)].slice(0, 5)
+        setHistory(newHistory)
+        localStorage.setItem('pulse_search_history', JSON.stringify(newHistory))
+    }
 
     // Mode for moving a task
     const [moveTaskId, setMoveTaskId] = useState<string | null>(null)
@@ -55,10 +77,16 @@ export function GlobalSearch() {
         if (!isOpen) {
             // Small delay to prevent UI flicker before closing
             setTimeout(() => setMoveTaskId(null), 200)
+            setSearch('') // Reset search on close
         }
     }, [isOpen])
 
     const handleSelectTask = (targetTaskId: string) => {
+        // Save history (only in navigation mode)
+        if (!moveTaskId) {
+            addToHistory(search)
+        }
+
         if (moveTaskId) {
             if (targetTaskId === moveTaskId) return // Cannot become child of self
 
@@ -126,7 +154,9 @@ export function GlobalSearch() {
                     )}
                     <Command.Input
                         autoFocus
-                        placeholder={moveTaskId ? "Select project..." : "Search tasks, projects..."}
+                        value={search}
+                        onValueChange={setSearch}
+                        placeholder={moveTaskId ? "Select project..." : "Search tasks..."}
                         className="flex-1 text-lg bg-transparent outline-none placeholder:text-gray-400 dark:text-white ml-2"
                     />
                     <div className="flex gap-1">
@@ -141,7 +171,25 @@ export function GlobalSearch() {
                         No results found.
                     </Command.Empty>
 
-                    {projects && projects.length > 0 && (
+                    {/* Recent Searches (Navigation Mode Only) */}
+                    {!moveTaskId && history.length > 0 && (
+                        <Command.Group heading="Recent Searches" className="text-xs font-medium text-gray-500 mb-2 px-2">
+                            {history.map(term => (
+                                <Command.Item
+                                    key={term}
+                                    value={term}
+                                    onSelect={() => setSearch(term)}
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer text-sm text-gray-700 dark:text-gray-200 aria-selected:bg-blue-50 aria-selected:text-blue-700 dark:aria-selected:bg-blue-900/20 dark:aria-selected:text-blue-400 transition-colors group"
+                                >
+                                    <History size={16} className="text-gray-400 group-aria-selected:text-blue-500" />
+                                    <span>{term}</span>
+                                </Command.Item>
+                            ))}
+                        </Command.Group>
+                    )}
+
+                    {/* Projects (Only shown in Move Mode) */}
+                    {moveTaskId && projects && projects.length > 0 && (
                         <Command.Group heading="Projects" className="text-xs font-medium text-gray-500 mb-2 px-2">
                             {projects.map(project => (
                                 <Command.Item

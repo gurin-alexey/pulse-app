@@ -17,9 +17,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     if (!settings) return null;
 
     const tabs = [
-        { name: 'Appearance', icon: Sun },
-        { name: 'Dashboard', icon: LayoutDashboard },
         { name: 'General', icon: Settings },
+        { name: 'Dashboard', icon: LayoutDashboard },
         { name: 'Account', icon: User },
     ];
 
@@ -54,35 +53,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 text-left align-middle shadow-xl transition-all border border-zinc-200 dark:border-zinc-800 h-[600px] flex">
+                            <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 text-left align-middle shadow-xl transition-all border border-zinc-200 dark:border-zinc-800 h-[85vh] md:h-[600px] flex flex-col md:flex-row">
 
                                 {/* Sidebar Navigation */}
-                                <div className="w-64 bg-zinc-50 dark:bg-zinc-950/50 border-r border-zinc-200 dark:border-zinc-800 p-4 flex flex-col justify-between">
-                                    <div>
-                                        <h2 className="text-lg font-semibold mb-6 px-3 text-zinc-900 dark:text-zinc-100">Settings</h2>
-                                        <div className="space-y-1">
-                                            {tabs.map((tab, index) => (
-                                                <button
-                                                    key={tab.name}
-                                                    onClick={() => setSelectedTab(index)}
-                                                    className={clsx(
-                                                        "w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                                                        selectedTab === index
-                                                            ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-                                                            : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100"
-                                                    )}
-                                                >
-                                                    <tab.icon size={18} />
-                                                    <span>{tab.name}</span>
-                                                </button>
-                                            ))}
-                                        </div>
+                                <div className="w-full md:w-64 bg-zinc-50 dark:bg-zinc-950/50 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 p-2 md:p-4 flex flex-col shrink-0">
+                                    <h2 className="text-lg font-semibold mb-2 md:mb-6 px-3 text-zinc-900 dark:text-zinc-100 hidden md:block">Settings</h2>
+                                    <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-1 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
+                                        {tabs.map((tab, index) => (
+                                            <button
+                                                key={tab.name}
+                                                onClick={() => setSelectedTab(index)}
+                                                className={clsx(
+                                                    "flex-shrink-0 flex items-center gap-2 md:w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
+                                                    selectedTab === index
+                                                        ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                                                        : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100"
+                                                )}
+                                            >
+                                                <tab.icon size={18} />
+                                                <span>{tab.name}</span>
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
 
                                 {/* Content Area */}
                                 <div className="flex-1 flex flex-col min-w-0">
-                                    <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-zinc-800">
+                                    <div className="flex items-center justify-between p-4 md:p-6 border-b border-zinc-200 dark:border-zinc-800">
                                         <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
                                             {tabs[selectedTab].name}
                                         </h3>
@@ -94,7 +91,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                         </button>
                                     </div>
 
-                                    <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+                                    <div className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-thin">
+                                        {/* Tab 0: General (Includes Theme & Preferences) */}
                                         {selectedTab === 0 && (
                                             <div className="space-y-8">
                                                 {/* Theme Section */}
@@ -122,65 +120,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                                         ))}
                                                     </div>
                                                 </section>
-                                            </div>
-                                        )}
 
-                                        {selectedTab === 1 && (
-                                            <div className="space-y-8">
-                                                <section>
-                                                    <h4 className="text-sm font-medium text-zinc-500 mb-4 uppercase tracking-wider">Visible Widgets</h4>
-                                                    <div className="space-y-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl p-2">
-                                                        {Object.keys(settings.dashboard_layout).map((key) => (
-                                                            <div key={key} className="flex items-center justify-between p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700/50 shadow-sm">
-                                                                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 capitalize">
-                                                                    {key.replace('_', ' ')}
-                                                                </span>
-                                                                <label className="relative inline-flex items-center cursor-pointer">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="sr-only peer"
-                                                                        checked={settings.dashboard_layout[key]}
-                                                                        onChange={(e) => updateSettings({
-                                                                            dashboard_layout: {
-                                                                                ...settings.dashboard_layout,
-                                                                                [key]: e.target.checked
-                                                                            }
-                                                                        })}
-                                                                    />
-                                                                    <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                                                </label>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </section>
-                                                <section>
-                                                    <h4 className="text-sm font-medium text-zinc-500 mb-4 uppercase tracking-wider">Integrations</h4>
-                                                    <div className="space-y-2">
-                                                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                                            OpenAI API Key
-                                                        </label>
-                                                        <input
-                                                            type="password"
-                                                            value={settings.preferences.openai_api_key || ''}
-                                                            onChange={(e) => updateSettings({
-                                                                preferences: {
-                                                                    ...settings.preferences,
-                                                                    openai_api_key: e.target.value
-                                                                }
-                                                            })}
-                                                            placeholder="sk-..."
-                                                            className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white"
-                                                        />
-                                                        <p className="text-xs text-zinc-500">
-                                                            Required for AI Chat functionality. Stored securely in your settings.
-                                                        </p>
-                                                    </div>
-                                                </section>
-                                            </div>
-                                        )}
-
-                                        {selectedTab === 2 && (
-                                            <div className="space-y-8">
                                                 <section>
                                                     <h4 className="text-sm font-medium text-zinc-500 mb-4 uppercase tracking-wider">Preferences</h4>
                                                     <div className="space-y-4">
@@ -297,7 +237,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                             </div>
                                         )}
 
-                                        {selectedTab === 3 && (
+                                        {/* Tab 1: Dashboard */}
+                                        {selectedTab === 1 && (
+                                            <div className="space-y-8">
+                                                <section>
+                                                    <h4 className="text-sm font-medium text-zinc-500 mb-4 uppercase tracking-wider">Visible Widgets</h4>
+                                                    <div className="space-y-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl p-2">
+                                                        {Object.keys(settings.dashboard_layout).map((key) => (
+                                                            <div key={key} className="flex items-center justify-between p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700/50 shadow-sm">
+                                                                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 capitalize">
+                                                                    {key.replace('_', ' ')}
+                                                                </span>
+                                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="sr-only peer"
+                                                                        checked={settings.dashboard_layout[key]}
+                                                                        onChange={(e) => updateSettings({
+                                                                            dashboard_layout: {
+                                                                                ...settings.dashboard_layout,
+                                                                                [key]: e.target.checked
+                                                                            }
+                                                                        })}
+                                                                    />
+                                                                    <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </section>
+                                                <section>
+                                                    <h4 className="text-sm font-medium text-zinc-500 mb-4 uppercase tracking-wider">Integrations</h4>
+                                                    <div className="space-y-2">
+                                                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                                            OpenAI API Key
+                                                        </label>
+                                                        <input
+                                                            type="password"
+                                                            value={settings.preferences.openai_api_key || ''}
+                                                            onChange={(e) => updateSettings({
+                                                                preferences: {
+                                                                    ...settings.preferences,
+                                                                    openai_api_key: e.target.value
+                                                                }
+                                                            })}
+                                                            placeholder="sk-..."
+                                                            className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white"
+                                                        />
+                                                        <p className="text-xs text-zinc-500">
+                                                            Required for AI Chat functionality. Stored securely in your settings.
+                                                        </p>
+                                                    </div>
+                                                </section>
+                                            </div>
+                                        )}
+
+                                        {/* Tab 2: Account */}
+                                        {selectedTab === 2 && (
                                             <div className="space-y-8">
                                                 <section>
                                                     <h4 className="text-sm font-medium text-zinc-500 mb-4 uppercase tracking-wider">Account</h4>
