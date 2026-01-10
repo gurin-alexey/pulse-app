@@ -41,20 +41,21 @@ export function useCreateTag() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async (name: string) => {
+        mutationFn: async ({ name, category, color: forcedColor }: { name: string, category?: string, color?: string }) => {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error("User not authenticated")
 
-            // Simple random color generator
+            // Simple random color generator if not provided
             const colors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e']
-            const color = colors[Math.floor(Math.random() * colors.length)]
+            const color = forcedColor || colors[Math.floor(Math.random() * colors.length)]
 
             const { data, error } = await supabase
                 .from('tags')
                 .insert({
                     name,
                     user_id: user.id,
-                    color
+                    color,
+                    category
                 })
                 .select()
                 .single()

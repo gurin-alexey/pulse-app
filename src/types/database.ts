@@ -50,6 +50,7 @@ export type Tag = {
     name: string
     color: string
     user_id: string
+    category?: 'place' | 'energy' | 'time' | 'people' | null
 }
 
 

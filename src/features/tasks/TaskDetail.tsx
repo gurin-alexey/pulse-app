@@ -13,6 +13,7 @@ import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { SubtaskList } from './SubtaskList'
 import { TagManager } from '../tags/TagManager'
+import { CategoryTags } from '../tags/CategoryTags'
 import { ProjectPicker } from './ProjectPicker'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover'
@@ -482,8 +483,8 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                         }}
                     />
 
-                    {/* Tag Manager */}
-                    <TagManager taskId={taskId} />
+                    {/* Categorized Tags (Place, Energy, Time, People) */}
+                    <CategoryTags taskId={taskId} />
 
                     {/* Project Type Toggle (GTD logic) */}
                     <div className="flex items-center gap-2 border-l border-gray-100 pl-4 py-1">

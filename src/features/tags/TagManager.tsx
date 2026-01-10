@@ -44,7 +44,7 @@ export function TagManager({ taskId, readOnly }: TagManagerProps) {
 
     const handleCreateTag = () => {
         if (!filter.trim()) return
-        createTag(filter, {
+        createTag({ name: filter }, {
             onSuccess: (newTag) => {
                 toggleTag({ taskId, tagId: newTag.id, isAttached: false })
                 setFilter('')
