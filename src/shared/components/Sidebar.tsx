@@ -579,64 +579,55 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                     </div>
 
                     {isTagsExpanded && (
-                        <div className="space-y-3 pl-2">
+                        <div className="space-y-1 pl-2">
                             {/* 1. Categorized Tags */}
                             {CATEGORIES.map(category => {
                                 const categoryTags = tags?.filter(t => t.category === category.id) || []
                                 if (categoryTags.length === 0) return null
 
                                 const CatIcon = category.icon
+                                const isCatExpanded = collapsedGroups[`cat-${category.id}`] // Using existing collapsedGroups state for simplicity, or create new if needed.
+
+                                // Actually, use a proper state for this. I'll add a new toggle function below inside the return to keep it simple or reuse toggleGroup if safely namespaced.
+                                // Let's assume we use toggleGroup with a prefix 'cat-'
 
                                 return (
                                     <div key={category.id} className="space-y-0.5">
-                                        <div className="flex items-center gap-2 px-2 py-1 text-xs font-semibold text-gray-500">
+                                        <button
+                                            onClick={() => toggleGroup(`cat-${category.id}`)}
+                                            className="flex items-center gap-2 px-2 py-1 text-xs font-semibold text-gray-500 hover:text-gray-700 w-full text-left transition-colors"
+                                        >
+                                            <ChevronRight
+                                                size={12}
+                                                className={clsx("text-gray-400 transition-transform duration-200", collapsedGroups[`cat-${category.id}`] && "rotate-90")}
+                                            />
                                             <CatIcon size={12} className={category.color} />
                                             {category.label}
-                                        </div>
-                                        {categoryTags.map(tag => (
-                                            <Link
-                                                key={tag.id}
-                                                to={`/tags/${tag.id}`}
-                                                onClick={onItemClick}
-                                                className={clsx(
-                                                    "flex items-center gap-2 px-3 py-1 transition-colors text-sm rounded-md ml-1",
-                                                    activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-600 hover:bg-gray-50/50"
-                                                )}
-                                            >
-                                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
-                                                <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
-                                                    {tag.name}
-                                                </span>
-                                            </Link>
-                                        ))}
+                                        </button>
+
+                                        {collapsedGroups[`cat-${category.id}`] && (
+                                            <div className="pl-3 space-y-0.5 animate-in slide-in-from-top-1 fade-in duration-200">
+                                                {categoryTags.map(tag => (
+                                                    <Link
+                                                        key={tag.id}
+                                                        to={`/tags/${tag.id}`}
+                                                        onClick={onItemClick}
+                                                        className={clsx(
+                                                            "flex items-center gap-2 px-3 py-1 transition-colors text-sm rounded-md",
+                                                            activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-600 hover:bg-gray-50/50"
+                                                        )}
+                                                    >
+                                                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                                                        <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
+                                                            {tag.name}
+                                                        </span>
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             })}
-
-                            {/* 2. Uncategorized Tags */}
-                            {tags?.some(t => !t.category) && (
-                                <div className="space-y-0.5">
-                                    <div className="px-2 py-1 text-xs font-semibold text-gray-400">
-                                        Other
-                                    </div>
-                                    {tags?.filter(t => !t.category).map(tag => (
-                                        <Link
-                                            key={tag.id}
-                                            to={`/tags/${tag.id}`}
-                                            onClick={onItemClick}
-                                            className={clsx(
-                                                "flex items-center gap-2 px-3 py-1 transition-colors text-sm rounded-md ml-1",
-                                                activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-600 hover:bg-gray-50/50"
-                                            )}
-                                        >
-                                            <TagIcon size={14} className="text-gray-400" />
-                                            <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
-                                                {tag.name}
-                                            </span>
-                                        </Link>
-                                    ))}
-                                </div>
-                            )}
 
                             {tags?.length === 0 && (
                                 <div className="px-5 py-2 text-xs text-gray-300 italic">
