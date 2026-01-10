@@ -4,6 +4,7 @@ import { useQueryClient, useIsFetching } from "@tanstack/react-query" // Import 
 
 // ... existing code ...
 
+import { createPortal } from "react-dom"
 import { useState, useRef, useEffect } from "react"
 import clsx from "clsx"
 import { useProjects } from "@/hooks/useProjects"
@@ -236,6 +237,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const [isProjectsExpanded, setIsProjectsExpanded] = useState(false)
     const [isTagsExpanded, setIsTagsExpanded] = useState(false)
     const [activeCategory, setActiveCategory] = useState<string | null>(null)
+    const [menuPosition, setMenuPosition] = useState<{ top: number, left: number } | null>(null)
 
     const { data: tags } = useTags()
 
@@ -438,7 +440,13 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation()
-                                    setActiveCategory(isActive ? null : category.id)
+                                    if (isActive) {
+                                        setActiveCategory(null)
+                                    } else {
+                                        const rect = e.currentTarget.getBoundingClientRect()
+                                        setMenuPosition({ top: rect.bottom, left: rect.left })
+                                        setActiveCategory(category.id)
+                                    }
                                 }}
                                 className={clsx(
                                     "p-2 rounded-lg transition-colors",
@@ -448,44 +456,57 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             >
                                 <CatIcon size={18} />
                             </button>
-
-                            {/* Dropdown Menu */}
-                            {isActive && (
-                                <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 shadow-xl rounded-lg z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-left">
-                                    <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        {category.label}
-                                    </div>
-                                    <div className="max-h-64 overflow-y-auto py-1">
-                                        {categoryTags.length > 0 ? (
-                                            categoryTags.map(tag => (
-                                                <Link
-                                                    key={tag.id}
-                                                    to={`/tags/${tag.id}`}
-                                                    onClick={() => {
-                                                        setActiveCategory(null)
-                                                        if (onItemClick) onItemClick()
-                                                    }}
-                                                    className={clsx(
-                                                        "flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors",
-                                                        activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-700"
-                                                    )}
-                                                >
-                                                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
-                                                    <span className="truncate">{tag.name}</span>
-                                                </Link>
-                                            ))
-                                        ) : (
-                                            <div className="px-3 py-2 text-xs text-gray-400 italic text-center">
-                                                No tags
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )
                 })}
             </div>
+
+            {/* Portal for Dropdown */}
+            {activeCategory && menuPosition && createPortal(
+                <div
+                    className="fixed inset-0 z-[100] bg-transparent"
+                    onClick={() => setActiveCategory(null)}
+                >
+                    <div
+                        className="absolute bg-white border border-gray-200 shadow-xl rounded-lg overflow-hidden animate-in fade-in zoom-in-95 duration-100 w-48"
+                        style={{
+                            top: menuPosition.top + 8,
+                            left: menuPosition.left
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            {CATEGORIES.find(c => c.id === activeCategory)?.label}
+                        </div>
+                        <div className="max-h-64 overflow-y-auto py-1">
+                            {tags?.filter(t => t.category === activeCategory).length! > 0 ? (
+                                tags?.filter(t => t.category === activeCategory).map(tag => (
+                                    <Link
+                                        key={tag.id}
+                                        to={`/tags/${tag.id}`}
+                                        onClick={() => {
+                                            setActiveCategory(null)
+                                            if (onItemClick) onItemClick()
+                                        }}
+                                        className={clsx(
+                                            "flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors",
+                                            activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-700"
+                                        )}
+                                    >
+                                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                                        <span className="truncate">{tag.name}</span>
+                                    </Link>
+                                ))
+                            ) : (
+                                <div className="px-3 py-2 text-xs text-gray-400 italic text-center">
+                                    No tags
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
 
             <div className="mt-12 space-y-0.5">
 
