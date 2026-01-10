@@ -294,14 +294,58 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
             }, [] as (typeof activeTasks[0] & { depth: number })[])
     }
 
-    // Default sorted list for "Grouping" views (just flat sort by order or date)
+    // Default sorted list for "Grouping" views
     const sortedActiveTasks = [...activeTasks].sort((a, b) => {
         const orderDiff = (a.sort_order || 0) - (b.sort_order || 0)
         if (orderDiff !== 0) return orderDiff
         return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
     })
 
-    const tasksForView = useTaskView({ tasks: sortedActiveTasks, showCompleted: false, sortBy, groupBy, projects: allProjects, targetDate })
+    // Special Logic: If we are modifying the view (grouping), some sections should remain as is
+    // User requested "Section Future and Ideas" to remain
+    const preservationKeywords = ['future', 'ideas', 'будущее', 'идеи', 'future', 'idea']
+
+    // 1. Identify Sections to Preserve
+    const preservedSectionIds = new Set(
+        localSections
+            .filter(s => preservationKeywords.some(k => s.name.toLowerCase().includes(k)))
+            .map(s => s.id)
+    )
+
+    // 2. Split tasks
+    const tasksToGroup = sortedActiveTasks.filter(t => !t.section_id || !preservedSectionIds.has(t.section_id))
+    const tasksToPreserve = sortedActiveTasks.filter(t => t.section_id && preservedSectionIds.has(t.section_id))
+
+    // 3. Get Standard Grouped View
+    const groupedStandardTasks = useTaskView({ tasks: tasksToGroup, showCompleted: false, sortBy, groupBy, projects: allProjects, targetDate })
+
+    // 4. Merge Preserved Sections as Groups
+    const tasksForView = useMemo(() => {
+        if (groupBy === 'none') return {} // Not used in this mode
+
+        const result = { ...groupedStandardTasks }
+
+        // Group preserved tasks by their section name
+        const preservedGroups: Record<string, typeof tasksToPreserve> = {}
+
+        tasksToPreserve.forEach(task => {
+            const section = localSections.find(s => s.id === task.section_id)
+            const groupName = section ? section.name : 'Other'
+            if (!preservedGroups[groupName]) preservedGroups[groupName] = []
+            preservedGroups[groupName].push(task)
+        })
+
+        // Sort tasks within these preserved groups (using original sort or manual)
+        // And append to result
+        Object.entries(preservedGroups).forEach(([name, tasks]) => {
+            // We can re-use the hierarchy builder if needed, or just flat list
+            // Let's use simple sort for now to match other logic
+            tasks.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+            result[name] = tasks
+        })
+
+        return result
+    }, [groupedStandardTasks, tasksToPreserve, localSections, groupBy])
     const renderMode = groupBy === 'none' ? 'sections' : 'groups'
 
     const handleTaskClick = (taskId: string) => {
