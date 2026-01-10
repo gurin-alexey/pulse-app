@@ -160,6 +160,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     // ... State declarations remain ...
     const [sortBy, setSortBy] = useState<SortOption>('manual')
     const [groupBy, setGroupBy] = useState<GroupOption>((mode === 'today' || mode === 'tomorrow') ? 'date' : 'none')
+    const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
     const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false)
     const [isAddingSection, setIsAddingSection] = useState(false)
     const [newSectionName, setNewSectionName] = useState("")
@@ -710,10 +711,28 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                                 }
                             }
 
+                            // Determine if this group is collapsed
+                            // Logic: If user has explicitly toggled it, use that state.
+                            // If not toggled yet (undefined), check if it matches "Future" or "Ideas" keywords to default to collapsed (true).
+                            // Otherwise default to expanded (false).
+
+                            const isDefaultCollapsed = ['future', 'ideas', 'будущее', 'идеи', 'future', 'idea'].some(k => groupName.toLowerCase().includes(k))
+                            const isGroupCollapsed = collapsedGroups[groupName] !== undefined ? collapsedGroups[groupName] : isDefaultCollapsed
+
                             return (
                                 <div key={groupName} className="mb-8">
-                                    <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">{groupName} ({visibleTasks.length})</h3>
-                                    {visibleTasks.map((task, index) => renderTaskItem(task, index))}
+                                    <button
+                                        onClick={() => setCollapsedGroups(prev => ({ ...prev, [groupName]: !isGroupCollapsed }))}
+                                        className="flex items-center gap-2 w-full text-left mb-2 group/header focus:outline-none"
+                                    >
+                                        <ChevronRight
+                                            size={16}
+                                            className={clsx("text-gray-400 transition-transform duration-200", !isGroupCollapsed && "rotate-90")}
+                                        />
+                                        <h3 className="text-sm font-bold text-gray-500 uppercase">{groupName} ({visibleTasks.length})</h3>
+                                    </button>
+
+                                    {!isGroupCollapsed && visibleTasks.map((task, index) => renderTaskItem(task, index))}
                                 </div>
                             )
                         })}
