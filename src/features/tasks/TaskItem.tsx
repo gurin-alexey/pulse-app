@@ -1,9 +1,9 @@
 import TextareaAutosize from 'react-textarea-autosize'
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
-import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput } from "lucide-react"
+import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight } from "lucide-react"
 import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion"
@@ -52,39 +52,56 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     // --- SWIPE LOGIC ---
     const controls = useAnimation()
     const x = useMotionValue(0)
-    // Background opacity/scale effects based on drag
-    // 0 to 50px -> opacity 0 to 1
+    const [isOpen, setIsOpen] = useState(false)
+
+    // Background opacity effects based on drag
     const leftActionOpacity = useTransform(x, [0, 50], [0, 1])
     const rightActionOpacity = useTransform(x, [0, -50], [0, 1])
-
-    // Scale effect for icons
-    const leftIconScale = useTransform(x, [0, 80], [0.5, 1])
-    const rightIconScale = useTransform(x, [0, -80], [0.5, 1])
-
-    // Track if we are swiping to disable conflicting interactions
-    const [isSwiping, setIsSwiping] = useState(false)
 
     const handleDragEnd = async (event: any, info: PanInfo) => {
         const offset = info.offset.x
         const velocity = info.velocity.x
 
-        // Thresholds for activation
-        if (offset < -80 || (offset < -10 && velocity < -200)) {
-            // Swiped Left -> Reveal Right Actions (Delete)
-            await controls.start({ x: -120, transition: { type: "spring", stiffness: 300, damping: 30 } })
-        } else if (offset > 80 || (offset > 10 && velocity > 200)) {
-            // Swiped Right -> Reveal Left Actions (Move/Edit)
+        if (offset < -50 || (offset < -10 && velocity < -200)) {
+            // Swiped Left -> Reveal Date Options (Now needing more space)
+            await controls.start({ x: -180, transition: { type: "spring", stiffness: 300, damping: 30 } })
+            setIsOpen(true)
+        } else if (offset > 50 || (offset > 10 && velocity > 200)) {
+            // Swiped Right -> Reveal Project/List Options
             await controls.start({ x: 120, transition: { type: "spring", stiffness: 300, damping: 30 } })
+            setIsOpen(true)
         } else {
-            // Reset to closed
-            await controls.start({ x: 0, transition: { type: "spring", stiffness: 400, damping: 40 } })
+            // Reset
+            await controls.start({ x: 0, transition: { type: "spring", stiffness: 300, damping: 30 } })
+            setIsOpen(false)
         }
-        setIsSwiping(false)
     }
 
     const resetSwipe = () => {
         controls.start({ x: 0 })
+        setIsOpen(false)
     }
+
+    // Close on click outside (simulated by global click listener when open)
+    useEffect(() => {
+        if (!isOpen) return
+
+        const handleClickOutside = () => {
+            resetSwipe()
+        }
+        // Small delay to prevent immediate closing if the click itself was the release
+        const timer = setTimeout(() => {
+            window.addEventListener('click', handleClickOutside)
+            window.addEventListener('touchstart', handleClickOutside)
+        }, 100)
+
+        return () => {
+            clearTimeout(timer)
+            window.removeEventListener('click', handleClickOutside)
+            window.removeEventListener('touchstart', handleClickOutside)
+        }
+    }, [isOpen])
+
     // --- END SWIPE LOGIC ---
 
 
@@ -95,8 +112,10 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const handleTaskClick = (e: React.MouseEvent) => {
         if (isEditing) return
-        // Ignore click if swiped/swiping significantly
-        if (Math.abs(x.get()) > 10) return
+        if (Math.abs(x.get()) > 10 || isOpen) {
+            // If open, let the outside click handler close it, don't navigate
+            return
+        }
         setSearchParams({ task: task.id })
     }
 
@@ -118,35 +137,9 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             (e.currentTarget as HTMLTextAreaElement).blur()
         }
 
-        if (e.altKey) {
-            let newDate: Date | null = null
-            let toastMessage = ""
-
-            switch (e.key) {
-                case '1': // Today
-                    newDate = startOfToday()
-                    toastMessage = "📅 Set to Today"
-                    break
-                case '2': // Tomorrow
-                    newDate = addDays(startOfToday(), 1)
-                    toastMessage = "📅 Set to Tomorrow"
-                    break
-                case '3': // Next Week
-                    newDate = nextMonday(startOfToday())
-                    toastMessage = "📅 Set to Next Week"
-                    break
-                case '0': // Clear
-                    newDate = null
-                    toastMessage = "📅 Date Cleared"
-                    break
-                default:
-                    return
-            }
-
-            e.preventDefault()
-            const dateStr = newDate ? format(newDate, 'yyyy-MM-dd') : null
-            updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-            if (showToasts) toast.success(toastMessage, { duration: 1500 })
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            (e.currentTarget as HTMLTextAreaElement).blur()
         }
     }
 
@@ -182,95 +175,67 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
         return null
     }
 
-    const startMove = (e: any) => {
+    // --- ACTIONS ---
+    const addToProject = (e: any) => {
         e.stopPropagation()
         resetSwipe()
         window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
     }
 
-    const handleDelete = (e: any) => {
+    // Placeholder for "Add to List" - for now behaves like Project or we can add specific logic later
+    const addToList = (e: any) => {
         e.stopPropagation()
         resetSwipe()
-        deleteTask(task.id)
-        if (showToasts) {
-            toast.message("Задача удалена", {
-                description: "Вы можете найти её в корзине",
-                duration: 4000,
-                action: {
-                    label: 'Отменить',
-                    onClick: () => restoreTask.mutate(task.id)
-                }
-            })
-        }
+        // Re-use same search for now as lists/projects are often similar or same entity in some structures
+        window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
     }
 
+    const setDate = (e: any, type: 'today' | 'tomorrow' | 'monday') => {
+        e.stopPropagation()
+        let newDate: Date;
+        let msg = ""
+        switch (type) {
+            case 'today':
+                newDate = startOfToday();
+                msg = "Тогда"
+                break;
+            case 'tomorrow':
+                newDate = addDays(startOfToday(), 1);
+                msg = "Завтра"
+                break;
+            case 'monday':
+                newDate = nextMonday(startOfToday());
+                msg = "Понедельник"
+                break;
+            default:
+                return
+        }
+        updateTask({ taskId: task.id, updates: { due_date: format(newDate, 'yyyy-MM-dd') } })
+        if (showToasts) toast.success(`📅 ${msg}`)
+        resetSwipe()
+    }
+
+
     const menuItems = [
+        // ... (Context menu items needed for desktop/long press)
         {
             label: 'Сегодня',
             icon: <Calendar size={14} className="text-green-500" />,
             onClick: () => {
                 const dateStr = format(startOfToday(), 'yyyy-MM-dd')
                 updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-                if (showToasts) toast.success("📅 Set to Today")
             }
         },
-        {
-            label: 'Завтра',
-            icon: <Calendar size={14} className="text-orange-500" />,
-            onClick: () => {
-                const dateStr = format(addDays(startOfToday(), 1), 'yyyy-MM-dd')
-                updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-                if (showToasts) toast.success("📅 Set to Tomorrow")
-            }
-        },
-        {
-            label: 'Следующая неделя',
-            icon: <Calendar size={14} className="text-blue-500" />,
-            onClick: () => {
-                const dateStr = format(nextMonday(startOfToday()), 'yyyy-MM-dd')
-                updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-                if (showToasts) toast.success("📅 Set to Next Week")
-            }
-        },
-        { type: 'separator' as const },
-        {
-            label: 'Метки',
-            icon: <TagIcon size={14} className="text-gray-400" />,
-            submenu: allTags?.map(tag => {
-                const isAttached = task.tags?.some((t: any) => t.id === tag.id)
-                return {
-                    label: tag.name,
-                    icon: (
-                        <div
-                            className={clsx(
-                                "w-2 h-2 rounded-full",
-                                "ring-2 ring-offset-2 ring-blue-400"
-                            )}
-                            style={{ backgroundColor: tag.color }}
-                        />
-                    ),
-                    onClick: () => toggleTag({ taskId: task.id, tagId: tag.id, isAttached })
-                }
-            })
-        },
-        { type: 'separator' as const },
-        {
-            label: 'Добавить в проект',
-            icon: <MoreHorizontal size={14} className="text-gray-500" />,
-            onClick: () => {
-                window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
-            }
-        },
-        { type: 'separator' as const },
         {
             label: 'Удалить',
             icon: <Trash2 size={14} />,
             variant: 'danger' as const,
-            onClick: () => handleDelete({})
+            onClick: () => {
+                deleteTask(task.id)
+            }
         }
     ]
 
-    // Determine opacity/style for completed
     const containerClasses = clsx(
         "relative flex items-center gap-2 px-2 h-9 bg-white transition-colors w-full select-none box-border border border-transparent z-10",
         isActive ? "bg-gray-100 placeholder:bg-gray-100" : "hover:bg-gray-100/60",
@@ -287,43 +252,65 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             onContextMenu={handleContextMenu}
         >
             {/* SWIPE CONTAINER */}
-            <div className="relative rounded-md overflow-hidden">
+            <div className="relative rounded-md overflow-hidden bg-gray-50">
 
                 {/* --- BACKGROUND ACTIONS --- */}
-                {/* Left Action (For Swipe Right) - Move/Edit */}
+
+                {/* LEFT Actions (Visible when swiping RIGHT) -> Move To... */}
                 <motion.div
                     style={{ opacity: leftActionOpacity }}
-                    className="absolute inset-y-0 left-0 w-[50%] bg-blue-500 flex items-center justify-start px-4 text-white rounded-l-md"
+                    className="absolute inset-y-0 left-0 w-[120px] flex"
                 >
-                    <motion.button
-                        style={{ scale: leftIconScale }}
-                        onClick={startMove} className="flex flex-col items-center gap-1 min-w-[50px]"
+                    <button
+                        onClick={addToProject}
+                        className="flex-1 bg-blue-500 flex flex-col items-center justify-center text-white gap-0.5 active:bg-blue-600"
                     >
-                        <FolderInput size={20} />
-                        <span className="text-[10px] font-bold">Move</span>
-                    </motion.button>
+                        <FolderInput size={16} />
+                        <span className="text-[9px] font-bold">Проект</span>
+                    </button>
+                    <button
+                        onClick={addToList}
+                        className="flex-1 bg-indigo-500 flex flex-col items-center justify-center text-white gap-0.5 border-l border-white/20 active:bg-indigo-600"
+                    >
+                        <List size={16} />
+                        <span className="text-[9px] font-bold">Список</span>
+                    </button>
                 </motion.div>
 
-                {/* Right Action (For Swipe Left) - Delete */}
+                {/* RIGHT Actions (Visible when swiping LEFT) -> Date... */}
                 <motion.div
                     style={{ opacity: rightActionOpacity }}
-                    className="absolute inset-y-0 right-0 w-[50%] bg-red-500 flex items-center justify-end px-4 text-white rounded-r-md"
+                    className="absolute inset-y-0 right-0 w-[180px] flex"
                 >
-                    <motion.button
-                        style={{ scale: rightIconScale }}
-                        onClick={handleDelete} className="flex flex-col items-center gap-1 min-w-[50px]"
+                    <button
+                        onClick={(e) => setDate(e, 'today')}
+                        className="flex-1 bg-green-500 flex flex-col items-center justify-center text-white gap-0.5 border-r border-white/20 active:bg-green-600"
                     >
-                        <Trash2 size={20} />
-                        <span className="text-[10px] font-bold">Delete</span>
-                    </motion.button>
+                        <Calendar size={16} />
+                        <span className="text-[9px] font-bold">Сегодня</span>
+                    </button>
+                    <button
+                        onClick={(e) => setDate(e, 'tomorrow')}
+                        className="flex-1 bg-orange-500 flex flex-col items-center justify-center text-white gap-0.5 border-r border-white/20 active:bg-orange-600"
+                    >
+                        <ArrowRight size={16} />
+                        <span className="text-[9px] font-bold">Завтра</span>
+                    </button>
+                    <button
+                        onClick={(e) => setDate(e, 'monday')}
+                        className="flex-1 bg-purple-500 flex flex-col items-center justify-center text-white gap-0.5 active:bg-purple-600"
+                    >
+                        <Calendar size={16} />
+                        <span className="text-[9px] font-bold">ПН</span>
+                    </button>
                 </motion.div>
 
                 {/* --- FOREGROUND CONTENT (SWIPEABLE) --- */}
                 <motion.div
                     drag={isMobile ? "x" : false} // Only swipe on mobile
                     dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.1}
-                    onDragStart={() => setIsSwiping(true)}
+                    dragElastic={0.05} // Stiffer drag to prevent wobbling
+                    onDragStart={() => setIsOpen(true)}
                     onDragEnd={handleDragEnd}
                     animate={controls}
                     style={{ x }}
