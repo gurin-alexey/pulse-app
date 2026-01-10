@@ -99,10 +99,14 @@ export function Layout() {
       if (taskId) return
 
       const currentX = sidebarX.get()
-      const shouldOpen = currentX > -(drawerWidth / 2) || e.velocity > 0.4
+      const shouldOpen = currentX > -(drawerWidth / 2) || (e.velocity > 0.4 && e.dir === 'Right')
 
       setIsSidebarOpen(shouldOpen)
-      // The useEffect will trigger the snap animation
+
+      // Swipe Left to Open Search
+      if (!isSidebarOpen && e.dir === 'Left' && Math.abs(e.deltaX) > 50) {
+        useCommandStore.getState().setOpen(true)
+      }
     },
     trackMouse: false,
     trackTouch: true,
