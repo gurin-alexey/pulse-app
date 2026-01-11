@@ -2,6 +2,7 @@ import { useAllTasks } from "@/hooks/useAllTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useSettings } from "@/store/useSettings"
 import { useCreateTask } from "@/hooks/useCreateTask"
+import { useTaskOccurrence } from "@/hooks/useTaskOccurrence"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
@@ -31,6 +32,7 @@ export function CalendarPage() {
     const hideNightTime = settings?.preferences?.hide_night_time ?? false
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
+    const { setOccurrenceStatus } = useTaskOccurrence()
     const [_, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
     const calendarRef = useRef<FullCalendar>(null)
@@ -302,8 +304,13 @@ export function CalendarPage() {
         const finalEndTime = isAllDay ? null : (newEnd?.toISOString() || null)
 
         if (mode === 'single') {
-            const newRule = addExDateToRRule(originalTask.recurrence_rule || '', new Date(occurrenceDate))
-            updateTask({ taskId: originalId, updates: { recurrence_rule: newRule } })
+            // Use 'archived' status in task_occurrences to hide the specific instance
+            // keeping the original RRULE clean (no EXDATE clutter)
+            setOccurrenceStatus({
+                taskId: originalId,
+                date: occurrenceDate,
+                status: 'archived'
+            })
 
             createTask({
                 title: originalTask.title,
