@@ -15,6 +15,10 @@ import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useSettings } from "@/store/useSettings"
 import { useTrashActions } from "@/hooks/useTrashActions"
 import { ContextMenu } from "@/shared/components/ContextMenu"
+import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
+import { useCreateTask } from "@/hooks/useCreateTask"
+import { useTaskOccurrence } from "@/hooks/useTaskOccurrence"
+import { addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
 
 interface TaskItemProps {
     task: any
@@ -43,6 +47,12 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     const showToasts = settings?.preferences.show_toast_hints !== false
 
     const isMobile = useMediaQuery("(max-width: 768px)")
+
+    // Recurrence Logic
+    const [recurrenceEditModalOpen, setRecurrenceEditModalOpen] = useState(false)
+    const [pendingDateUpdate, setPendingDateUpdate] = useState<string | null>(null)
+    const { mutate: createTask } = useCreateTask()
+    const { setOccurrenceStatus } = useTaskOccurrence()
 
     // Local state for inline editing
     const [title, setTitle] = useState(task.title)
@@ -143,6 +153,81 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
         }
     }
 
+    const handleRecurrenceUpdateConfirm = (mode: 'single' | 'following' | 'all') => {
+        if (!pendingDateUpdate) return
+
+        // Parse ID if virtual
+        let realTaskId = task.id
+        let occurrenceDate = null
+        if (realTaskId.includes('_recur_')) {
+            const parts = realTaskId.split('_recur_')
+            realTaskId = parts[0]
+            occurrenceDate = parts[1]
+        }
+
+        if (mode === 'single') {
+            if (occurrenceDate) {
+                setOccurrenceStatus({ taskId: realTaskId, date: occurrenceDate, status: 'archived' })
+            }
+            createTask({
+                title: task.title,
+                description: task.description,
+                priority: task.priority,
+                projectId: task.project_id,
+                userId: task.user_id,
+                parentId: task.parent_id,
+                due_date: pendingDateUpdate,
+                // Maintain time if present
+                start_time: task.start_time ? `${pendingDateUpdate}T${task.start_time.split('T')[1]}` : null,
+                end_time: task.end_time ? `${pendingDateUpdate}T${task.end_time.split('T')[1]}` : null,
+            })
+        }
+        else if (mode === 'following') {
+            if (occurrenceDate) {
+                // 1. Truncate old series
+                let splitDateMs = new Date(occurrenceDate).getTime()
+                if (task.start_time) {
+                    const timePart = new Date(task.start_time).toISOString().split('T')[1]
+                    splitDateMs = new Date(`${occurrenceDate}T${timePart}`).getTime()
+                }
+                const prevTime = new Date(splitDateMs - 1000)
+                const oldRuleEnd = addUntilToRRule(task.recurrence_rule || '', prevTime)
+                updateTask({ taskId: realTaskId, updates: { recurrence_rule: oldRuleEnd } })
+
+                // 2. Create NEW series
+                const newStartStr = task.start_time ?
+                    `${pendingDateUpdate}T${task.start_time.split('T')[1]}` :
+                    `${pendingDateUpdate}T00:00:00`
+
+                const newStart = new Date(newStartStr)
+                const newRule = updateDTStartInRRule(task.recurrence_rule || '', newStart)
+
+                createTask({
+                    title: task.title,
+                    description: task.description,
+                    priority: task.priority,
+                    projectId: task.project_id,
+                    userId: task.user_id,
+                    parentId: task.parent_id,
+                    due_date: pendingDateUpdate,
+                    start_time: task.start_time ? newStartStr : null,
+                    end_time: task.end_time ? `${pendingDateUpdate}T${task.end_time.split('T')[1]}` : null,
+                    recurrence_rule: newRule,
+                })
+            } else {
+                // Master task -> Just move it? Or treate as All
+                updateTask({ taskId: realTaskId, updates: { due_date: pendingDateUpdate } })
+            }
+        }
+        else {
+            // All: Update master
+            updateTask({ taskId: realTaskId, updates: { due_date: pendingDateUpdate } })
+        }
+
+        setRecurrenceEditModalOpen(false)
+        setPendingDateUpdate(null)
+    }
+
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault()
         setContextMenu({ x: e.clientX, y: e.clientY })
@@ -210,22 +295,94 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             default:
                 return
         }
-        updateTask({ taskId: task.id, updates: { due_date: format(newDate, 'yyyy-MM-dd') } })
+
+        const dateStr = format(newDate, 'yyyy-MM-dd')
+
+        if (task.recurrence_rule) {
+            setPendingDateUpdate(dateStr)
+            setRecurrenceEditModalOpen(true)
+            resetSwipe()
+            return
+        }
+
+        updateTask({ taskId: task.id, updates: { due_date: dateStr } })
         if (showToasts) toast.success(`📅 ${msg}`)
         resetSwipe()
     }
 
 
     const menuItems = [
-        // ... (Context menu items needed for desktop/long press)
         {
             label: 'Сегодня',
             icon: <Calendar size={14} className="text-green-500" />,
             onClick: () => {
                 const dateStr = format(startOfToday(), 'yyyy-MM-dd')
-                updateTask({ taskId: task.id, updates: { due_date: dateStr } })
+                if (task.recurrence_rule) {
+                    setPendingDateUpdate(dateStr)
+                    setRecurrenceEditModalOpen(true)
+                } else {
+                    updateTask({ taskId: task.id, updates: { due_date: dateStr } })
+                    if (showToasts) toast.success("📅 Перенесено на сегодня")
+                }
             }
         },
+        {
+            label: 'Завтра',
+            icon: <ArrowRight size={14} className="text-orange-500" />,
+            onClick: () => {
+                const tomorrow = addDays(startOfToday(), 1)
+                const dateStr = format(tomorrow, 'yyyy-MM-dd')
+                if (task.recurrence_rule) {
+                    setPendingDateUpdate(dateStr)
+                    setRecurrenceEditModalOpen(true)
+                } else {
+                    updateTask({ taskId: task.id, updates: { due_date: dateStr } })
+                    if (showToasts) toast.success("📅 Перенесено на завтра")
+                }
+            }
+        },
+        {
+            label: 'Ближайший понедельник',
+            icon: <Calendar size={14} className="text-purple-500" />,
+            onClick: () => {
+                const monday = nextMonday(startOfToday())
+                const dateStr = format(monday, 'yyyy-MM-dd')
+                if (task.recurrence_rule) {
+                    setPendingDateUpdate(dateStr)
+                    setRecurrenceEditModalOpen(true)
+                } else {
+                    updateTask({ taskId: task.id, updates: { due_date: dateStr } })
+                    if (showToasts) toast.success("📅 Перенесено на понедельник")
+                }
+            }
+        },
+        { type: 'separator' as const },
+        {
+            label: 'Добавить в проект',
+            icon: <FolderInput size={14} className="text-gray-500" />,
+            onClick: () => {
+                window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
+            }
+        },
+        { type: 'separator' as const },
+        {
+            label: 'Метки',
+            icon: <TagIcon size={14} className="text-gray-400" />,
+            submenu: allTags?.map((tag: any) => ({
+                label: tag.name,
+                icon: (
+                    <div
+                        className={clsx(
+                            "w-2 h-2 rounded-full",
+                            task.tags?.some((t: any) => t.id === tag.id) ? "ring-2 ring-offset-2 ring-blue-400" : ""
+                        )}
+                        style={{ backgroundColor: tag.color }}
+                    />
+                ),
+                onClick: () => toggleTag({ taskId: task.id, tagId: tag.id, isAttached: task.tags?.some((t: any) => t.id === tag.id) })
+            }))
+        },
+        { type: 'separator' as const },
         {
             label: 'Удалить',
             icon: <Trash2 size={14} />,
@@ -434,6 +591,16 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                     items={menuItems as any}
                 />
             )}
+
+            <RecurrenceEditModal
+                isOpen={recurrenceEditModalOpen}
+                onClose={() => {
+                    setRecurrenceEditModalOpen(false)
+                    setPendingDateUpdate(null)
+                }}
+                onConfirm={handleRecurrenceUpdateConfirm}
+                title="Изменение даты повторяющейся задачи"
+            />
         </motion.div>
     )
 }
