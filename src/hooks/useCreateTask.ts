@@ -113,7 +113,7 @@ export function useCreateTask() {
         onSuccess: (_, variables) => {
             // Invalidate to ensure consistency and fetching real ID/DB state
             queryClient.invalidateQueries({ queryKey: ['tasks'] })
-            queryClient.invalidateQueries({ queryKey: ['all-tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
             if (variables.parentId) {
                 queryClient.invalidateQueries({ queryKey: ['subtasks', variables.parentId] })
             }

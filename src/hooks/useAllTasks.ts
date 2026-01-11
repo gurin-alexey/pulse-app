@@ -28,9 +28,10 @@ export async function fetchAllTasks() {
     const occurrences = occurrencesResponse.data as TaskOccurrence[]
 
     // Create a quick lookup map: "taskId_date" -> status
-    const occurrencesMap = new Map<string, string>()
+    // Use plain object for better serialization in React Query cache
+    const occurrencesMap: Record<string, string> = {}
     occurrences.forEach(occ => {
-        occurrencesMap.set(`${occ.task_id}_${occ.original_date}`, occ.status)
+        occurrencesMap[`${occ.task_id}_${occ.original_date.split('T')[0]}`] = occ.status
     })
 
     return { tasks, occurrencesMap }
@@ -38,7 +39,7 @@ export async function fetchAllTasks() {
 
 export function useAllTasks() {
     return useQuery({
-        queryKey: ['all-tasks'],
+        queryKey: ['all-tasks-v2'],
         queryFn: fetchAllTasks,
         // Since we changed the return type, components consuming this need to handle the object structure.
         // Or we can keep returning tasks array but attach occurrences to them? 

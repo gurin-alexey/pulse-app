@@ -93,13 +93,13 @@ export function useUpdateTask() {
         onMutate: async ({ taskId, updates }) => {
             // Cancel outgoing refetches
             await queryClient.cancelQueries({ queryKey: ['task', taskId] })
-            await queryClient.cancelQueries({ queryKey: ['all-tasks'] })
+            await queryClient.cancelQueries({ queryKey: ['all-tasks-v2'] })
             await queryClient.cancelQueries({ queryKey: ['tasks'] })
             await queryClient.cancelQueries({ queryKey: ['subtasks'] })
 
             // Snapshot the previous value
             const previousTask = queryClient.getQueryData<Task>(['task', taskId])
-            const previousAllTasks = queryClient.getQueryData<any>(['all-tasks'])
+            const previousAllTasks = queryClient.getQueryData<any>(['all-tasks-v2'])
 
             // We need to find the task in ANY specific project list to update it optimistically
             // and to know which list to rollback
@@ -223,7 +223,7 @@ export function useUpdateTask() {
 
             // Update All Tasks (Calendar/Global)
             if (previousAllTasks) {
-                queryClient.setQueryData(['all-tasks'], (old: any) => {
+                queryClient.setQueryData(['all-tasks-v2'], (old: any) => {
                     if (!old?.tasks) return old
                     return {
                         ...old,
@@ -255,7 +255,7 @@ export function useUpdateTask() {
                 queryClient.setQueryData(['task', taskId], context.previousTask)
             }
             if (context?.previousAllTasks) {
-                queryClient.setQueryData(['all-tasks'], context.previousAllTasks)
+                queryClient.setQueryData(['all-tasks-v2'], context.previousAllTasks)
             }
             // Rollback all modified lists
             context?.modifiedLists.forEach(({ queryKey, data }) => {
@@ -265,7 +265,7 @@ export function useUpdateTask() {
         onSettled: (_data, _error, { taskId }, context) => {
             queryClient.invalidateQueries({ queryKey: ['task', taskId] })
             queryClient.invalidateQueries({ queryKey: ['tasks'] }) // Invalidate all lists to be safe
-            queryClient.invalidateQueries({ queryKey: ['all-tasks'] }) // Invalidate calendar view
+            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] }) // Invalidate calendar view
 
             // If we have the updated data and it has a parent_id, invalidate that specific subtask list
             // But 'data' arg in onSettled might be undefined if error?

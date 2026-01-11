@@ -14,7 +14,7 @@ export function useTrashActions() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] })
-            queryClient.invalidateQueries({ queryKey: ['all-tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
         }
     })
 

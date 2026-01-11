@@ -27,6 +27,7 @@ interface EventDropArg {
 
 export function DailyPlanner() {
     const { data, isLoading } = useAllTasks()
+
     const tasks = data?.tasks
     const occurrencesMap = data?.occurrencesMap
     const { mutate: updateTask } = useUpdateTask()
@@ -51,7 +52,18 @@ export function DailyPlanner() {
         calendarRef.current?.getApi().today()
     }
 
-    const [showCompleted, setShowCompleted] = useState(false)
+    const [showCompleted, setShowCompleted] = useState(() => {
+        try {
+            const saved = localStorage.getItem('pulse_calendar_show_completed')
+            return saved ? JSON.parse(saved) : false
+        } catch {
+            return false
+        }
+    })
+
+    useEffect(() => {
+        localStorage.setItem('pulse_calendar_show_completed', JSON.stringify(showCompleted))
+    }, [showCompleted])
     const [popup, setPopup] = useState<{ taskId: string, occurrence?: string, x: number, y: number } | null>(null)
 
     // Close popup on escape

@@ -19,12 +19,12 @@ export function useDeleteTask() {
         onMutate: async (taskId) => {
             // Cancel outgoing refetches
             await queryClient.cancelQueries({ queryKey: ['task', taskId] })
-            await queryClient.cancelQueries({ queryKey: ['all-tasks'] })
+            await queryClient.cancelQueries({ queryKey: ['all-tasks-v2'] })
             await queryClient.cancelQueries({ queryKey: ['tasks'] })
             await queryClient.cancelQueries({ queryKey: ['subtasks'] })
 
             // Snapshot previous value
-            const previousAllTasks = queryClient.getQueryData<any>(['all-tasks'])
+            const previousAllTasks = queryClient.getQueryData<any>(['all-tasks-v2'])
 
             // Snapshot all list queries
             const tasksQueries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
@@ -43,7 +43,7 @@ export function useDeleteTask() {
 
             // Update All Tasks (Calendar)
             if (previousAllTasks) {
-                queryClient.setQueryData(['all-tasks'], (old: any) => {
+                queryClient.setQueryData(['all-tasks-v2'], (old: any) => {
                     if (!old?.tasks) return old
                     return {
                         ...old,
@@ -70,14 +70,14 @@ export function useDeleteTask() {
         onError: (_err, _taskId, context) => {
             // Rollback
             if (context?.previousAllTasks) {
-                queryClient.setQueryData(['all-tasks'], context.previousAllTasks)
+                queryClient.setQueryData(['all-tasks-v2'], context.previousAllTasks)
             }
             context?.modifiedLists.forEach(({ queryKey, data }) => {
                 queryClient.setQueryData(queryKey, data)
             })
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['all-tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
             queryClient.invalidateQueries({ queryKey: ['tasks'] })
             queryClient.invalidateQueries({ queryKey: ['subtasks'] })
         },

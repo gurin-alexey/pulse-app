@@ -23,7 +23,7 @@ export function useTaskOccurrence() {
             if (error) throw error
         },
         onSuccess: (_data, { taskId, date }) => {
-            queryClient.invalidateQueries({ queryKey: ['all-tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
             queryClient.invalidateQueries({ queryKey: ['occurrence', taskId, date] })
         }
     })
@@ -39,7 +39,7 @@ export function useTaskOccurrence() {
             if (error) throw error
         },
         onSuccess: (_data, { taskId, date }) => {
-            queryClient.invalidateQueries({ queryKey: ['all-tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
             queryClient.invalidateQueries({ queryKey: ['occurrence', taskId, date] })
         }
     })

@@ -23,14 +23,25 @@ export const generateRecurringInstances = (
     task: Task,
     rangeStart: Date,
     rangeEnd: Date,
-    occurrencesMap?: Map<string, string>
+    occurrencesMap?: Record<string, string> | Map<string, string>
 ) => {
     if (!task.recurrence_rule || !task.due_date) {
         return [task]
     }
 
     try {
-        const dtstart = task.start_time ? new Date(task.start_time) : new Date(task.due_date + 'T00:00:00')
+        let dtstart: Date
+        if (task.start_time) {
+            dtstart = new Date(task.start_time)
+        } else {
+            dtstart = new Date(task.due_date + 'T00:00:00')
+        }
+
+        if (isNaN(dtstart.getTime())) {
+            console.warn('Invalid start date for recurrence', task.id, task.due_date)
+            return [task]
+        }
+
         const rule = getRuleInstance(task.recurrence_rule, dtstart)
 
         const dates = rule.between(rangeStart, rangeEnd, true)
@@ -48,7 +59,13 @@ export const generateRecurringInstances = (
             // Note: date from rrule includes time, we should probably key by date string for safety
             // Actually, DB stores date type, so we need to match date part.
             const lookupKey = `${task.id}_${instanceDueStr}`
-            const status = occurrencesMap?.get(lookupKey)
+            let status: string | undefined
+            if (occurrencesMap instanceof Map) {
+                status = occurrencesMap.get(lookupKey)
+            } else {
+                // Handle case where Map was serialized to Object in cache
+                status = (occurrencesMap as any)?.[lookupKey]
+            }
 
             if (status === 'skipped' || status === 'archived') {
                 return // Skip this instance (don't render it)
