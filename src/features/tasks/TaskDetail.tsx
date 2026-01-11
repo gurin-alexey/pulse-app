@@ -18,7 +18,7 @@ import { useSettings } from '@/store/useSettings'
 import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
-import { addExDateToRRule, addUntilToRRule } from '@/utils/recurrence'
+import { addExDateToRRule, addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
 
 import { ContextMenu } from '@/shared/components/ContextMenu'
 import { SubtaskList } from './SubtaskList'
@@ -26,6 +26,7 @@ import { CategoryTags } from '../tags/CategoryTags'
 import { ProjectPicker } from './ProjectPicker'
 import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
+import { RecurrenceEditModal } from '@/components/ui/date-picker/RecurrenceEditModal'
 
 type TaskDetailProps = {
     taskId: string
@@ -46,6 +47,10 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
 
     const showToasts = settings?.preferences.show_toast_hints !== false
     const [showDeleteRecurrenceModal, setShowDeleteRecurrenceModal] = useState(false)
+
+    // Recurrence Edit (for Description)
+    const [recurrenceEditModalOpen, setRecurrenceEditModalOpen] = useState(false)
+    const [pendingDescription, setPendingDescription] = useState<string | null>(null)
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
@@ -128,9 +133,103 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
         }
     }
 
+    const handleRecurrenceDescriptionConfirm = (mode: 'single' | 'following' | 'all') => {
+        if (!task || pendingDescription === null) return
+
+        if (mode === 'single') {
+            if (occurrenceDateStr) {
+                setOccurrenceStatus({
+                    taskId,
+                    date: occurrenceDateStr,
+                    status: 'archived'
+                })
+
+                let startTime = null
+                let endTime = null
+                if (task.start_time) {
+                    const timePart = new Date(task.start_time).toISOString().split('T')[1]
+                    startTime = `${occurrenceDateStr}T${timePart}`
+                    if (task.end_time) {
+                        const startMs = new Date(task.start_time).getTime()
+                        const endMs = new Date(task.end_time).getTime()
+                        const duration = endMs - startMs
+                        endTime = new Date(new Date(startTime).getTime() + duration).toISOString()
+                    }
+                }
+
+                createTask({
+                    title: task.title,
+                    description: pendingDescription,
+                    priority: task.priority,
+                    projectId: task.project_id,
+                    userId: task.user_id,
+                    parentId: task.parent_id,
+                    due_date: occurrenceDateStr,
+                    start_time: startTime,
+                    end_time: endTime
+                })
+            }
+        }
+        else if (mode === 'following') {
+            if (occurrenceDateStr) {
+                let splitDateMs = new Date(occurrenceDateStr).getTime()
+                if (task.start_time) {
+                    const timePart = new Date(task.start_time).toISOString().split('T')[1]
+                    // We must be careful to use the date part from occurrenceDateStr and time part from master
+                    splitDateMs = new Date(`${occurrenceDateStr}T${timePart}`).getTime()
+                }
+
+                const prevTime = new Date(splitDateMs - 1000)
+                const oldRuleEnd = addUntilToRRule(task.recurrence_rule || '', prevTime)
+                updateTask({ taskId, updates: { recurrence_rule: oldRuleEnd } })
+
+                const newStart = new Date(splitDateMs)
+                const newRule = updateDTStartInRRule(task.recurrence_rule || '', newStart)
+
+                let startTime = null
+                let endTime = null
+                if (task.start_time) {
+                    startTime = newStart.toISOString()
+                    if (task.end_time) {
+                        const startMs = new Date(task.start_time).getTime()
+                        const endMs = new Date(task.end_time).getTime()
+                        const duration = endMs - startMs
+                        endTime = new Date(newStart.getTime() + duration).toISOString()
+                    }
+                }
+
+                createTask({
+                    title: task.title,
+                    description: pendingDescription,
+                    priority: task.priority,
+                    projectId: task.project_id,
+                    userId: task.user_id,
+                    parentId: task.parent_id,
+                    due_date: occurrenceDateStr,
+                    start_time: startTime,
+                    end_time: endTime,
+                    recurrence_rule: newRule
+                })
+            }
+        }
+        else {
+            updateTask({ taskId, updates: { description: pendingDescription } })
+        }
+
+        setRecurrenceEditModalOpen(false)
+        setPendingDescription(null)
+    }
+
     const handleDescriptionBlur = () => {
-        if (task && description !== task.description) {
-            updateTask({ taskId, updates: { description } })
+        if (!task) return
+        if (description !== task.description) {
+            // If recurring AND currently on an occurrence (virtual instance), ask user
+            if (task.recurrence_rule && occurrenceDateStr && occurrence) {
+                setPendingDescription(description)
+                setRecurrenceEditModalOpen(true)
+            } else {
+                updateTask({ taskId, updates: { description } })
+            }
         }
     }
 
@@ -177,7 +276,8 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
 
     const handleDeleteFuture = () => {
         if (!task?.recurrence_rule || !occurrenceDateStr) return
-        const untilDate = subDays(new Date(occurrenceDateStr), 1)
+        // Set until date to the end of the previous day (23:59:59)
+        const untilDate = new Date(new Date(occurrenceDateStr).getTime() - 1000)
         const newRule = addUntilToRRule(task.recurrence_rule, untilDate)
         updateTask({ taskId, updates: { recurrence_rule: newRule } })
         setShowDeleteRecurrenceModal(false)
@@ -573,6 +673,17 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                     />
                 )
             }
+            <RecurrenceEditModal
+                isOpen={recurrenceEditModalOpen}
+                onClose={() => {
+                    setRecurrenceEditModalOpen(false)
+                    setPendingDescription(null)
+                    // Revert description
+                    setDescription(task?.description || '')
+                }}
+                onConfirm={handleRecurrenceDescriptionConfirm}
+                title="Изменение описания повторяющейся задачи"
+            />
             {/* Delete Recurrence Modal */}
             <Transition appear show={showDeleteRecurrenceModal} as={Fragment}>
                 <Dialog as="div" className="relative z-50" onClose={() => setShowDeleteRecurrenceModal(false)}>

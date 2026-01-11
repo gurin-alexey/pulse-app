@@ -324,8 +324,11 @@ export function CalendarPage() {
             })
         }
         else if (mode === 'following') {
-            const prevDay = new Date(new Date(occurrenceDate).getTime() - 86400000)
-            const oldRuleEnd = addUntilToRRule(originalTask.recurrence_rule || '', prevDay)
+            // Set until date to just before the current instance start time
+            // We use info.oldEvent.start to get the precise time of the instance being moved
+            const splitDate = info.oldEvent?.start || new Date(occurrenceDate)
+            const prevTime = new Date(splitDate.getTime() - 1000)
+            const oldRuleEnd = addUntilToRRule(originalTask.recurrence_rule || '', prevTime)
             updateTask({ taskId: originalId, updates: { recurrence_rule: oldRuleEnd } })
 
             const newRule = updateDTStartInRRule(originalTask.recurrence_rule || '', newStart || new Date())
