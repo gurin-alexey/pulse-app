@@ -73,7 +73,7 @@ export function CalendarPage() {
         info: any;
     }>({ isOpen: false, info: null })
 
-    const [showCompleted, setShowCompleted] = useState(true)
+    const [showCompleted, setShowCompleted] = useState(false)
 
     // Refetch events when tasks data changes
     useEffect(() => {
