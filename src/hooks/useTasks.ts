@@ -61,9 +61,14 @@ export async function fetchTasks(filter: TaskFilter) {
 
         const targetDateStr = localDate.toISOString().split('T')[0]
 
-        // Fetch tasks that due on target date OR are recurring (potential candidates)
-        // Use not.is.null syntax for checking non-null recurrence
-        query = query.or(`due_date.eq.${targetDateStr},recurrence_rule.not.is.null`)
+        // Fetch tasks that are due within the target date range OR are recurring
+        // Using range (gte/lte) ensures we catch tasks with time components in due_date
+        // syntax: or(and(due_date.gte.START,due_date.lte.END),recurrence_rule.not.is.null)
+        // Note: Supabase JS client .or() accepts raw PostgREST string
+        const start = `${targetDateStr}T00:00:00`
+        const end = `${targetDateStr}T23:59:59`
+
+        query = query.or(`and(due_date.gte.${start},due_date.lte.${end}),recurrence_rule.not.is.null`)
     } else if (filter.type === 'is_project') {
         query = query
             .eq('is_project', true)
