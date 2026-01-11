@@ -7,7 +7,12 @@ import type { Task } from '@/types/database'
  */
 const getRuleInstance = (recurrenceRule: string, dtstart: Date) => {
     let finalRule = recurrenceRule
-    if (!finalRule.includes('RRULE:') && !finalRule.includes('DTSTART:')) {
+
+    // Strip existing DTSTART lines to ensure we always use the current task date
+    // This prevents "snapping back" when moving a task, as the rule would otherwise keep the old start date
+    finalRule = finalRule.split('\n').filter(line => !line.startsWith('DTSTART')).join('\n')
+
+    if (!finalRule.includes('RRULE:')) {
         finalRule = `RRULE:${finalRule}`
     }
 
@@ -34,7 +39,8 @@ export const generateRecurringInstances = (
         if (task.start_time) {
             dtstart = new Date(task.start_time)
         } else {
-            dtstart = new Date(task.due_date + 'T00:00:00')
+            const dateStr = (task.due_date || '').split('T')[0]
+            dtstart = new Date(dateStr + 'T00:00:00')
         }
 
         if (isNaN(dtstart.getTime())) {

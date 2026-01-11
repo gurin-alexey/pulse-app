@@ -195,7 +195,10 @@ export function DailyPlanner() {
     }
 
     const handleEventDrop = (info: EventDropArg) => {
-        const taskId = info.event.id
+        let taskId = info.event.extendedProps?.originalId || info.event.extendedProps?.original_id || info.event.id
+        if (taskId && taskId.includes('_recur_')) {
+            taskId = taskId.split('_recur_')[0]
+        }
         const isAllDay = info.event.allDay
 
         if (isAllDay && info.event.start) {
@@ -238,7 +241,10 @@ export function DailyPlanner() {
     }
 
     const handleEventResize = (info: any) => {
-        const taskId = info.event.id
+        let taskId = info.event.extendedProps?.originalId || info.event.extendedProps?.original_id || info.event.id
+        if (taskId && taskId.includes('_recur_')) {
+            taskId = taskId.split('_recur_')[0]
+        }
         const newStart = info.event.start?.toISOString() || null
         const newEnd = info.event.end?.toISOString() || null
 
