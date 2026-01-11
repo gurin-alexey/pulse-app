@@ -215,7 +215,8 @@ export function DroppableNavItem({ label, children, className }: { label: string
 // --- Main Sidebar Component ---
 
 export function Sidebar({ activePath, onItemClick }: SidebarProps) {
-    const { data: allTasks } = useAllTasks()
+    const { data } = useAllTasks()
+    const allTasks = data?.tasks
     const { data: projects, isError: projectsError, error: pError } = useProjects()
     if (projectsError) {
         console.error('Projects fetch error:', pError)

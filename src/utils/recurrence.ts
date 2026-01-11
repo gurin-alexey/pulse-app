@@ -19,7 +19,12 @@ const getRuleInstance = (recurrenceRule: string, dtstart: Date) => {
     return rrulestr(finalRule, { forceset: true })
 }
 
-export const generateRecurringInstances = (task: Task, rangeStart: Date, rangeEnd: Date) => {
+export const generateRecurringInstances = (
+    task: Task,
+    rangeStart: Date,
+    rangeEnd: Date,
+    occurrencesMap?: Map<string, string>
+) => {
     if (!task.recurrence_rule || !task.due_date) {
         return [task]
     }
@@ -30,7 +35,25 @@ export const generateRecurringInstances = (task: Task, rangeStart: Date, rangeEn
 
         const dates = rule.between(rangeStart, rangeEnd, true)
 
-        return dates.map((date) => {
+        const activeInstances: any[] = []
+
+        dates.forEach((date) => {
+            const instanceDueStr = [
+                date.getFullYear(),
+                String(date.getMonth() + 1).padStart(2, '0'),
+                String(date.getDate()).padStart(2, '0')
+            ].join('-')
+
+            // Check if there is an exception for this specific date
+            // Note: date from rrule includes time, we should probably key by date string for safety
+            // Actually, DB stores date type, so we need to match date part.
+            const lookupKey = `${task.id}_${instanceDueStr}`
+            const status = occurrencesMap?.get(lookupKey)
+
+            if (status === 'skipped' || status === 'archived') {
+                return // Skip this instance (don't render it)
+            }
+
             let endTimeString = null
             if (task.start_time && task.end_time) {
                 const start = new Date(task.start_time)
@@ -40,13 +63,7 @@ export const generateRecurringInstances = (task: Task, rangeStart: Date, rangeEn
                 endTimeString = newEnd.toISOString()
             }
 
-            const instanceDueStr = [
-                date.getFullYear(),
-                String(date.getMonth() + 1).padStart(2, '0'),
-                String(date.getDate()).padStart(2, '0')
-            ].join('-')
-
-            return {
+            activeInstances.push({
                 ...task,
                 id: `${task.id}_recur_${date.getTime()}`,
                 original_id: task.id,
@@ -54,9 +71,12 @@ export const generateRecurringInstances = (task: Task, rangeStart: Date, rangeEn
                 start_time: task.start_time ? date.toISOString() : null,
                 end_time: endTimeString,
                 is_virtual: true,
-                occurrence_date: date.toISOString()
-            }
+                is_completed: status === 'completed' ? true : task.is_completed, // Allow override
+                occurrence_date: instanceDueStr // Store as YYYY-MM-DD for easy lookup later
+            })
         })
+
+        return activeInstances
 
     } catch (e) {
         console.error('Failed to parse recurrence rule for task', task.id, e)

@@ -1,32 +1,34 @@
-import { useState, useEffect, Fragment, useRef } from 'react'
+import { useState, useEffect, Fragment, useRef, useMemo } from 'react'
 import { Menu, Transition } from '@headlessui/react'
-import { format, isToday } from 'date-fns'
+import { format, isToday, subMonths, addMonths } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import ruLocale from '@fullcalendar/core/locales/ru'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { useAllTasks } from '@/hooks/useAllTasks'
 import { Loader2, Calendar, ArrowLeft, Settings, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import type { DateSelectArg } from "@fullcalendar/core"
+import clsx from 'clsx'
+
+import { useAllTasks } from '@/hooks/useAllTasks'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useCreateTask } from '@/hooks/useCreateTask'
-import { useSearchParams, useNavigate } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
-import type { DateSelectArg } from "@fullcalendar/core"
-import { TaskDetail } from "@/features/tasks/TaskDetail"
-import clsx from 'clsx'
 import { useSettings } from "@/store/useSettings"
+import { supabase } from '@/lib/supabase'
+import { TaskDetail } from "@/features/tasks/TaskDetail"
+import { generateRecurringInstances } from '@/utils/recurrence'
 
-// Manually define the type if it's missing or named differently in this version
+import './calendar.css'
+
 interface EventDropArg {
     event: any
-    // ... other props if needed
 }
-import './calendar.css' // We'll create this for custom styling if needed
-
 
 export function DailyPlanner() {
-    const { data: tasks, isLoading } = useAllTasks()
+    const { data, isLoading } = useAllTasks()
+    const tasks = data?.tasks
+    const occurrencesMap = data?.occurrencesMap
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const [_, setSearchParams] = useSearchParams()
@@ -50,7 +52,7 @@ export function DailyPlanner() {
     }
 
     const [showCompleted, setShowCompleted] = useState(false)
-    const [popup, setPopup] = useState<{ taskId: string, x: number, y: number } | null>(null)
+    const [popup, setPopup] = useState<{ taskId: string, occurrence?: string, x: number, y: number } | null>(null)
 
     // Close popup on escape
     useEffect(() => {
@@ -61,6 +63,60 @@ export function DailyPlanner() {
         return () => window.removeEventListener('keydown', handleEsc)
     }, [])
 
+    const events = useMemo(() => {
+        if (!tasks) return []
+
+        const expandedEvents: any[] = []
+        const rangeStart = subMonths(currentDate, 3)
+        const rangeEnd = addMonths(currentDate, 3)
+
+        tasks.forEach(task => {
+            let instances: any[] = []
+            if (task.recurrence_rule) {
+                instances = generateRecurringInstances(task, rangeStart, rangeEnd, occurrencesMap)
+            } else {
+                instances = [task]
+            }
+
+            instances.forEach(t => {
+                if (!showCompleted && t.is_completed) return
+
+                let start = t.start_time || t.due_date
+                let end = t.end_time
+
+                let bg = '', border = '', text = ''
+                if (t.is_completed) {
+                    bg = '#f3f4f6'; border = '#e5e7eb'; text = '#9ca3af'
+                } else {
+                    switch (t.priority) {
+                        case 'high': bg = '#fee2e2'; border = '#f87171'; text = '#b91c1c'; break;
+                        case 'medium': bg = '#ffedd5'; border = '#fb923c'; text = '#c2410c'; break;
+                        case 'low': bg = '#dbeafe'; border = '#60a5fa'; text = '#1d4ed8'; break;
+                        default: bg = '#f3f4f6'; border = '#9ca3af'; text = '#374151'; break;
+                    }
+                }
+
+                expandedEvents.push({
+                    id: t.id,
+                    title: t.title,
+                    start: start || undefined,
+                    end: end || undefined,
+                    allDay: !t.start_time,
+                    backgroundColor: bg,
+                    borderColor: border,
+                    textColor: text,
+                    classNames: clsx(t.is_completed && "opacity-75 line-through decoration-gray-400"),
+                    extendedProps: {
+                        occurrence: t.occurrence_date,
+                        originalId: t.original_id || t.id
+                    }
+                })
+            })
+        })
+
+        return expandedEvents
+    }, [tasks, occurrencesMap, currentDate, showCompleted])
+
     if (isLoading) {
         return (
             <div className="h-full flex items-center justify-center text-gray-400">
@@ -69,59 +125,6 @@ export function DailyPlanner() {
             </div>
         )
     }
-
-    const filteredTasks = tasks?.filter(t => showCompleted || !t.is_completed) || []
-
-    const events = filteredTasks.map(task => {
-        // Fallback logic: if start_time is missing, try due_date
-        let start = task.start_time || task.due_date
-        let end = task.end_time
-
-        // Match CalendarPage Priority Colors
-        let bg = ''
-        let border = ''
-        let text = ''
-
-        if (task.is_completed) {
-            bg = '#f3f4f6'
-            border = '#e5e7eb'
-            text = '#9ca3af'
-        } else {
-            switch (task.priority) {
-                case 'high':
-                    bg = '#fee2e2' // red-100
-                    border = '#f87171' // red-400
-                    text = '#b91c1c' // red-700
-                    break
-                case 'medium':
-                    bg = '#ffedd5' // orange-100
-                    border = '#fb923c' // orange-400
-                    text = '#c2410c' // orange-700
-                    break
-                case 'low':
-                    bg = '#dbeafe' // blue-100
-                    border = '#60a5fa' // blue-400
-                    text = '#1d4ed8' // blue-700
-                    break
-                default: // none/normal
-                    bg = '#f3f4f6' // gray-100
-                    border = '#9ca3af' // gray-400
-                    text = '#374151' // gray-700
-            }
-        }
-
-        return {
-            id: task.id,
-            title: task.title,
-            start: start || undefined,
-            end: end || undefined,
-            allDay: !task.start_time,
-            backgroundColor: bg,
-            borderColor: border,
-            textColor: text,
-            classNames: clsx(task.is_completed && "opacity-75 line-through decoration-gray-400")
-        }
-    })
 
     const handleDateSelect = async (selectInfo: DateSelectArg) => {
         const calendarApi = selectInfo.view.calendar
@@ -151,11 +154,6 @@ export function DailyPlanner() {
 
         createTask(updates, {
             onSuccess: (newTask) => {
-                // Determine position for popup (center of selection roughly, or just mouse pos if available? Select doesn't give mouse event universally)
-                // Fallback to center screen or just URL param as before? 
-                // Creating new task -> maybe still open sidebar or model? 
-                // User specifically asked for "clicking on a task". 
-                // Let's stick to sidebar for NEW tasks for now to avoid complexity of positioning not from a click.
                 setSearchParams({ task: newTask.id })
             }
         })
@@ -179,10 +177,10 @@ export function DailyPlanner() {
         if (safeY + popupH > winH) safeY = winH - popupH - 20
         if (safeY < 0) safeY = 20
 
-        setPopup({ taskId: info.event.id, x: safeX, y: safeY })
+        const occurrence = info.event.extendedProps?.occurrence
+        const originalId = info.event.extendedProps?.originalId || info.event.id
+        setPopup({ taskId: originalId, occurrence, x: safeX, y: safeY })
     }
-
-    // ... handleEventDrop, handleEventResize same as before ...
 
     const handleEventDrop = (info: EventDropArg) => {
         const taskId = info.event.id
@@ -369,7 +367,7 @@ export function DailyPlanner() {
                             height: 520,
                         }}
                     >
-                        <TaskDetail taskId={popup.taskId} />
+                        <TaskDetail taskId={popup.taskId} occurrenceDate={popup.occurrence} />
                         {/* Close Button Overlay */}
                         <button
                             onClick={() => setPopup(null)}

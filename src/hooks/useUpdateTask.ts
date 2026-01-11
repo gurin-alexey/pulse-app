@@ -99,7 +99,7 @@ export function useUpdateTask() {
 
             // Snapshot the previous value
             const previousTask = queryClient.getQueryData<Task>(['task', taskId])
-            const previousAllTasks = queryClient.getQueryData<Task[]>(['all-tasks'])
+            const previousAllTasks = queryClient.getQueryData<any>(['all-tasks'])
 
             // We need to find the task in ANY specific project list to update it optimistically
             // and to know which list to rollback
@@ -114,7 +114,7 @@ export function useUpdateTask() {
             const seenIds = new Set<string>()
 
             const queries = [
-                previousAllTasks || [],
+                previousAllTasks?.tasks || [],
                 ...(tasksQueries.flatMap(([_, data]) => data || [])),
                 ...(subtasksQueries.flatMap(([_, data]) => data || []))
             ]
@@ -223,13 +223,17 @@ export function useUpdateTask() {
 
             // Update All Tasks (Calendar/Global)
             if (previousAllTasks) {
-                queryClient.setQueryData<Task[]>(['all-tasks'], old =>
-                    old?.map(t => {
-                        if (t.id === taskId) return { ...t, ...positionalUpdates, ...contextualUpdates }
-                        if (descendantIds.includes(t.id)) return { ...t, ...contextualUpdates }
-                        return t
-                    }) || []
-                )
+                queryClient.setQueryData(['all-tasks'], (old: any) => {
+                    if (!old?.tasks) return old
+                    return {
+                        ...old,
+                        tasks: old.tasks.map((t: Task) => {
+                            if (t.id === taskId) return { ...t, ...positionalUpdates, ...contextualUpdates }
+                            if (descendantIds.includes(t.id)) return { ...t, ...contextualUpdates }
+                            return t
+                        })
+                    }
+                })
             }
 
             // Update individual task detail cache

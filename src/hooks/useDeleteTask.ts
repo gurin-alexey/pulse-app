@@ -24,7 +24,7 @@ export function useDeleteTask() {
             await queryClient.cancelQueries({ queryKey: ['subtasks'] })
 
             // Snapshot previous value
-            const previousAllTasks = queryClient.getQueryData<Task[]>(['all-tasks'])
+            const previousAllTasks = queryClient.getQueryData<any>(['all-tasks'])
 
             // Snapshot all list queries
             const tasksQueries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
@@ -43,9 +43,13 @@ export function useDeleteTask() {
 
             // Update All Tasks (Calendar)
             if (previousAllTasks) {
-                queryClient.setQueryData<Task[]>(['all-tasks'], old =>
-                    old ? old.filter(t => t.id !== taskId) : []
-                )
+                queryClient.setQueryData(['all-tasks'], (old: any) => {
+                    if (!old?.tasks) return old
+                    return {
+                        ...old,
+                        tasks: old.tasks.filter((t: Task) => t.id !== taskId)
+                    }
+                })
             }
 
             // Update all found project lists

@@ -24,7 +24,9 @@ import { useSwipeable } from "react-swipeable"
 import { motion, useMotionValue, useTransform, animate } from "framer-motion"
 
 export function CalendarPage() {
-    const { data: tasks, isLoading } = useAllTasks()
+    const { data, isLoading } = useAllTasks()
+    const tasks = data?.tasks
+    const occurrencesMap = data?.occurrencesMap
     const { settings } = useSettings()
     const hideNightTime = settings?.preferences?.hide_night_time ?? false
     const { mutate: updateTask } = useUpdateTask()
@@ -206,7 +208,7 @@ export function CalendarPage() {
             if (!showCompleted && task.is_completed) return
 
             if (task.recurrence_rule) {
-                const instances = generateRecurringInstances(task, start, end)
+                const instances = generateRecurringInstances(task, start, end, occurrencesMap)
                 instances.forEach(instance => {
                     if (!showCompleted && instance.is_completed) return
                     allEvents.push(mapTaskToEvent(instance))

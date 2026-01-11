@@ -1,33 +1,38 @@
 import { useEffect, useState, useRef, Fragment } from 'react'
-import { Menu, Transition } from '@headlessui/react'
+import { Menu, Transition, Dialog } from '@headlessui/react'
 import TextareaAutosize from 'react-textarea-autosize'
+import { toast } from 'sonner'
+import { Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ArrowUp, Flag, Repeat, MoreHorizontal, Tag as TagIcon } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import clsx from 'clsx'
+import { format, subDays } from 'date-fns'
+import { useQuery } from '@tanstack/react-query'
+
+import { supabase } from '@/lib/supabase'
 import { useTask } from '@/hooks/useTask'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useCreateTask } from '@/hooks/useCreateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
-import { toast } from 'sonner'
-import { ContextMenu } from '@/shared/components/ContextMenu'
-import { useTags, useToggleTaskTag } from '@/hooks/useTags'
-import { X, Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ChevronRight, ArrowUp, Flag, Repeat, MoreHorizontal, Tag as TagIcon } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
-import clsx from 'clsx'
-import { SubtaskList } from './SubtaskList'
-import { TagManager } from '../tags/TagManager'
-import { CategoryTags } from '../tags/CategoryTags'
-import { ProjectPicker } from './ProjectPicker'
-import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
-import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover'
-import { format } from 'date-fns'
-import { addExDateToRRule } from '@/utils/recurrence'
-import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { useTrashActions } from '@/hooks/useTrashActions'
 import { useSettings } from '@/store/useSettings'
+import { useTags, useToggleTaskTag } from '@/hooks/useTags'
+import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
+import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
+import { addExDateToRRule, addUntilToRRule } from '@/utils/recurrence'
+
+import { ContextMenu } from '@/shared/components/ContextMenu'
+import { SubtaskList } from './SubtaskList'
+import { CategoryTags } from '../tags/CategoryTags'
+import { ProjectPicker } from './ProjectPicker'
+import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover'
+import { RichTextEditor } from '@/components/ui/RichTextEditor'
 
 type TaskDetailProps = {
     taskId: string
+    occurrenceDate?: string | null
 }
 
-export function TaskDetail({ taskId }: TaskDetailProps) {
+export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const [searchParams, setSearchParams] = useSearchParams()
     const { data: task, isLoading } = useTask(taskId)
     const { mutate: updateTask } = useUpdateTask()
@@ -36,10 +41,13 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const { restoreTask } = useTrashActions()
     const { settings } = useSettings()
 
+    // New hook for handling occurrences
+    const { setOccurrenceStatus, removeOccurrence } = useTaskOccurrence()
+
     const showToasts = settings?.preferences.show_toast_hints !== false
+    const [showDeleteRecurrenceModal, setShowDeleteRecurrenceModal] = useState(false)
 
-
-    // Context Menu State (Moved up)
+    // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
     const { mutate: toggleTag } = useToggleTaskTag()
     const { data: allTags } = useTags()
@@ -55,7 +63,8 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     const [description, setDescription] = useState('')
 
     // Instance handling (for recurrence)
-    const occurrence = searchParams.get('occurrence')
+    const occurrence = occurrenceDate ?? searchParams.get('occurrence')
+    const occurrenceDateStr = occurrence || null
 
     // Sync local state when task loads
     useEffect(() => {
@@ -82,32 +91,38 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
     useEffect(() => {
         return () => {
             const currentParams = new URLSearchParams(window.location.search)
-            // If the URL param 'task' is gone, we are effectively closing the view
-            // OR if we are in a popup (DailyPlanner) and unmounting, we also want to check logic
-            // But relying on URL for popup validity is tricky. 
-            // However, the CRITICAL fix is checking isNewRef.
-
             const closing = !currentParams.get('task')
             const isEmpty = !titleRef.current.trim() && !descriptionRef.current.trim()
 
-            // Only delete if it was explicitly marked as NEW and is empty
             if (closing && isEmpty && isNewRef.current) {
                 deleteTask(taskId)
             }
         }
     }, [taskId])
 
-    const handleClose = () => {
-        const newParams = new URLSearchParams(searchParams)
-        newParams.delete('task')
-        newParams.delete('isNew')
-        newParams.delete('occurrence')
-        setSearchParams(newParams)
-    }
+    // Fetch status for this specific occurrence if it exists
+    const { data: occurrenceData } = useQuery({
+        queryKey: ['occurrence', taskId, occurrenceDateStr],
+        queryFn: async () => {
+            if (!occurrenceDateStr) return null
+            const { data, error } = await supabase
+                .from('task_occurrences')
+                .select('status')
+                .eq('task_id', taskId)
+                .eq('original_date', occurrenceDateStr)
+                .maybeSingle()
+
+            return data
+        },
+        enabled: !!occurrenceDateStr
+    })
+
+    const isInstanceCompleted = occurrenceData?.status === 'completed'
+    // Status logic: if virtual instance, rely on DB record. Default to parent task status if no record.
+    const isCompleted = occurrence ? isInstanceCompleted : task?.is_completed
 
     const handleTitleBlur = () => {
         if (!task) return
-
         if (title !== task.title) {
             updateTask({ taskId, updates: { title } })
         }
@@ -121,10 +136,26 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
     const toggleStatus = () => {
         if (!task) return
-        updateTask({ taskId, updates: { is_completed: !task.is_completed } })
+
+        if (occurrence && occurrenceDateStr) {
+            if (isInstanceCompleted) {
+                // If it was completed, we remove the record -> back to pending (not completed)
+                removeOccurrence({ taskId, date: occurrenceDateStr })
+            } else {
+                // Mark as completed
+                setOccurrenceStatus({ taskId, date: occurrenceDateStr, status: 'completed' })
+            }
+        } else {
+            updateTask({ taskId, updates: { is_completed: !task.is_completed } })
+        }
     }
 
     const handleDelete = () => {
+        if (occurrenceDateStr && task?.recurrence_rule) {
+            setShowDeleteRecurrenceModal(true)
+            return
+        }
+
         deleteTask(taskId)
         if (showToasts) {
             toast.message("Задача удалена", {
@@ -136,6 +167,25 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                 }
             })
         }
+    }
+
+    const handleDeleteInstance = () => {
+        if (!occurrenceDateStr) return
+        setOccurrenceStatus({ taskId, date: occurrenceDateStr, status: 'archived' })
+        setShowDeleteRecurrenceModal(false)
+    }
+
+    const handleDeleteFuture = () => {
+        if (!task?.recurrence_rule || !occurrenceDateStr) return
+        const untilDate = subDays(new Date(occurrenceDateStr), 1)
+        const newRule = addUntilToRRule(task.recurrence_rule, untilDate)
+        updateTask({ taskId, updates: { recurrence_rule: newRule } })
+        setShowDeleteRecurrenceModal(false)
+    }
+
+    const handleDeleteAll = () => {
+        deleteTask(taskId)
+        setShowDeleteRecurrenceModal(false)
     }
 
     const handleDetachInstance = () => {
@@ -292,9 +342,9 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                             {/* Checkbox */}
                             <button
                                 onClick={toggleStatus}
-                                className={clsx("transition-colors shrink-0", t.is_completed ? "text-green-500" : "text-gray-400 hover:text-gray-600")}
+                                className={clsx("transition-colors shrink-0", isCompleted ? "text-green-500" : "text-gray-400 hover:text-gray-600")}
                             >
-                                {t.is_completed ? <CheckSquare size={20} /> : <Square size={20} />}
+                                {isCompleted ? <CheckSquare size={20} /> : <Square size={20} />}
                             </button>
 
                             {/* Divider */}
@@ -523,6 +573,81 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
                     />
                 )
             }
-        </div >
+            {/* Delete Recurrence Modal */}
+            <Transition appear show={showDeleteRecurrenceModal} as={Fragment}>
+                <Dialog as="div" className="relative z-50" onClose={() => setShowDeleteRecurrenceModal(false)}>
+                    <Transition.Child
+                        as={Fragment}
+                        enter="ease-out duration-300"
+                        enterFrom="opacity-0"
+                        enterTo="opacity-100"
+                        leave="ease-in duration-200"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                    >
+                        <div className="fixed inset-0 bg-black/25 backdrop-blur-sm" />
+                    </Transition.Child>
+
+                    <div className="fixed inset-0 overflow-y-auto">
+                        <div className="flex min-h-full items-center justify-center p-4 text-center">
+                            <Transition.Child
+                                as={Fragment}
+                                enter="ease-out duration-300"
+                                enterFrom="opacity-0 scale-95"
+                                enterTo="opacity-100 scale-100"
+                                leave="ease-in duration-200"
+                                leaveFrom="opacity-100 scale-100"
+                                leaveTo="opacity-0 scale-95"
+                            >
+                                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                                    <Dialog.Title
+                                        as="h3"
+                                        className="text-lg font-medium leading-6 text-gray-900"
+                                    >
+                                        Удалить повторяющуюся задачу?
+                                    </Dialog.Title>
+                                    <div className="mt-2">
+                                        <p className="text-sm text-gray-500">
+                                            Это повторяющаяся задача. Вы хотите удалить только это мероприятие или всю серию?
+                                        </p>
+                                    </div>
+
+                                    <div className="mt-6 flex flex-col gap-2">
+                                        <button
+                                            type="button"
+                                            className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                                            onClick={handleDeleteInstance}
+                                        >
+                                            Удалить только эту
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                                            onClick={handleDeleteFuture}
+                                        >
+                                            Эту и последующие
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="inline-flex justify-center rounded-md border border-transparent bg-red-100 px-4 py-2 text-sm font-medium text-red-900 hover:bg-red-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                                            onClick={handleDeleteAll}
+                                        >
+                                            Все мероприятия
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="mt-2 inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+                                            onClick={() => setShowDeleteRecurrenceModal(false)}
+                                        >
+                                            Отмена
+                                        </button>
+                                    </div>
+                                </Dialog.Panel>
+                            </Transition.Child>
+                        </div>
+                    </div>
+                </Dialog>
+            </Transition>
+        </div>
     )
 }
