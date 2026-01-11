@@ -25,6 +25,9 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TaskItem } from "@/features/tasks/TaskItem"
+import { useQuery } from "@tanstack/react-query"
+import { supabase } from "@/lib/supabase"
+import { generateRecurringInstances } from "@/utils/recurrence"
 
 // Draggable Task Item Wrapper
 // Sortable Task Item Wrapper
@@ -109,6 +112,8 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     // Data Hooks
     const { data: allProjects } = useProjects()
 
+
+
     // Determine filter
     const filter: TaskFilter = mode === 'inbox'
         ? { type: 'inbox', includeSubtasks: true }
@@ -148,6 +153,18 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
         }
         return undefined
     }, [mode])
+
+    // Data Hooks
+    // Fetch occurrences for Today/Tomorrow to support Status check and generation
+    const { data: occurrences } = useQuery({
+        queryKey: ['task_occurrences', mode, targetDate],
+        queryFn: async () => {
+            if (!targetDate) return []
+            const { data } = await supabase.from('task_occurrences').select('*').eq('original_date', targetDate)
+            return data || []
+        },
+        enabled: (mode === 'today' || mode === 'tomorrow') && !!targetDate
+    })
 
     // Mutation Hooks
     const { mutate: updateTask } = useUpdateTask()
@@ -208,9 +225,66 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
 
     useEffect(() => {
         if (!isMutatingRef.current && tasks) {
-            setLocalTasks([...tasks].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
+            let processedTasks = [...tasks]
+
+            // For Today/Tomorrow, we must expand recurring tasks
+            if ((mode === 'today' || mode === 'tomorrow') && targetDate && occurrences) {
+                const expanded: any[] = []
+
+                // Create lookup map for occurrences
+                const occurrencesMap = new Map()
+                if (Array.isArray(occurrences)) {
+                    occurrences.forEach((o: any) => {
+                        occurrencesMap.set(`${o.task_id}_${o.original_date}`, o.status)
+                    })
+                }
+
+                // Helper to check if task matches the target date
+                // Tasks from useTasks are either due exactly today OR are recurring
+
+                for (const task of tasks) {
+                    if (task.recurrence_rule) {
+                        try {
+                            // Generate instance for target date
+                            // We use expanded range to avoid edge-case exclusions at 00:00
+                            const start = new Date(targetDate + 'T00:00:00')
+                            start.setMinutes(-15) // small buffer
+
+                            const end = new Date(targetDate + 'T23:59:59')
+                            end.setMinutes(15)
+
+                            // Correct signature: task, start, end, map
+                            const instances = generateRecurringInstances(task, start, end, occurrencesMap)
+                            if (instances.length > 0) {
+                                expanded.push(...instances)
+                            }
+
+                            // Note: If generating instances returns empty, it means the recurrence doesn't occur today.
+                            // So we don't add the master.
+                        } catch (e) {
+                            console.error('Error expanding task recurrence', task.id, e)
+                        }
+                    } else {
+                        // Non-recurring: Must match due_date (ignoring time part if present)
+                        if (task.due_date?.split('T')[0] === targetDate) {
+                            expanded.push(task)
+                        }
+                    }
+                }
+
+                processedTasks = expanded
+            } else if (mode === 'today' || mode === 'tomorrow') {
+                // If occurrences not loaded yet, or if simple list needed?
+                // Just use filtering by due_date for safety if recurrence expansion not ready
+                // But better to wait/show loading? Or show raw?
+                // Showing raw might show old recurring tasks.
+                // We'll trust the filter.
+                processedTasks = processedTasks.filter(t => t.due_date === targetDate && !t.recurrence_rule)
+            }
+
+            setLocalTasks(processedTasks.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
         }
-    }, [tasks])
+    }, [tasks, occurrences, mode, targetDate])
 
     // Derived tasks to use for rendering
     const activeTasks = localTasks.filter((t: any) => !t.is_completed)

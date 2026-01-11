@@ -60,7 +60,10 @@ export async function fetchTasks(filter: TaskFilter) {
         }
 
         const targetDateStr = localDate.toISOString().split('T')[0]
-        query = query.eq('due_date', targetDateStr)
+
+        // Fetch tasks that due on target date OR are recurring (potential candidates)
+        // Use not.is.null syntax for checking non-null recurrence
+        query = query.or(`due_date.eq.${targetDateStr},recurrence_rule.not.is.null`)
     } else if (filter.type === 'is_project') {
         query = query
             .eq('is_project', true)

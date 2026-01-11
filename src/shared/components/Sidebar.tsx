@@ -19,6 +19,7 @@ import { useAllTasks } from "@/hooks/useAllTasks"
 import { useTags } from "@/hooks/useTags"
 import { isToday, isTomorrow, parseISO } from "date-fns"
 import { CATEGORIES } from "@/constants/categories"
+import { generateRecurringInstances } from "@/utils/recurrence"
 
 type SidebarProps = {
     activePath: string
@@ -217,6 +218,43 @@ export function DroppableNavItem({ label, children, className }: { label: string
 export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const { data } = useAllTasks()
     const allTasks = data?.tasks
+    const occurrencesMap = data?.occurrencesMap
+
+    // Calculate Counts for recurring tasks support
+    const getCount = (mode: 'today' | 'tomorrow') => {
+        if (!allTasks) return 0
+
+        const targetDate = new Date()
+        const localDate = new Date(targetDate.getTime() - (targetDate.getTimezoneOffset() * 60000))
+        if (mode === 'tomorrow') {
+            localDate.setDate(localDate.getDate() + 1)
+        }
+        const dateStr = localDate.toISOString().split('T')[0]
+        const rangeStart = new Date(dateStr + 'T00:00:00')
+        rangeStart.setMinutes(-15)
+        const rangeEnd = new Date(dateStr + 'T23:59:59')
+        rangeEnd.setMinutes(15)
+
+        let count = 0
+        for (const task of allTasks) {
+            if (task.recurrence_rule) {
+                try {
+                    const instances = generateRecurringInstances(task, rangeStart, rangeEnd, occurrencesMap as any)
+                    // Must filter by date match because range is buffered
+                    count += instances.filter((i: any) => !i.is_completed && i.due_date === dateStr).length
+                } catch (e) {
+                    console.error(e)
+                }
+            } else {
+                // Ignore time part in due_date match
+                if (!task.is_completed && task.due_date?.split('T')[0] === dateStr) {
+                    count++
+                }
+            }
+        }
+        return count
+    }
+
     const { data: projects, isError: projectsError, error: pError } = useProjects()
     if (projectsError) {
         console.error('Projects fetch error:', pError)
@@ -369,14 +407,14 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
             label: "Today",
             path: "/today",
             icon: Sun,
-            count: allTasks?.filter(t => !t.is_completed && t.due_date && isToday(parseISO(t.due_date))).length,
+            count: getCount('today'),
             droppable: false
         },
         {
             label: "Tomorrow",
             path: "/tomorrow",
             icon: Sunrise, // Distinct icon for Tomorrow
-            count: allTasks?.filter(t => !t.is_completed && t.due_date && isTomorrow(parseISO(t.due_date))).length,
+            count: getCount('tomorrow'),
             droppable: false
         },
         { label: "Calendar", path: "/calendar", icon: Calendar, droppable: false },

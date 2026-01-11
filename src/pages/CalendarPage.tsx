@@ -466,6 +466,29 @@ export function CalendarPage() {
         handleEventClick(arg)
     }
 
+    const renderEventContent = (eventInfo: any) => {
+        // Hide time for all-day events in generic views if needed, but 'timeText' usually handles formatting
+        const { timeText, event } = eventInfo
+
+        // List view handles its own layout mostly, but we can return custom content for the main cell
+        if (eventInfo.view.type.startsWith('list')) {
+            return (
+                <div className="flex items-center gap-2">
+                    <span className="font-medium">{event.title}</span>
+                    {timeText && <span className="text-gray-500 text-xs">({timeText})</span>}
+                </div>
+            )
+        }
+
+        // TimeGrid / DayGrid
+        return (
+            <div className="flex flex-col w-full h-full px-0.5 py-0 leading-none overflow-hidden">
+                <div className="text-xs font-semibold truncate shrink-0 mb-0.5">{event.title}</div>
+                {timeText && <div className="text-[10px] opacity-80 truncate min-h-0 shrink">{timeText}</div>}
+            </div>
+        )
+    }
+
     return (
         <div className="h-full flex flex-col bg-white p-0 md:p-4 relative overflow-hidden">
             <RecurrenceEditModal
@@ -703,6 +726,7 @@ export function CalendarPage() {
                     eventOrder="extendedProps.isCompleted,start,-duration,allDay,title"
                     height="100%"
                     events={handleFetchEvents}
+                    eventContent={renderEventContent}
                     eventDrop={handleEventDrop}
                     eventResize={handleEventResize}
                     eventClick={handleEventClickWrapper}

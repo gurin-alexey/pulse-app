@@ -103,7 +103,7 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                         leaveFrom="opacity-100 translate-y-0"
                         leaveTo="opacity-0 translate-y-1"
                     >
-                        <PopoverPanel className="absolute left-0 z-50 mt-2 w-[320px] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden text-sm font-sans">
+                        <PopoverPanel anchor="bottom start" className="z-50 mt-2 w-[280px] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden text-sm font-sans">
                             {/* [REMOVED] Header Tabs: "Date" vs "Duration" */}
 
                             {/* Quick Actions */}
@@ -113,10 +113,10 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                                     className="flex flex-col items-center gap-1 group"
                                     title="Today"
                                 >
-                                    <div className="w-8 h-8 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
-                                        <Sun size={16} />
+                                    <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
+                                        <Sun size={20} />
                                     </div>
-                                    <span className="text-[10px] text-gray-500 font-medium">Today</span>
+                                    <span className="text-xs text-gray-500 font-medium">Today</span>
                                 </button>
 
                                 <button
@@ -124,10 +124,10 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                                     className="flex flex-col items-center gap-1 group"
                                     title="Tomorrow"
                                 >
-                                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                                        <Sunrise size={16} />
+                                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                                        <Sunrise size={20} />
                                     </div>
-                                    <span className="text-[10px] text-gray-500 font-medium">Tmrw</span>
+                                    <span className="text-xs text-gray-500 font-medium">Tmrw</span>
                                 </button>
 
                                 <button
@@ -135,15 +135,15 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                                     className="flex flex-col items-center gap-1 group"
                                     title="Next Week"
                                 >
-                                    <div className="w-8 h-8 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                                        <CalendarIcon size={16} />
+                                    <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                                        <CalendarIcon size={20} />
                                     </div>
-                                    <span className="text-[10px] text-gray-500 font-medium">Next Wk</span>
+                                    <span className="text-xs text-gray-500 font-medium">Next Wk</span>
                                 </button>
                             </div>
 
                             {/* Calendar Grid */}
-                            <div className="p-4">
+                            <div className="p-3">
                                 {/* Month Header */}
                                 <div className="flex items-center justify-between mb-4">
                                     <button
