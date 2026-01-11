@@ -38,7 +38,7 @@ export function Login() {
                     appearance={{ theme: ThemeSupa }}
                     providers={['google']}
                     theme="light"
-                    redirectTo={`${window.location.origin}`}
+                    redirectTo={`${window.location.origin}/`}
                 />
             </div>
         </div>

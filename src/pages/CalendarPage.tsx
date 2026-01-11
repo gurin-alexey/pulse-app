@@ -290,9 +290,14 @@ export function CalendarPage() {
             return;
         }
 
+        const isAllDay = event.allDay
         const newStart = event.start
         const newEnd = event.end
         const dateStr = newStart ? format(newStart, 'yyyy-MM-dd') : null
+
+        // If it's All Day, we MUST clear the times
+        const finalStartTime = isAllDay ? null : (newStart?.toISOString() || null)
+        const finalEndTime = isAllDay ? null : (newEnd?.toISOString() || null)
 
         if (mode === 'single') {
             const newRule = addExDateToRRule(originalTask.recurrence_rule || '', new Date(occurrenceDate))
@@ -305,8 +310,8 @@ export function CalendarPage() {
                 projectId: originalTask.project_id,
                 userId: originalTask.user_id,
                 due_date: dateStr,
-                start_time: newStart?.toISOString() || null,
-                end_time: newEnd?.toISOString() || null
+                start_time: finalStartTime,
+                end_time: finalEndTime
             })
         }
         else if (mode === 'following') {
@@ -323,8 +328,8 @@ export function CalendarPage() {
                 projectId: originalTask.project_id,
                 userId: originalTask.user_id,
                 due_date: dateStr,
-                start_time: newStart?.toISOString() || null,
-                end_time: newEnd?.toISOString() || null,
+                start_time: finalStartTime,
+                end_time: finalEndTime,
                 recurrence_rule: newRule
             })
         }
@@ -334,8 +339,8 @@ export function CalendarPage() {
             updateTask({
                 taskId: originalId,
                 updates: {
-                    start_time: newStart?.toISOString() || null,
-                    end_time: newEnd?.toISOString() || null,
+                    start_time: finalStartTime,
+                    end_time: finalEndTime,
                     due_date: dateStr,
                     recurrence_rule: newRule
                 }
