@@ -25,6 +25,8 @@ import './calendar.css'
 
 interface EventDropArg {
     event: any
+    oldEvent?: any
+    revert: () => void
 }
 
 export function DailyPlanner() {
