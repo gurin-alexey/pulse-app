@@ -1,5 +1,5 @@
 import React from 'react'
-import { Calendar, ArrowRight, SkipForward, FolderInput, Tag as TagIcon, Trash2 } from 'lucide-react'
+import { Calendar, ArrowRight, SkipForward, FolderInput, Tag as TagIcon, Trash2, Unlink } from 'lucide-react'
 import { format, startOfToday, addDays, nextMonday } from 'date-fns'
 import { toast } from 'sonner'
 import clsx from 'clsx'
@@ -103,6 +103,14 @@ export function useTaskMenu({
                 window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: taskId }))
             }
         },
+        ...(task?.parent_id ? [{
+            label: 'Сделать самостоятельной',
+            icon: <Unlink size={14} className="text-gray-500" />,
+            onClick: () => {
+                updateTask({ taskId, updates: { parent_id: null } })
+                if (showToasts) toast.success("Задача стала самостоятельной")
+            }
+        }] : []),
 
         { type: 'separator' as const },
 
