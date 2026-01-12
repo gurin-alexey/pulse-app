@@ -8,6 +8,7 @@ import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion"
 import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } from "date-fns"
+import { ru } from 'date-fns/locale'
 import { toast } from "sonner"
 
 
@@ -35,9 +36,10 @@ interface TaskItemProps {
     disableAnimation?: boolean
     onIndent?: () => void
     onOutdent?: () => void
+    viewMode?: 'today' | 'tomorrow' | 'inbox' | 'project' | 'all'
 }
 
-export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent }: TaskItemProps) {
+export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent, viewMode }: TaskItemProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
@@ -368,7 +370,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             onContextMenu={handleContextMenu}
         >
             {/* SWIPE CONTAINER */}
-            <div className="relative rounded-md overflow-hidden bg-gray-50">
+            <div className="relative rounded-md overflow-hidden md:overflow-visible bg-gray-50">
 
                 {/* --- BACKGROUND ACTIONS --- */}
 
@@ -438,9 +440,9 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                     <div
                         {...listeners}
                         {...attributes}
-                        className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-gray-600 cursor-move transition-opacity items-center justify-center"
+                        className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing transition-opacity items-center justify-center rounded hover:bg-gray-100/50"
                     >
-                        <GripVertical size={14} />
+                        <GripVertical size={18} />
                     </div>
 
                     {/* Completion Checkbox */}
@@ -520,20 +522,67 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                         )}
 
                         {/* Date/Time */}
-                        {task.due_date && (
-                            <div
-                                className="text-xs tabular-nums cursor-help"
-                                title={format(new Date(task.due_date), 'dd MMM yyyy')}
-                            >
-                                {getRelativeDate(task.due_date)}
-                            </div>
-                        )}
+                        <div className="flex items-center gap-2 text-xs">
+                            {task.start_time && (
+                                <div className={clsx(
+                                    "tabular-nums",
+                                    viewMode === 'today' ? "text-blue-600 font-medium" : "text-gray-500"
+                                )}>
+                                    {(() => {
+                                        const t = task.start_time
+                                        // Handle full ISO strings or dates by trying to parse if it contains 'T' or -
+                                        if (t.includes('T') || t.includes('-')) {
+                                            try {
+                                                return format(new Date(t), 'HH:mm')
+                                            } catch (e) {
+                                                return t.slice(0, 5)
+                                            }
+                                        }
+                                        return t.slice(0, 5)
+                                    })()}
+                                </div>
+                            )}
+
+                            {task.due_date && (() => {
+                                const date = new Date(task.due_date)
+                                const today = startOfToday()
+                                const diff = differenceInCalendarDays(date, today)
+
+                                // Hiding logic
+                                if (viewMode === 'today' && diff === 0) return null
+                                if (viewMode === 'tomorrow' && diff === 1) return null
+
+                                let text = ''
+                                let className = "text-gray-500"
+
+                                if (diff < 0) {
+                                    // Overdue
+                                    text = `${Math.abs(diff)} дн.`
+                                    className = "text-red-500 font-medium"
+                                } else if (diff === 0) {
+                                    text = "Сегодня"
+                                } else if (diff === 1) {
+                                    text = "Завтра"
+                                } else {
+                                    text = `${diff} дн.`
+                                }
+
+                                return (
+                                    <div
+                                        className={clsx("tabular-nums cursor-help", className)}
+                                        title={format(date, 'dd MMM yyyy', { locale: ru })}
+                                    >
+                                        {text}
+                                    </div>
+                                )
+                            })()}
+                        </div>
 
                         {/* Chevron */}
                         <div
                             className={clsx(
                                 "w-6 h-6 flex items-center justify-center cursor-pointer transition-transform hover:bg-gray-200 rounded shrink-0",
-                                !hasChildren && "invisible pointer-events-none",
+                                !hasChildren && "hidden",
                                 isCollapsed ? "" : "rotate-90"
                             )}
                             onClick={(e) => {
