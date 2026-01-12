@@ -20,6 +20,8 @@ import { useCreateTask } from "@/hooks/useCreateTask"
 import { useTaskOccurrence } from "@/hooks/useTaskOccurrence"
 import { addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
 import { useTaskMenu } from '@/hooks/useTaskMenu'
+import { useDeleteRecurrence } from '@/hooks/useDeleteRecurrence'
+import { DeleteRecurrenceModal } from '@/components/ui/date-picker/DeleteRecurrenceModal'
 
 interface TaskItemProps {
     task: any
@@ -58,6 +60,16 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     const isVirtual = task.id.includes('_recur_')
     const realTaskId = isVirtual ? task.id.split('_recur_')[0] : task.id
     const virtualDate = isVirtual ? format(new Date(Number(task.id.split('_recur_')[1])), 'yyyy-MM-dd') : null
+    const targetDate = virtualDate || (task.recurrence_rule ? task.due_date : null)
+
+    // Deletion Modal
+    const [showDeleteRecurrenceModal, setShowDeleteRecurrenceModal] = useState(false)
+    const { handleDeleteInstance, handleDeleteFuture, handleDeleteAll } = useDeleteRecurrence({
+        task,
+        taskId: realTaskId,
+        occurrenceDate: targetDate,
+        onSuccess: () => setShowDeleteRecurrenceModal(false)
+    })
 
     // Local state for inline editing
     const [title, setTitle] = useState(task.title)
@@ -331,7 +343,13 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             setPendingDateUpdate(dateStr)
             setRecurrenceEditModalOpen(true)
         },
-        onDelete: () => deleteTask(realTaskId)
+        onDelete: () => {
+            if (task.recurrence_rule && targetDate) {
+                setShowDeleteRecurrenceModal(true)
+            } else {
+                deleteTask(realTaskId)
+            }
+        }
     })
 
     const containerClasses = clsx(
@@ -548,6 +566,15 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 }}
                 onConfirm={handleRecurrenceUpdateConfirm}
                 title="Изменение даты повторяющейся задачи"
+            />
+
+            <DeleteRecurrenceModal
+                isOpen={showDeleteRecurrenceModal}
+                onClose={() => setShowDeleteRecurrenceModal(false)}
+                onDeleteInstance={handleDeleteInstance}
+                onDeleteFuture={handleDeleteFuture}
+                onDeleteAll={handleDeleteAll}
+                isFirstInstance={task.due_date === targetDate}
             />
         </motion.div>
     )

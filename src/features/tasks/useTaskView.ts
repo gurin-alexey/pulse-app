@@ -126,7 +126,17 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects, t
                     return timeA.localeCompare(timeB)
                 })
 
+                const overdueTasks = filtered.filter(task => {
+                    if (task.is_completed) return false
+                    return task.due_date && task.due_date < targetDate
+                })
+
                 const orderedGroups: Record<string, TaskWithTags[]> = {}
+
+                if (overdueTasks.length > 0) {
+                    orderedGroups['Просрочено'] = organizeByHierarchy(overdueTasks)
+                }
+
                 if (dateGroups['DEADLINE'].length > 0) orderedGroups['DEADLINE'] = organizeByHierarchy(dateGroups['DEADLINE'], tasksMap)
                 if (dateGroups['CALENDAR'].length > 0) orderedGroups['CALENDAR'] = organizeByHierarchy(dateGroups['CALENDAR'], tasksMap)
                 if (dateGroups['ALL DAY'].length > 0) orderedGroups['ALL DAY'] = organizeByHierarchy(dateGroups['ALL DAY'], tasksMap)

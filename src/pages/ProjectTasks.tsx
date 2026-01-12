@@ -265,8 +265,12 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                             console.error('Error expanding task recurrence', task.id, e)
                         }
                     } else {
-                        // Non-recurring: Must match due_date (ignoring time part if present)
-                        if (task.due_date?.split('T')[0] === targetDate) {
+                        // Non-recurring: Match target date OR overdue (if today)
+                        const d = task.due_date?.split('T')[0]
+                        const isMatch = d === targetDate
+                        const isOverdue = mode === 'today' && d && targetDate && d < targetDate && !task.is_completed
+
+                        if (isMatch || isOverdue) {
                             expanded.push(task)
                         }
                     }
@@ -279,7 +283,12 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 // But better to wait/show loading? Or show raw?
                 // Showing raw might show old recurring tasks.
                 // We'll trust the filter.
-                processedTasks = processedTasks.filter(t => t.due_date === targetDate && !t.recurrence_rule)
+                processedTasks = processedTasks.filter(t => {
+                    const d = t.due_date?.split('T')[0]
+                    const isMatch = d === targetDate
+                    const isOverdue = mode === 'today' && d && targetDate && d < targetDate && !t.is_completed
+                    return (isMatch || isOverdue) && !t.recurrence_rule
+                })
             }
 
             setLocalTasks(processedTasks.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))

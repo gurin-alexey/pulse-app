@@ -53,12 +53,15 @@ export function useTaskMenu({
         }
     }
 
+    const todayStr = format(startOfToday(), 'yyyy-MM-dd')
+    const currentTaskDate = finalOccurrenceDate || task?.due_date
+
     const menuItems = [
-        {
+        ...(currentTaskDate !== todayStr ? [{
             label: 'Сегодня',
             icon: <Calendar size={14} className="text-green-500" />,
             onClick: () => handleDateAction(startOfToday(), "📅 Перенесено на сегодня")
-        },
+        }] : []),
         {
             label: 'Завтра',
             icon: <ArrowRight size={14} className="text-orange-500" />,

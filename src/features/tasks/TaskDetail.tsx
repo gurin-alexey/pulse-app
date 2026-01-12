@@ -20,6 +20,8 @@ import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import { addExDateToRRule, addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
 import { useTaskMenu } from '@/hooks/useTaskMenu'
+import { useDeleteRecurrence } from '@/hooks/useDeleteRecurrence'
+import { DeleteRecurrenceModal } from '@/components/ui/date-picker/DeleteRecurrenceModal'
 
 import { ContextMenu } from '@/shared/components/ContextMenu'
 import { SubtaskList } from './SubtaskList'
@@ -358,25 +360,12 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
         }
     }
 
-    const handleDeleteInstance = () => {
-        if (!occurrenceDateStr) return
-        setOccurrenceStatus({ taskId: realTaskId, date: occurrenceDateStr, status: 'archived' })
-        setShowDeleteRecurrenceModal(false)
-    }
-
-    const handleDeleteFuture = () => {
-        if (!task?.recurrence_rule || !occurrenceDateStr) return
-        // Set until date to the end of the previous day (23:59:59)
-        const untilDate = new Date(new Date(occurrenceDateStr).getTime() - 1000)
-        const newRule = addUntilToRRule(task.recurrence_rule, untilDate)
-        updateTask({ taskId: realTaskId, updates: { recurrence_rule: newRule } })
-        setShowDeleteRecurrenceModal(false)
-    }
-
-    const handleDeleteAll = () => {
-        deleteTask(realTaskId)
-        setShowDeleteRecurrenceModal(false)
-    }
+    const { handleDeleteInstance, handleDeleteFuture, handleDeleteAll } = useDeleteRecurrence({
+        task,
+        taskId: realTaskId,
+        occurrenceDate: occurrenceDateStr,
+        onSuccess: () => setShowDeleteRecurrenceModal(false)
+    })
 
     const handleDetachInstance = () => {
         if (!task || !occurrence) return
@@ -746,80 +735,14 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 title={recurrenceAction === 'date-time' ? "Изменение времени повторяющейся задачи" : "Изменение описания повторяющейся задачи"}
             />
             {/* Delete Recurrence Modal */}
-            <Transition appear show={showDeleteRecurrenceModal} as={Fragment}>
-                <Dialog as="div" className="relative z-50" onClose={() => setShowDeleteRecurrenceModal(false)}>
-                    <Transition.Child
-                        as={Fragment}
-                        enter="ease-out duration-300"
-                        enterFrom="opacity-0"
-                        enterTo="opacity-100"
-                        leave="ease-in duration-200"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
-                    >
-                        <div className="fixed inset-0 bg-black/25 backdrop-blur-sm" />
-                    </Transition.Child>
-
-                    <div className="fixed inset-0 overflow-y-auto">
-                        <div className="flex min-h-full items-center justify-center p-4 text-center">
-                            <Transition.Child
-                                as={Fragment}
-                                enter="ease-out duration-300"
-                                enterFrom="opacity-0 scale-95"
-                                enterTo="opacity-100 scale-100"
-                                leave="ease-in duration-200"
-                                leaveFrom="opacity-100 scale-100"
-                                leaveTo="opacity-0 scale-95"
-                            >
-                                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
-                                    <Dialog.Title
-                                        as="h3"
-                                        className="text-lg font-medium leading-6 text-gray-900"
-                                    >
-                                        Удалить повторяющуюся задачу?
-                                    </Dialog.Title>
-                                    <div className="mt-2">
-                                        <p className="text-sm text-gray-500">
-                                            Это повторяющаяся задача. Вы хотите удалить только это мероприятие или всю серию?
-                                        </p>
-                                    </div>
-
-                                    <div className="mt-6 flex flex-col gap-2">
-                                        <button
-                                            type="button"
-                                            className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                                            onClick={handleDeleteInstance}
-                                        >
-                                            Удалить только эту
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                                            onClick={handleDeleteFuture}
-                                        >
-                                            Эту и последующие
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="inline-flex justify-center rounded-md border border-transparent bg-red-100 px-4 py-2 text-sm font-medium text-red-900 hover:bg-red-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-                                            onClick={handleDeleteAll}
-                                        >
-                                            Все мероприятия
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="mt-2 inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
-                                            onClick={() => setShowDeleteRecurrenceModal(false)}
-                                        >
-                                            Отмена
-                                        </button>
-                                    </div>
-                                </Dialog.Panel>
-                            </Transition.Child>
-                        </div>
-                    </div>
-                </Dialog>
-            </Transition>
+            <DeleteRecurrenceModal
+                isOpen={showDeleteRecurrenceModal}
+                onClose={() => setShowDeleteRecurrenceModal(false)}
+                onDeleteInstance={handleDeleteInstance}
+                onDeleteFuture={handleDeleteFuture}
+                onDeleteAll={handleDeleteAll}
+                isFirstInstance={task?.due_date === occurrenceDateStr}
+            />
         </div>
     )
 }

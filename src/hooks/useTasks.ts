@@ -68,7 +68,11 @@ export async function fetchTasks(filter: TaskFilter) {
         const start = `${targetDateStr}T00:00:00`
         const end = `${targetDateStr}T23:59:59`
 
-        query = query.or(`and(due_date.gte.${start},due_date.lte.${end}),recurrence_rule.not.is.null`)
+        if (filter.type === 'today') {
+            query = query.or(`and(due_date.lt.${start},is_completed.eq.false),and(due_date.gte.${start},due_date.lte.${end}),recurrence_rule.not.is.null`)
+        } else {
+            query = query.or(`and(due_date.gte.${start},due_date.lte.${end}),recurrence_rule.not.is.null`)
+        }
     } else if (filter.type === 'is_project') {
         query = query
             .eq('is_project', true)
