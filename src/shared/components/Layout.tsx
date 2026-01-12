@@ -76,7 +76,7 @@ export function Layout() {
 
   const swipeHandlers = useSwipeable({
     onSwiping: (e) => {
-      if (isDesktop) return
+      if (isDesktop || isCalendarPage) return
       const target = e.event.target as HTMLElement
       // Prevent sidebar swipe if interacting with a task or if dragging section
       if (target.closest('[data-task-swipe-area="true"]')) return
@@ -94,7 +94,7 @@ export function Layout() {
       sidebarX.set(nextX)
     },
     onSwiped: (e) => {
-      if (isDesktop) return
+      if (isDesktop || isCalendarPage) return
       const target = e.event.target as HTMLElement
       if (target.closest('[data-task-swipe-area="true"]')) return
       if (taskId) return
@@ -136,7 +136,7 @@ export function Layout() {
   const isTrash = location.pathname === '/trash'
   const isTag = location.pathname.startsWith('/tags/')
 
-  const mobileTitle = isCalendarPage ? "Calendar"
+  const mobileTitle = isCalendarPage ? null
     : isInbox ? "Inbox"
       : isToday ? "Today"
         : isTomorrow ? "Tomorrow"
@@ -247,7 +247,7 @@ export function Layout() {
     >
       <div {...swipeHandlers} className="flex h-screen overflow-hidden bg-gray-50 flex-col md:flex-row">
         {/* Mobile Top Header */}
-        <header className="md:hidden h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-30 pt-[env(safe-area-inset-top)]">
+        <header className="md:hidden h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-[60] pt-[env(safe-area-inset-top)]">
           <button
             onClick={() => setIsSidebarOpen(true)}
             className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg"
@@ -282,12 +282,12 @@ export function Layout() {
           <>
             <motion.div
               style={{ opacity: backdropOpacity, pointerEvents: backdropPointerEvents }}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[90] md:hidden"
               onClick={() => setIsSidebarOpen(false)}
             />
             <motion.aside
               style={{ x: sidebarX }}
-              className="fixed inset-y-0 left-0 w-[280px] bg-white z-50 md:hidden flex flex-col shadow-2xl"
+              className="fixed inset-y-0 left-0 w-[280px] bg-white z-[100] md:hidden flex flex-col shadow-2xl"
             >
               <div className="p-4 border-b border-gray-100 flex items-center justify-between h-16 shrink-0 pt-[env(safe-area-inset-top)]">
                 <div className="flex items-center gap-3">

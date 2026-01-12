@@ -11,7 +11,7 @@ import multiMonthPlugin from "@fullcalendar/multimonth"
 import listPlugin from "@fullcalendar/list"
 import ruLocale from '@fullcalendar/core/locales/ru'
 import { useSearchParams, useNavigate } from "react-router-dom"
-import { Loader2, Settings, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowLeft, ArrowRight } from "lucide-react"
+import { Loader2, Settings, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowLeft, ArrowRight, Check } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
 import { useState, useEffect, useRef, Fragment } from "react"
@@ -587,29 +587,29 @@ export function CalendarPage() {
 
             {/* Mobile Header Portals */}
             {isMobile && mounted && document.getElementById('mobile-header-title') && createPortal(
-                <div className="flex items-center justify-center gap-1">
-                    <button
-                        onClick={headerGoPrev}
-                        className="p-1 text-gray-400 hover:text-gray-600 active:scale-95 transition-transform"
-                    >
-                        <ChevronLeft size={20} />
-                    </button>
+                <div className="flex items-center justify-center">
+                    <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm divide-x divide-gray-200">
+                        <button
+                            onClick={headerGoPrev}
+                            className="py-2 px-5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-l-lg active:bg-gray-100 transition-all"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
 
-                    <button
-                        onClick={headerGoToday}
-                        className="text-lg truncate flex items-center active:opacity-70 transition-opacity mx-1"
-                    >
-                        <span className="font-medium text-gray-500 mr-1.5">сегодня</span>
-                        <span className="font-bold text-gray-900">{format(new Date(), 'd MMMM', { locale: ru })}</span>
-                        <span className="font-medium text-gray-500">, {format(new Date(), 'EEEE', { locale: ru }).toLowerCase()}</span>
-                    </button>
+                        <button
+                            onClick={headerGoToday}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                        >
+                            Сегодня
+                        </button>
 
-                    <button
-                        onClick={headerGoNext}
-                        className="p-1 text-gray-400 hover:text-gray-600 active:scale-95 transition-transform"
-                    >
-                        <ChevronRight size={20} />
-                    </button>
+                        <button
+                            onClick={headerGoNext}
+                            className="py-2 px-5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-r-lg active:bg-gray-100 transition-all"
+                        >
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
                 </div>,
                 document.getElementById('mobile-header-title')!
             )}
@@ -647,34 +647,37 @@ export function CalendarPage() {
                                     )}
                                 </Menu.Item>
                             </div>
+                            <div className="p-2 border-t border-gray-100">
+                                <div className="px-2 py-1.5">
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Вид</p>
+                                </div>
+                                {[
+                                    { id: 'timeGridDay', label: '1 День' },
+                                    { id: 'threeDay', label: '3 Дня' },
+                                    { id: 'timeGridWeek', label: 'Неделя' }
+                                ].map(view => (
+                                    <Menu.Item key={view.id}>
+                                        {({ active }) => (
+                                            <button
+                                                onClick={() => headerChangeView(view.id)}
+                                                className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition-colors ${active ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+                                            >
+                                                <span className={currentViewType === view.id ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                                                    {view.label}
+                                                </span>
+                                                {currentViewType === view.id && <Check size={16} className="text-blue-600" />}
+                                            </button>
+                                        )}
+                                    </Menu.Item>
+                                ))}
+                            </div>
                         </Menu.Items>
                     </Transition>
                 </Menu>,
                 document.getElementById('mobile-header-right')!
             )}
 
-            {isMobile && (
-                <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 shadow-xl bg-white p-1.5 rounded-2xl border border-gray-100 flex gap-1 w-auto min-w-[280px]">
-                    <button
-                        onClick={() => headerChangeView('timeGridDay')}
-                        className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentViewType === 'timeGridDay' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-                    >
-                        1 День
-                    </button>
-                    <button
-                        onClick={() => headerChangeView('threeDay')}
-                        className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentViewType === 'threeDay' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-                    >
-                        3 Дня
-                    </button>
-                    <button
-                        onClick={() => headerChangeView('timeGridWeek')}
-                        className={`flex-1 px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentViewType === 'timeGridWeek' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-                    >
-                        Неделя
-                    </button>
-                </div>
-            )}
+
 
             <motion.div
                 ref={(node) => {
@@ -700,10 +703,12 @@ export function CalendarPage() {
                             type: 'timeGrid',
                             duration: { days: 3 },
                             buttonText: '3 Дня',
-                            titleFormat: { month: 'short', day: 'numeric' }
+                            titleFormat: { month: 'short', day: 'numeric' },
+                            dayHeaderFormat: { weekday: 'short', month: 'numeric', day: 'numeric', omitCommas: false }
                         },
                         timeGridDay: {
-                            titleFormat: { month: 'long', day: 'numeric' }
+                            titleFormat: { month: 'long', day: 'numeric' },
+                            dayHeaderFormat: { weekday: 'long', month: 'long', day: 'numeric', omitCommas: false }
                         },
                         timeGridWeek: {
                             titleFormat: { month: 'short', day: 'numeric' }
