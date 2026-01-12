@@ -24,6 +24,7 @@ export function useTaskOccurrence() {
         },
         onSuccess: (_data, { taskId, date }) => {
             queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
+            queryClient.invalidateQueries({ queryKey: ['task_occurrences'] })
             queryClient.invalidateQueries({ queryKey: ['occurrence', taskId, date] })
         }
     })

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
-import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight } from "lucide-react"
+import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight, Repeat, SkipForward } from "lucide-react"
 import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion"
@@ -19,6 +19,7 @@ import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditM
 import { useCreateTask } from "@/hooks/useCreateTask"
 import { useTaskOccurrence } from "@/hooks/useTaskOccurrence"
 import { addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
+import { useTaskMenu } from '@/hooks/useTaskMenu'
 
 interface TaskItemProps {
     task: any
@@ -52,7 +53,11 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     const [recurrenceEditModalOpen, setRecurrenceEditModalOpen] = useState(false)
     const [pendingDateUpdate, setPendingDateUpdate] = useState<string | null>(null)
     const { mutate: createTask } = useCreateTask()
-    const { setOccurrenceStatus } = useTaskOccurrence()
+    const { setOccurrenceStatus, removeOccurrence } = useTaskOccurrence()
+
+    const isVirtual = task.id.includes('_recur_')
+    const realTaskId = isVirtual ? task.id.split('_recur_')[0] : task.id
+    const virtualDate = isVirtual ? format(new Date(Number(task.id.split('_recur_')[1])), 'yyyy-MM-dd') : null
 
     // Local state for inline editing
     const [title, setTitle] = useState(task.title)
@@ -131,12 +136,20 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const toggleStatus = (e?: React.MouseEvent | React.TouchEvent) => {
         e?.stopPropagation()
-        updateTask({ taskId: task.id, updates: { is_completed: !task.is_completed } })
+        if (isVirtual && virtualDate) {
+            if (task.is_completed) {
+                removeOccurrence({ taskId: realTaskId, date: virtualDate })
+            } else {
+                setOccurrenceStatus({ taskId: realTaskId, date: virtualDate, status: 'completed' })
+            }
+        } else {
+            updateTask({ taskId: realTaskId, updates: { is_completed: !task.is_completed } })
+        }
     }
 
     const saveTitle = () => {
         if (title.trim() !== task.title) {
-            updateTask({ taskId: task.id, updates: { title: title.trim() } })
+            updateTask({ taskId: realTaskId, updates: { title: title.trim() } })
         }
         setIsEditing(false)
     }
@@ -305,93 +318,21 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             return
         }
 
-        updateTask({ taskId: task.id, updates: { due_date: dateStr } })
+        updateTask({ taskId: realTaskId, updates: { due_date: dateStr } })
         if (showToasts) toast.success(`📅 ${msg}`)
         resetSwipe()
     }
 
 
-    const menuItems = [
-        {
-            label: 'Сегодня',
-            icon: <Calendar size={14} className="text-green-500" />,
-            onClick: () => {
-                const dateStr = format(startOfToday(), 'yyyy-MM-dd')
-                if (task.recurrence_rule) {
-                    setPendingDateUpdate(dateStr)
-                    setRecurrenceEditModalOpen(true)
-                } else {
-                    updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-                    if (showToasts) toast.success("📅 Перенесено на сегодня")
-                }
-            }
+    const menuItems = useTaskMenu({
+        task,
+        taskId: realTaskId,
+        onDateChangeRequest: (dateStr) => {
+            setPendingDateUpdate(dateStr)
+            setRecurrenceEditModalOpen(true)
         },
-        {
-            label: 'Завтра',
-            icon: <ArrowRight size={14} className="text-orange-500" />,
-            onClick: () => {
-                const tomorrow = addDays(startOfToday(), 1)
-                const dateStr = format(tomorrow, 'yyyy-MM-dd')
-                if (task.recurrence_rule) {
-                    setPendingDateUpdate(dateStr)
-                    setRecurrenceEditModalOpen(true)
-                } else {
-                    updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-                    if (showToasts) toast.success("📅 Перенесено на завтра")
-                }
-            }
-        },
-        {
-            label: 'Ближайший понедельник',
-            icon: <Calendar size={14} className="text-purple-500" />,
-            onClick: () => {
-                const monday = nextMonday(startOfToday())
-                const dateStr = format(monday, 'yyyy-MM-dd')
-                if (task.recurrence_rule) {
-                    setPendingDateUpdate(dateStr)
-                    setRecurrenceEditModalOpen(true)
-                } else {
-                    updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-                    if (showToasts) toast.success("📅 Перенесено на понедельник")
-                }
-            }
-        },
-        { type: 'separator' as const },
-        {
-            label: 'Добавить в проект',
-            icon: <FolderInput size={14} className="text-gray-500" />,
-            onClick: () => {
-                window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
-            }
-        },
-        { type: 'separator' as const },
-        {
-            label: 'Метки',
-            icon: <TagIcon size={14} className="text-gray-400" />,
-            submenu: allTags?.map((tag: any) => ({
-                label: tag.name,
-                icon: (
-                    <div
-                        className={clsx(
-                            "w-2 h-2 rounded-full",
-                            task.tags?.some((t: any) => t.id === tag.id) ? "ring-2 ring-offset-2 ring-blue-400" : ""
-                        )}
-                        style={{ backgroundColor: tag.color }}
-                    />
-                ),
-                onClick: () => toggleTag({ taskId: task.id, tagId: tag.id, isAttached: task.tags?.some((t: any) => t.id === tag.id) })
-            }))
-        },
-        { type: 'separator' as const },
-        {
-            label: 'Удалить',
-            icon: <Trash2 size={14} />,
-            variant: 'danger' as const,
-            onClick: () => {
-                deleteTask(task.id)
-            }
-        }
-    ]
+        onDelete: () => deleteTask(realTaskId)
+    })
 
     const containerClasses = clsx(
         "relative flex items-center gap-2 px-2 h-9 bg-white transition-colors w-full select-none box-border border border-transparent z-10",
@@ -550,6 +491,13 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                                         {isMobile ? tag.name.slice(0, 4) : tag.name}
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Recurrence Icon */}
+                        {task.recurrence_rule && (
+                            <div className="flex items-center justify-center text-gray-400" title="Повторяющаяся задача">
+                                <Repeat size={14} />
                             </div>
                         )}
 

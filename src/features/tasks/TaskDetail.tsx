@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, Fragment } from 'react'
 import { Menu, Transition, Dialog } from '@headlessui/react'
 import TextareaAutosize from 'react-textarea-autosize'
 import { toast } from 'sonner'
-import { Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ArrowUp, Flag, Repeat, MoreHorizontal, Tag as TagIcon, FolderInput, ArrowRight } from 'lucide-react'
+import { Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ArrowUp, Flag, Repeat, MoreHorizontal, Tag as TagIcon, FolderInput, ArrowRight, SkipForward } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { format, subDays, addDays, startOfToday, nextMonday } from 'date-fns'
@@ -19,6 +19,7 @@ import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import { addExDateToRRule, addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
+import { useTaskMenu } from '@/hooks/useTaskMenu'
 
 import { ContextMenu } from '@/shared/components/ContextMenu'
 import { SubtaskList } from './SubtaskList'
@@ -34,8 +35,22 @@ type TaskDetailProps = {
 }
 
 export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
+    // Parse composite ID if present (e.g. from URL for recurring instance)
+    const isCompositeId = taskId.includes('_recur_')
+    let realTaskId = taskId
+    let embeddedDate: string | null = null
+
+    if (isCompositeId) {
+        const parts = taskId.split('_recur_')
+        realTaskId = parts[0]
+        const timestamp = Number(parts[1])
+        if (!isNaN(timestamp)) {
+            embeddedDate = format(new Date(timestamp), 'yyyy-MM-dd')
+        }
+    }
+
     const [searchParams, setSearchParams] = useSearchParams()
-    const { data: task, isLoading } = useTask(taskId)
+    const { data: task, isLoading } = useTask(realTaskId)
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
     const { mutate: deleteTask, isPending: isDeleting } = useDeleteTask()
@@ -63,14 +78,14 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const { data: parentTask } = useTask(task?.parent_id || '')
 
     // Enable hotkeys for this active task
-    useTaskDateHotkeys(taskId, !!task)
+    useTaskDateHotkeys(realTaskId, !!task)
 
     // Local state for auto-save inputs
     const [title, setTitle] = useState('')
     const [description, setDescription] = useState('')
 
     // Instance handling (for recurrence)
-    const occurrence = occurrenceDate ?? searchParams.get('occurrence')
+    const occurrence = occurrenceDate ?? searchParams.get('occurrence') ?? embeddedDate
     const occurrenceDateStr = occurrence || null
 
     // Sync local state when task loads
@@ -102,20 +117,20 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
             const isEmpty = !titleRef.current.trim() && !descriptionRef.current.trim()
 
             if (closing && isEmpty && isNewRef.current) {
-                deleteTask(taskId)
+                deleteTask(realTaskId)
             }
         }
-    }, [taskId])
+    }, [realTaskId])
 
     // Fetch status for this specific occurrence if it exists
     const { data: occurrenceData } = useQuery({
-        queryKey: ['occurrence', taskId, occurrenceDateStr],
+        queryKey: ['occurrence', realTaskId, occurrenceDateStr],
         queryFn: async () => {
             if (!occurrenceDateStr) return null
             const { data, error } = await supabase
                 .from('task_occurrences')
                 .select('status')
-                .eq('task_id', taskId)
+                .eq('task_id', realTaskId)
                 .eq('original_date', occurrenceDateStr)
                 .maybeSingle()
 
@@ -131,7 +146,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const handleTitleBlur = () => {
         if (!task) return
         if (title !== task.title) {
-            updateTask({ taskId, updates: { title } })
+            updateTask({ taskId: realTaskId, updates: { title } })
         }
     }
 
@@ -144,7 +159,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
             if (mode === 'single') {
                 if (occurrenceDateStr) {
                     setOccurrenceStatus({
-                        taskId,
+                        taskId: realTaskId,
                         date: occurrenceDateStr,
                         status: 'archived'
                     })
@@ -185,7 +200,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
 
                     const prevTime = new Date(splitDateMs - 1000)
                     const oldRuleEnd = addUntilToRRule(task.recurrence_rule || '', prevTime)
-                    updateTask({ taskId, updates: { recurrence_rule: oldRuleEnd } })
+                    updateTask({ taskId: realTaskId, updates: { recurrence_rule: oldRuleEnd } })
 
                     const newStart = new Date(splitDateMs)
                     const newRule = updateDTStartInRRule(task.recurrence_rule || '', newStart)
@@ -217,7 +232,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 }
             }
             else {
-                updateTask({ taskId, updates: { description: pendingDescription } })
+                updateTask({ taskId: realTaskId, updates: { description: pendingDescription } })
             }
             setPendingDescription(null)
         } else if (recurrenceAction === 'date-time') {
@@ -228,7 +243,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 if (occurrenceDateStr) {
                     // Archive the OLD slot
                     setOccurrenceStatus({
-                        taskId,
+                        taskId: realTaskId,
                         date: occurrenceDateStr,
                         status: 'archived'
                     })
@@ -260,7 +275,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                     }
                     const prevTime = new Date(splitDateMs - 1000)
                     const oldRuleEnd = addUntilToRRule(task.recurrence_rule || '', prevTime)
-                    updateTask({ taskId, updates: { recurrence_rule: oldRuleEnd } })
+                    updateTask({ taskId: realTaskId, updates: { recurrence_rule: oldRuleEnd } })
 
                     // 2. Create NEW series
                     const newStartStr = pendingDateUpdates.start_time ||
@@ -286,7 +301,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
             }
             // "All": Update master task
             else {
-                updateTask({ taskId, updates: pendingDateUpdates })
+                updateTask({ taskId: realTaskId, updates: pendingDateUpdates })
             }
             setPendingDateUpdates(null)
         }
@@ -303,7 +318,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 setRecurrenceAction('description')
                 setRecurrenceEditModalOpen(true)
             } else {
-                updateTask({ taskId, updates: { description } })
+                updateTask({ taskId: realTaskId, updates: { description } })
             }
         }
     }
@@ -314,13 +329,13 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
         if (occurrence && occurrenceDateStr) {
             if (isInstanceCompleted) {
                 // If it was completed, we remove the record -> back to pending (not completed)
-                removeOccurrence({ taskId, date: occurrenceDateStr })
+                removeOccurrence({ taskId: realTaskId, date: occurrenceDateStr })
             } else {
                 // Mark as completed
-                setOccurrenceStatus({ taskId, date: occurrenceDateStr, status: 'completed' })
+                setOccurrenceStatus({ taskId: realTaskId, date: occurrenceDateStr, status: 'completed' })
             }
         } else {
-            updateTask({ taskId, updates: { is_completed: !task.is_completed } })
+            updateTask({ taskId: realTaskId, updates: { is_completed: !task.is_completed } })
         }
     }
 
@@ -330,14 +345,14 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
             return
         }
 
-        deleteTask(taskId)
+        deleteTask(realTaskId)
         if (showToasts) {
             toast.message("Задача удалена", {
                 description: "Вы можете найти её в корзине",
                 duration: 4000,
                 action: {
                     label: 'Отменить',
-                    onClick: () => restoreTask.mutate(taskId)
+                    onClick: () => restoreTask.mutate(realTaskId)
                 }
             })
         }
@@ -345,7 +360,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
 
     const handleDeleteInstance = () => {
         if (!occurrenceDateStr) return
-        setOccurrenceStatus({ taskId, date: occurrenceDateStr, status: 'archived' })
+        setOccurrenceStatus({ taskId: realTaskId, date: occurrenceDateStr, status: 'archived' })
         setShowDeleteRecurrenceModal(false)
     }
 
@@ -354,12 +369,12 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
         // Set until date to the end of the previous day (23:59:59)
         const untilDate = new Date(new Date(occurrenceDateStr).getTime() - 1000)
         const newRule = addUntilToRRule(task.recurrence_rule, untilDate)
-        updateTask({ taskId, updates: { recurrence_rule: newRule } })
+        updateTask({ taskId: realTaskId, updates: { recurrence_rule: newRule } })
         setShowDeleteRecurrenceModal(false)
     }
 
     const handleDeleteAll = () => {
-        deleteTask(taskId)
+        deleteTask(realTaskId)
         setShowDeleteRecurrenceModal(false)
     }
 
@@ -370,7 +385,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
 
         // 1. Update original task to exclude this date
         const newRule = addExDateToRRule(task.recurrence_rule || '', occDate)
-        updateTask({ taskId, updates: { recurrence_rule: newRule } })
+        updateTask({ taskId: realTaskId, updates: { recurrence_rule: newRule } })
 
         // 2. Create new standalone task at the instance position
         const dateStr = format(occDate, 'yyyy-MM-dd')
@@ -410,92 +425,25 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
         setContextMenu({ x: e.clientX, y: e.clientY })
     }
 
-    const menuItems = [
-        {
-            label: 'Сегодня',
-            icon: <CalendarIcon size={14} className="text-green-500" />,
-            onClick: () => {
-                const dateStr = format(startOfToday(), 'yyyy-MM-dd')
-                if (task?.recurrence_rule) {
-                    setPendingDateUpdates({ due_date: dateStr })
-                    setRecurrenceAction('date-time')
-                    setRecurrenceEditModalOpen(true)
-                } else {
-                    updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-                    if (showToasts) toast.success("📅 Перенесено на сегодня")
-                }
-            }
+    const menuItems = useTaskMenu({
+        task,
+        taskId: realTaskId,
+        occurrenceDate: occurrenceDateStr,
+        onDateChangeRequest: (dateStr) => {
+            setPendingDateUpdates({ due_date: dateStr })
+            setRecurrenceAction('date-time')
+            setRecurrenceEditModalOpen(true)
         },
-        {
-            label: 'Завтра',
-            icon: <ArrowRight size={14} className="text-orange-500" />,
-            onClick: () => {
-                const tomorrow = addDays(startOfToday(), 1)
-                const dateStr = format(tomorrow, 'yyyy-MM-dd')
-                if (task?.recurrence_rule) {
-                    setPendingDateUpdates({ due_date: dateStr })
-                    setRecurrenceAction('date-time')
-                    setRecurrenceEditModalOpen(true)
-                } else {
-                    updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-                    if (showToasts) toast.success("📅 Перенесено на завтра")
-                }
-            }
-        },
-        {
-            label: 'Ближайший понедельник',
-            icon: <CalendarIcon size={14} className="text-purple-500" />,
-            onClick: () => {
-                const monday = nextMonday(startOfToday())
-                const dateStr = format(monday, 'yyyy-MM-dd')
-                if (task?.recurrence_rule) {
-                    setPendingDateUpdates({ due_date: dateStr })
-                    setRecurrenceAction('date-time')
-                    setRecurrenceEditModalOpen(true)
-                } else {
-                    updateTask({ taskId: task.id, updates: { due_date: dateStr } })
-                    if (showToasts) toast.success("📅 Перенесено на понедельник")
-                }
-            }
-        },
-        { type: 'separator' as const },
-        {
-            label: 'Добавить в проект',
-            icon: <FolderInput size={14} className="text-gray-500" />,
-            onClick: () => {
-                window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: taskId }))
-            }
-        },
-        { type: 'separator' as const },
-        {
-            label: 'Метки',
-            icon: <TagIcon size={14} className="text-gray-400" />,
-            submenu: allTags?.map((tag: any) => ({
-                label: tag.name,
-                icon: (
-                    <div
-                        className={clsx(
-                            "w-2 h-2 rounded-full",
-                            (task as any)?.tags?.some((t: any) => t.id === tag.id) ? "ring-2 ring-offset-2 ring-blue-400" : ""
-                        )}
-                        style={{ backgroundColor: tag.color }}
-                    />
-                ),
-                onClick: () => toggleTag({ taskId, tagId: tag.id, isAttached: (task as any)?.tags?.some((t: any) => t.id === tag.id) })
-            }))
-        },
-        { type: 'separator' as const },
-        {
-            label: 'Удалить',
-            icon: <Trash2 size={14} />,
-            variant: 'danger' as const,
-            onClick: handleDelete
+        onDelete: handleDelete,
+        onSkipOccurrence: () => {
+            setContextMenu(null)
+            setSearchParams({}) // Close detail view
         }
-    ]
+    })
 
     // Safety fallback for rendering while loading/creating
     const t = task || ({
-        id: taskId,
+        id: realTaskId,
         title: '',
         description: '',
         priority: 'none',
@@ -595,7 +543,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                                         setRecurrenceAction('date-time')
                                         setRecurrenceEditModalOpen(true)
                                     } else {
-                                        updateTask({ taskId, updates })
+                                        updateTask({ taskId: realTaskId, updates })
                                     }
                                 }}
                             >
@@ -649,7 +597,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                                                 <Menu.Item key={opt.id}>
                                                     {({ active }) => (
                                                         <button
-                                                            onClick={() => updateTask({ taskId, updates: { priority: (opt.id === 'none' ? null : opt.id) as any } })}
+                                                            onClick={() => updateTask({ taskId: realTaskId, updates: { priority: (opt.id === 'none' ? null : opt.id) as any } })}
                                                             className={clsx(
                                                                 "flex w-full items-center gap-3 px-3 py-2 text-sm font-medium transition-colors",
                                                                 active ? opt.bg : "bg-white",
@@ -716,7 +664,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                         />
                     </div>
 
-                    <SubtaskList taskId={taskId} projectId={t.project_id} isProject={t.is_project} />
+                    <SubtaskList taskId={realTaskId} projectId={t.project_id} isProject={t.is_project} />
                 </div>
             </div>
 
@@ -733,7 +681,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                         onSelect={(pid, sid) => {
                             if (pid !== t.project_id || sid !== t.section_id) {
                                 updateTask({
-                                    taskId,
+                                    taskId: realTaskId,
                                     updates: {
                                         project_id: pid ?? null, // Use null for Inbox
                                         section_id: sid
@@ -744,12 +692,12 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                     />
 
                     {/* Categorized Tags (Place, Energy, Time, People) */}
-                    <CategoryTags taskId={taskId} />
+                    <CategoryTags taskId={realTaskId} />
 
                     {/* Project Type Toggle (GTD logic) */}
                     <div className="flex items-center gap-2 border-l border-gray-100 pl-4 py-1">
                         <button
-                            onClick={() => updateTask({ taskId, updates: { is_project: !t.is_project } })}
+                            onClick={() => updateTask({ taskId: realTaskId, updates: { is_project: !t.is_project } })}
                             className={clsx(
                                 "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all tracking-wider",
                                 t.is_project
