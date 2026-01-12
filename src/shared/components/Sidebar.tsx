@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise, RefreshCw } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise, RefreshCw, FolderInput, LogOut } from "lucide-react"
 import { useQueryClient, useIsFetching } from "@tanstack/react-query" // Import react-query hooks
 
 // ... existing code ...
@@ -28,14 +28,16 @@ type SidebarProps = {
 
 // --- DND Components ---
 
-function ProjectActionsMenu({ project, onRename, onDelete, isOver }: any) {
+function ProjectActionsMenu({ project, onRename, onDelete, isOver, groups, onMoveToGroup, onCreateGroup }: any) {
     const [isOpen, setIsOpen] = useState(false)
+    const [view, setView] = useState<'main' | 'folders'>('main')
     const menuRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
                 setIsOpen(false)
+                setView('main')
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
@@ -45,7 +47,7 @@ function ProjectActionsMenu({ project, onRename, onDelete, isOver }: any) {
     return (
         <div className="relative" ref={menuRef} onClick={e => e.preventDefault()}>
             <button
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen) }}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen); setView('main') }}
                 className={clsx(
                     "opacity-0 group-hover/project:opacity-100 p-1 rounded transition-all",
                     isOpen && "opacity-100 bg-gray-100/20",
@@ -57,22 +59,79 @@ function ProjectActionsMenu({ project, onRename, onDelete, isOver }: any) {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 shadow-xl rounded-md z-50 py-1 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                    <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onRename(project) }}
-                        className="text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-full transition-colors"
-                    >
-                        <Edit2 size={13} className="text-gray-400" />
-                        Rename
-                    </button>
-                    <div className="h-px bg-gray-50 my-0.5" />
-                    <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onDelete(e, project.id) }}
-                        className="text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 w-full transition-colors"
-                    >
-                        <Trash2 size={13} className="text-red-500" />
-                        Delete
-                    </button>
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 shadow-xl rounded-md z-50 py-1 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    {view === 'main' ? (
+                        <>
+                            <button
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onRename(project) }}
+                                className="text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-full transition-colors"
+                            >
+                                <Edit2 size={13} className="text-gray-400" />
+                                Rename
+                            </button>
+                            <button
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setView('folders') }}
+                                className="text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-full transition-colors"
+                            >
+                                <FolderInput size={13} className="text-gray-400" />
+                                Move to Folder
+                                <ChevronRight size={12} className="ml-auto text-gray-300" />
+                            </button>
+                            <div className="h-px bg-gray-50 my-0.5" />
+                            <button
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onDelete(e, project.id) }}
+                                className="text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 w-full transition-colors"
+                            >
+                                <Trash2 size={13} className="text-red-500" />
+                                Delete
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <div className="px-2 py-1 flex items-center gap-2 border-b border-gray-50 mb-1">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setView('main') }}
+                                    className="p-1 hover:bg-gray-100 rounded text-gray-500"
+                                >
+                                    <ChevronRight size={12} className="rotate-180" />
+                                </button>
+                                <span className="text-xs font-semibold text-gray-500">Select Folder</span>
+                            </div>
+
+                            <div className="max-h-48 overflow-y-auto">
+                                {project.group_id && (
+                                    <button
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onMoveToGroup(null) }}
+                                        className="text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 w-full transition-colors"
+                                    >
+                                        <LogOut size={13} className="rotate-180" />
+                                        Remove from Folder
+                                    </button>
+                                )}
+
+                                {groups?.map((group: any) => (
+                                    group.id !== project.group_id && (
+                                        <button
+                                            key={group.id}
+                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onMoveToGroup(group.id) }}
+                                            className="text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-full transition-colors"
+                                        >
+                                            <Folder size={13} className="text-gray-400" />
+                                            {group.name}
+                                        </button>
+                                    )
+                                ))}
+
+                                <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onCreateGroup() }}
+                                    className="text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-2 w-full transition-colors border-t border-gray-50 mt-1"
+                                >
+                                    <Plus size={13} />
+                                    New Folder
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
         </div>
@@ -386,6 +445,9 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                 onRename={handleRenameProject}
                                 onDelete={handleDeleteProject}
                                 isOver={isOver}
+                                groups={groups}
+                                onMoveToGroup={(groupId: string | null) => updateProject({ projectId: project.id, updates: { group_id: groupId } })}
+                                onCreateGroup={handleCreateGroup}
                             />
                         </Link>
                     </div>

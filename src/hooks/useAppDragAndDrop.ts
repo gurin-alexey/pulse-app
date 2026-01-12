@@ -16,10 +16,16 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 
+import { useUpdateProject } from '@/hooks/useUpdateProject'
+import { useCreateProjectGroup } from '@/hooks/useProjectGroups'
+
 export function useAppDragAndDrop() {
     const isDesktop = useMediaQuery("(min-width: 768px)")
     const queryClient = useQueryClient()
     const { mutate: updateTask } = useUpdateTask()
+    const { mutate: updateProject } = useUpdateProject()
+    const { mutate: createProjectGroup } = useCreateProjectGroup()
+
 
     // Drag state
     const [activeDragData, setActiveDragData] = useState<any>(null)
@@ -73,69 +79,123 @@ export function useAppDragAndDrop() {
 
         if (!over) return
 
-        const activeTask = active.data.current?.task
-        if (!activeTask) return
+        const activeData = active.data.current
 
-        const overType = over.data.current?.type
+        // --- 1. HANDLE TASKS ---
+        if (activeData?.task) {
+            const activeTask = activeData.task
+            const overType = over.data.current?.type
 
-        // 1. Task -> Sidebar Project
-        if (overType === 'Project') {
-            const targetProjectId = over.id as string
-            if (activeTask.project_id !== targetProjectId) {
-                updateTask({
-                    taskId: activeTask.id,
-                    updates: {
-                        project_id: targetProjectId,
-                        section_id: null,
-                        parent_id: null,
-                        sort_order: -new Date().getTime()
+            // Task -> Sidebar Project
+            if (overType === 'Project') {
+                const targetProjectId = over.id as string
+                if (activeTask.project_id !== targetProjectId) {
+                    updateTask({
+                        taskId: activeTask.id,
+                        updates: {
+                            project_id: targetProjectId,
+                            section_id: null,
+                            parent_id: null,
+                            sort_order: -new Date().getTime()
+                        }
+                    })
+                }
+            }
+
+            // Task -> Sidebar Folder (Move to first project in folder)
+            else if (overType === 'Folder') {
+                const folder = over.data.current?.group
+                if (folder) { // Ensure it's not root drop
+                    const projectsInFolder = queryClient.getQueryData<any[]>(['projects'])?.filter(p => p.group_id === folder.id)
+                    if (projectsInFolder && projectsInFolder.length > 0) {
+                        updateTask({
+                            taskId: activeTask.id,
+                            updates: {
+                                project_id: projectsInFolder[0].id,
+                                section_id: null,
+                                parent_id: null,
+                                sort_order: -new Date().getTime()
+                            }
+                        })
                     }
-                })
+                }
+            }
+
+            // Task -> Sidebar Nav (Inbox, Today)
+            else if (overType === 'Nav') {
+                const navLabel = over.data.current?.label
+                const updates: any = {}
+
+                if (navLabel === 'Inbox') {
+                    updates.project_id = null
+                    updates.section_id = null
+                    updates.due_date = null
+                } else if (navLabel === 'Today') {
+                    updates.due_date = new Date().toISOString().split('T')[0]
+                } else if (navLabel === 'Trash') {
+                    updates.deleted_at = new Date().toISOString()
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    updateTask({
+                        taskId: activeTask.id,
+                        updates: {
+                            ...updates,
+                            parent_id: null,
+                            sort_order: -new Date().getTime()
+                        }
+                    })
+                }
             }
         }
 
-        // 2. Task -> Sidebar Folder (Move to first project in folder)
-        else if (overType === 'Folder') {
-            const folder = over.data.current?.group
-            const projectsInFolder = queryClient.getQueryData<any[]>(['projects'])?.filter(p => p.group_id === folder?.id)
+        // --- 2. HANDLE PROJECTS ---
+        else if (activeData?.type === 'Project') {
+            const activeProject = activeData.project
+            const overType = over.data.current?.type
 
-            if (projectsInFolder && projectsInFolder.length > 0) {
-                updateTask({
-                    taskId: activeTask.id,
-                    updates: {
-                        project_id: projectsInFolder[0].id,
-                        section_id: null,
-                        parent_id: null,
-                        sort_order: -new Date().getTime()
+            // Project -> Folder (Add to group)
+            if (overType === 'Folder') {
+                // Check if it's the Root drop zone
+                if (over.data.current?.root) {
+                    // Ungroup
+                    if (activeProject.group_id) {
+                        updateProject({ projectId: activeProject.id, updates: { group_id: null } })
                     }
-                })
-            }
-        }
-
-        // 3. Task -> Sidebar Nav (Inbox, Today)
-        else if (overType === 'Nav') {
-            const navLabel = over.data.current?.label
-            const updates: any = {}
-
-            if (navLabel === 'Inbox') {
-                updates.project_id = null
-                updates.section_id = null
-                updates.due_date = null
-            } else if (navLabel === 'Today') {
-                updates.due_date = new Date().toISOString().split('T')[0]
-            } else if (navLabel === 'Trash') {
-                updates.deleted_at = new Date().toISOString()
+                } else {
+                    // Specific Folder
+                    const folderId = over.id as string
+                    if (activeProject.group_id !== folderId) {
+                        updateProject({ projectId: activeProject.id, updates: { group_id: folderId } })
+                    }
+                }
             }
 
-            if (Object.keys(updates).length > 0) {
-                updateTask({
-                    taskId: activeTask.id,
-                    updates: {
-                        ...updates,
-                        parent_id: null,
-                        sort_order: -new Date().getTime()
+            // Project -> Project (Group together)
+            else if (overType === 'Project') {
+                const targetProject = over.data.current?.project
+                if (targetProject.id === activeProject.id) return
+
+                // If target is already in a group, join it
+                if (targetProject.group_id) {
+                    if (activeProject.group_id !== targetProject.group_id) {
+                        updateProject({ projectId: activeProject.id, updates: { group_id: targetProject.group_id } })
                     }
-                })
+                } else {
+                    // Both are ungrouped. Create new group.
+                    // Prevent accidental grouping if dragging quickly over list? No, explicit intent.
+                    const newGroupName = "New Group" // Or prompt? Can't prompt easily here.
+                    // Create group then move both
+                    // Need user ID
+                    if (activeProject.user_id) {
+                        createProjectGroup({ name: newGroupName, userId: activeProject.user_id }, {
+                            onSuccess: (newGroup) => {
+                                updateProject({ projectId: targetProject.id, updates: { group_id: newGroup.id } })
+                                updateProject({ projectId: activeProject.id, updates: { group_id: newGroup.id } })
+                            }
+                        })
+                    }
+                }
             }
         }
     }
