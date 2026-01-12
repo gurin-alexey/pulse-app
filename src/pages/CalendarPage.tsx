@@ -10,7 +10,7 @@ import interactionPlugin from "@fullcalendar/interaction"
 import multiMonthPlugin from "@fullcalendar/multimonth"
 import listPlugin from "@fullcalendar/list"
 import ruLocale from '@fullcalendar/core/locales/ru'
-import { useSearchParams, useNavigate } from "react-router-dom"
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom"
 import { Loader2, Settings, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowLeft, ArrowRight, Check } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
@@ -25,6 +25,7 @@ import { useSwipeable } from "react-swipeable"
 import { motion, useMotionValue, useTransform, animate } from "framer-motion"
 
 export function CalendarPage() {
+    const location = useLocation()
     const { data, isLoading } = useAllTasks()
     const tasks = data?.tasks
     const occurrencesMap = data?.occurrencesMap
@@ -586,7 +587,7 @@ export function CalendarPage() {
             )}
 
             {/* Mobile Header Portals */}
-            {isMobile && mounted && document.getElementById('mobile-header-title') && createPortal(
+            {isMobile && mounted && location.pathname.startsWith('/calendar') && document.getElementById('mobile-header-title') && createPortal(
                 <div className="flex items-center justify-center">
                     <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm divide-x divide-gray-200">
                         <button
@@ -614,7 +615,7 @@ export function CalendarPage() {
                 document.getElementById('mobile-header-title')!
             )}
 
-            {isMobile && mounted && document.getElementById('mobile-header-right') && createPortal(
+            {isMobile && mounted && location.pathname.startsWith('/calendar') && document.getElementById('mobile-header-right') && createPortal(
                 <Menu as="div" className="relative inline-block text-left">
                     <Menu.Button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
                         <Settings size={20} />

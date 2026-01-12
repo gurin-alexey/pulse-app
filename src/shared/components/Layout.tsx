@@ -255,8 +255,9 @@ export function Layout() {
             <Menu size={24} />
           </button>
 
-          <div id="mobile-header-title" className="flex-1 flex justify-center items-center font-bold text-xl text-blue-600 truncate px-2">
-            {mobileTitle}
+          <div className="flex-1 flex justify-center items-center font-bold text-xl text-blue-600 truncate px-2">
+            <div id="mobile-header-title" className={isCalendarPage ? 'contents' : 'hidden'} />
+            {!isCalendarPage && mobileTitle}
           </div>
 
           <div id="mobile-header-right" className="w-10 flex justify-end items-center">
