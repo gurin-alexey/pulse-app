@@ -1,3 +1,4 @@
+import { toast } from 'sonner'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useSearchParams } from 'react-router-dom'
@@ -17,6 +18,27 @@ export function useDeleteTask() {
             if (error) throw error
         },
         onMutate: async (taskId) => {
+            // Optimistic Toast
+            toast.success("Task moved to Trash", {
+                description: "You can restore it from the Trash folder.",
+                action: {
+                    label: "Undo",
+                    onClick: async () => {
+                        const { error } = await supabase
+                            .from('tasks')
+                            .update({ deleted_at: null })
+                            .eq('id', taskId)
+
+                        if (!error) {
+                            toast.success("Task restored")
+                            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
+                            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+                            queryClient.invalidateQueries({ queryKey: ['subtasks'] })
+                        }
+                    }
+                }
+            })
+
             // Cancel outgoing refetches
             await queryClient.cancelQueries({ queryKey: ['task', taskId] })
             await queryClient.cancelQueries({ queryKey: ['all-tasks-v2'] })

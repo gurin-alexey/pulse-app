@@ -1,7 +1,7 @@
 import { Popover, PopoverButton, PopoverPanel, Transition } from '@headlessui/react'
 import { Fragment, useState, useEffect } from 'react'
 import { format, addDays, startOfToday, startOfTomorrow, nextMonday, type Day, isSameDay, isSameMonth, startOfMonth, endOfMonth, eachDayOfInterval, getDay, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns'
-import { Calendar as CalendarIcon, Clock, Bell, Repeat, Sun, Sunrise, ChevronRight, ChevronLeft, ChevronDown, Check, ArrowRight } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, Bell, Repeat, Sun, Sunrise, ChevronRight, ChevronLeft, ChevronDown, Check, ArrowRight, X } from 'lucide-react'
 import clsx from 'clsx'
 import { RecurrenceMenu } from './RecurrenceMenu'
 import { RRule } from 'rrule'
@@ -30,6 +30,14 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
         setSelectedRecurrence(recurrenceRule)
         if (date) setCurrentMonth(date)
     }, [date, time, endTime, recurrenceRule])
+
+    // Generate 30-minute slots
+    const timeSlots: string[] = []
+    for (let i = 0; i < 24; i++) {
+        const h = i.toString().padStart(2, '0')
+        timeSlots.push(`${h}:00`)
+        timeSlots.push(`${h}:30`)
+    }
 
     const today = startOfToday()
 
@@ -113,7 +121,7 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                                     className="flex flex-col items-center gap-1 group"
                                     title="Today"
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
+                                    <div className="w-10 h-10 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
                                         <Sun size={20} />
                                     </div>
                                     <span className="text-xs text-gray-500 font-medium">Today</span>
@@ -124,7 +132,7 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                                     className="flex flex-col items-center gap-1 group"
                                     title="Tomorrow"
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                                    <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                                         <Sunrise size={20} />
                                     </div>
                                     <span className="text-xs text-gray-500 font-medium">Tmrw</span>
@@ -135,7 +143,7 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                                     className="flex flex-col items-center gap-1 group"
                                     title="Next Week"
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                                    <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-500 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
                                         <CalendarIcon size={20} />
                                     </div>
                                     <span className="text-xs text-gray-500 font-medium">Next Wk</span>
@@ -181,7 +189,7 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                                                 key={day.toString()}
                                                 onClick={() => setSelectedDate(day)}
                                                 className={clsx(
-                                                    "h-8 w-8 mx-auto flex items-center justify-center rounded-full text-xs font-medium transition-all relative",
+                                                    "h-8 w-8 mx-auto flex items-center justify-center rounded-lg text-xs font-medium transition-all relative",
                                                     isSelected
                                                         ? "bg-[#2e3b55] text-white shadow-md shadow-blue-900/10"
                                                         : isSameMonthDay
@@ -204,36 +212,63 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                                     <Clock size={16} className="text-gray-400 mr-3 shrink-0" />
 
                                     {/* Start Time */}
-                                    <input
-                                        type="time"
-                                        value={selectedTime || ''}
-                                        onChange={(e) => setSelectedTime(e.target.value)}
-                                        className="bg-transparent border-none p-0 text-sm text-gray-700 focus:ring-0 w-[60px] cursor-pointer"
-                                        placeholder="Add time"
-                                    />
+                                    <div className="relative">
+                                        <select
+                                            value={selectedTime || ''}
+                                            onChange={(e) => setSelectedTime(e.target.value)}
+                                            className="bg-transparent border-none p-0 text-sm text-gray-700 focus:ring-0 w-[70px] cursor-pointer outline-none"
+                                        >
+                                            <option value="">Time</option>
+                                            {timeSlots.map(t => (
+                                                <option key={t} value={t}>{t}</option>
+                                            ))}
+                                            {selectedTime && !timeSlots.includes(selectedTime) && (
+                                                <option value={selectedTime}>{selectedTime}</option>
+                                            )}
+                                        </select>
+                                    </div>
 
                                     {/* End Time (Conditional) */}
                                     {selectedTime && (
                                         <div className="flex items-center ml-2 animate-in fade-in slide-in-from-left-2 duration-200">
-                                            <ArrowRight size={14} className="text-gray-400 mx-2" />
-                                            <input
-                                                type="time"
-                                                value={selectedEndTime || ''}
-                                                onChange={(e) => setSelectedEndTime(e.target.value)}
-                                                className="bg-transparent border-none p-0 text-sm text-gray-700 focus:ring-0 w-[60px] cursor-pointer"
-                                                placeholder="End time"
-                                            />
+                                            <ArrowRight size={14} className="text-gray-400 mx-1" />
+                                            <div className="flex items-center">
+                                                <select
+                                                    value={selectedEndTime || ''}
+                                                    onChange={(e) => setSelectedEndTime(e.target.value)}
+                                                    className="bg-transparent border-none p-0 text-sm text-gray-700 focus:ring-0 w-[70px] cursor-pointer outline-none"
+                                                >
+                                                    <option value="">End</option>
+                                                    {timeSlots
+                                                        .filter(t => t > (selectedTime || ''))
+                                                        .map(t => (
+                                                            <option key={t} value={t}>{t}</option>
+                                                        ))
+                                                    }
+                                                    {selectedEndTime && (!timeSlots.includes(selectedEndTime) || selectedEndTime <= selectedTime) && (
+                                                        <option value={selectedEndTime}>{selectedEndTime}</option>
+                                                    )}
+                                                </select>
+                                                {selectedEndTime && (
+                                                    <button
+                                                        onClick={() => setSelectedEndTime(null)}
+                                                        className="ml-1 text-gray-400 hover:text-gray-600 rounded-full p-0.5 hover:bg-gray-200"
+                                                        title="Clear end time"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
-                                </div>
 
-                                {/* Reminder (Placeholder) */}
-                                <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 cursor-pointer group">
-                                    <div className="flex items-center">
-                                        <Bell size={16} className="text-gray-400 mr-3 group-hover:text-gray-600" />
-                                        <span className="text-gray-600">Remind me</span>
-                                    </div>
-                                    <ChevronRight size={14} className="text-gray-300" />
+                                    {/* Reminder Bell */}
+                                    <button
+                                        className="ml-auto text-gray-400 hover:text-blue-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                        title="Set Reminder (Coming soon)"
+                                    >
+                                        <Bell size={16} />
+                                    </button>
                                 </div>
 
                                 {/* Recurrence */}

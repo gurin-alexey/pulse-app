@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { toast } from 'sonner'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
@@ -23,6 +24,7 @@ export function useDeleteRecurrence({ task, taskId, occurrenceDate, onSuccess }:
             date: occurrenceDate,
             status: 'archived'
         })
+        toast.success("Occurrence deleted")
         onSuccess?.()
     }, [taskId, occurrenceDate, setOccurrenceStatus, onSuccess])
 
@@ -34,6 +36,7 @@ export function useDeleteRecurrence({ task, taskId, occurrenceDate, onSuccess }:
         const newRule = addUntilToRRule(task.recurrence_rule, untilDate)
 
         updateTask({ taskId, updates: { recurrence_rule: newRule } })
+        toast.success("Future occurrences deleted")
         onSuccess?.()
     }, [task, taskId, occurrenceDate, updateTask, onSuccess])
 

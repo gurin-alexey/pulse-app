@@ -3,6 +3,7 @@ import { TaskDetail } from "@/features/tasks/TaskDetail"
 import clsx from "clsx"
 import { Drawer } from "vaul"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
+import { useSearchParams } from "react-router-dom"
 
 export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: () => void }) {
     // Simple media query for mobile check
@@ -14,10 +15,33 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
     // Memoize snapPoints to prevent unwanted re-renders/looping in Vaul
     const snapPoints = React.useMemo(() => [0.5, 1], [])
 
+    const [searchParams] = useSearchParams()
+    const isNew = searchParams.get('isNew') === 'true'
+
     if (!taskId) return null
 
-    // Desktop: Standard Centered Modal (Existing Logic)
+    // Desktop: Standard or Popover
     if (!isMobile) {
+        if (isNew) {
+            return (
+                <div
+                    className="fixed inset-0 z-50 flex items-end justify-end bg-transparent p-0 animate-in fade-in duration-150"
+                    onClick={onClose}
+                >
+                    {/* Invisible backdrop for click-outside */}
+
+                    <div
+                        className="mr-8 mb-24 bg-white shadow-2xl w-full max-w-lg max-h-[75vh] rounded-2xl animate-in zoom-in-95 slide-in-from-bottom-10 duration-200 flex flex-col relative overflow-hidden ring-1 ring-gray-900/5 border border-gray-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex-1 overflow-y-auto">
+                            <TaskDetail taskId={taskId} />
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
         return (
             <div
                 className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-150"

@@ -40,6 +40,7 @@ export function Layout() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const taskId = searchParams.get('task')
+  const isNew = searchParams.get('isNew') === 'true'
   const currentOutlet = useOutlet()
 
   const { fetchSettings } = useSettings()
@@ -119,7 +120,8 @@ export function Layout() {
   const closeModal = () => {
     const newParams = new URLSearchParams(searchParams)
     newParams.delete('task')
-    setSearchParams(newParams)
+    newParams.delete('isNew')
+    setSearchParams(newParams, { replace: true })
   }
 
   // Context Awareness for Mobile Title & FAB
@@ -372,8 +374,8 @@ export function Layout() {
           </AnimatePresence>
         </main>
 
-        {/* Modal for Calendar Page OR Mobile List View OR Dashboard Page */}
-        {taskId && (isCalendarPage || isDashboardPage || !isDesktop) && (
+        {/* Modal for Calendar Page OR Mobile List View OR Dashboard Page OR New Task (FAB) */}
+        {taskId && (isCalendarPage || isDashboardPage || !isDesktop || isNew) && (
           <TaskDetailModal taskId={taskId} onClose={closeModal} />
         )}
 
