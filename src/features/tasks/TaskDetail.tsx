@@ -644,7 +644,11 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                                     onTranscription={(text) => {
                                         setTitle(prev => {
                                             const trailingSpace = prev.length > 0 && !prev.endsWith(' ') ? ' ' : ''
-                                            return prev + trailingSpace + text
+                                            let finalText = text
+                                            if (prev.trim().length === 0 && finalText.length > 0) {
+                                                finalText = finalText.charAt(0).toUpperCase() + finalText.slice(1)
+                                            }
+                                            return prev + trailingSpace + finalText
                                         })
                                     }}
                                     className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600"

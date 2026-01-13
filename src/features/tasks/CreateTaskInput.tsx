@@ -68,7 +68,11 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
             if (result.isFinal) {
                 setTitle(prev => {
                     const trailingSpace = prev.length > 0 && !prev.endsWith(' ') ? ' ' : ''
-                    return prev + trailingSpace + result.transcript
+                    let text = result.transcript
+                    if (prev.trim().length === 0 && text.length > 0) {
+                        text = text.charAt(0).toUpperCase() + text.slice(1)
+                    }
+                    return prev + trailingSpace + text
                 })
             }
         })
