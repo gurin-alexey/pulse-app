@@ -124,6 +124,9 @@ public class QuickAddActivity extends Activity {
                 if (!currentText.isEmpty()) {
                     taskInput.setText(currentText + " " + spokenText);
                 } else {
+                    if (spokenText.length() > 0) {
+                        spokenText = spokenText.substring(0, 1).toUpperCase() + spokenText.substring(1);
+                    }
                     taskInput.setText(spokenText);
                 }
                 taskInput.setSelection(taskInput.getText().length());
