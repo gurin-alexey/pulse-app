@@ -8,12 +8,36 @@ import { useSearchParams } from "react-router-dom"
 export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: () => void }) {
     // Simple media query for mobile check
     const isMobile = useMediaQuery("(max-width: 768px)")
+    const [isOpen, setIsOpen] = React.useState(true)
+
+    const handleOpenChange = (open: boolean) => {
+        setIsOpen(open)
+        if (!open) {
+            // Reset snap points for next time
+            setSnapPoints([0.55, 1])
+            setSnap(0.55)
+
+            // Wait for animation to finish before unmounting (calling onClose)
+            setTimeout(() => {
+                onClose()
+            }, 300)
+        }
+    }
 
     // Controlled snap state
-    const [snap, setSnap] = React.useState<number | string | null>(0.5)
+    const [snap, setSnap] = React.useState<number | string | null>(0.55)
 
-    // Memoize snapPoints to prevent unwanted re-renders/looping in Vaul
-    const snapPoints = React.useMemo(() => [0.5, 1], [])
+    // Dynamic snap points:
+    // Initial: [0.55, 1]
+    // Once expanded to 1, we remove 0.55 so swiping down closes immediately.
+    const [snapPoints, setSnapPoints] = React.useState<(number | string)[]>([0.55, 1])
+
+    // Effect to remove 0.55 when fully expanded
+    React.useEffect(() => {
+        if (snap === 1) {
+            setSnapPoints([1])
+        }
+    }, [snap])
 
     const [searchParams] = useSearchParams()
     const isNew = searchParams.get('isNew') === 'true'
@@ -62,8 +86,8 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
     // Mobile: Vaul Drawer
     return (
         <Drawer.Root
-            open={true}
-            onOpenChange={(open) => !open && onClose()}
+            open={isOpen}
+            onOpenChange={handleOpenChange}
             snapPoints={snapPoints}
             activeSnapPoint={snap}
             setActiveSnapPoint={setSnap}
@@ -73,9 +97,12 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
                 <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" />
                 <Drawer.Content
                     className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 h-[96dvh] z-50 focus:outline-none"
-                    onFocusCapture={() => {
+                    onFocusCapture={(e) => {
                         // When input is focused (keyboard opens), expand to full screen
-                        setSnap(1)
+                        // Check if it's an input or textarea
+                        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                            setSnap(1)
+                        }
                     }}
                 >
                     {/* Drag Handle */}

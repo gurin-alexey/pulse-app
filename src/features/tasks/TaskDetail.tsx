@@ -631,6 +631,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                             )}
                             placeholder="What needs to be done?"
                             minRows={1}
+                            maxRows={6} // Limit initial growth to prevent massive jump before scroll
                         />
 
                     </div>
