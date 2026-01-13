@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useCreateTask } from '@/hooks/useCreateTask'
-import { Plus, Mic } from 'lucide-react'
+import { Plus, Mic, ArrowUp } from 'lucide-react'
 import clsx from 'clsx'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
 
@@ -18,64 +18,76 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
     const { mutate, isPending } = useCreateTask()
     const inputRef = useRef<HTMLInputElement>(null)
 
+    // State refs to avoid stale closures in callbacks
+    const titleRef = useRef(title)
+    useEffect(() => { titleRef.current = title }, [title])
+
+    const propsRef = useRef({ projectId, sectionId, defaultDueDate })
+    useEffect(() => {
+        propsRef.current = { projectId, sectionId, defaultDueDate }
+    }, [projectId, sectionId, defaultDueDate])
+
+    const submitTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
     // Voice Input Logic
-    const { isListening, toggleListening, hasSupport } = useSpeechToText({ interimResults: true })
+    const { isListening, startListening, stopListening, hasSupport } = useSpeechToText({ interimResults: true })
 
-    const handleVoiceResult = (result: { transcript: string, isFinal: boolean }) => {
-        // Simple append logic or replace? Providing append behavior for now
-        // Ideally we want to append only new words, but simpler to just set value if we assume "dictate to fill"
-        // Let's rely on the assumption that if they use voice, they might be dictating the whole thing or appending.
+    const submitTaskFromRef = async () => {
+        const taskTitle = titleRef.current
+        if (!taskTitle.trim()) return
 
-        // Strategy: If isResult is final, append with space. If interim, show preview?
-        // This simple hook delivers chunks.
+        const { projectId, sectionId, defaultDueDate } = propsRef.current
+        const { data: { user } } = await supabase.auth.getUser()
 
-        // Improved Strategy: The hook delivers total transcript since start in "continuous" mode usually.
-        // But my hook implementation accumulates? NO, my hook resets onresult.
-        // Let's just fix the hook logic implicitly by appending what we get.
+        if (!user) {
+            alert('User not logged in')
+            return
+        }
 
-        // Actually, for a single field input, replacing or smart appending is tricky.
-        // Let's try: on voice start, we listen. 
-        // We will append the *new* transcript to the existing title.
-
-        // BUT: native recognition `continuous=true` returns *all* results in the session.
-        // My hook implementation: 
-        //   interimTranscript += ... 
-
-        // Let's adjust: We will update the title based on previous title + new transcript.
-        // To do this correctly without dupes, we might need a "voiceSessionStartTitle" state.
+        mutate(
+            { id: crypto.randomUUID(), title: taskTitle.trim(), projectId, userId: user.id, sectionId: sectionId, due_date: defaultDueDate },
+            {
+                onError: (error) => {
+                    console.error('Failed to create task:', error)
+                    alert(`Failed to create task: ${error.message}`)
+                }
+            }
+        )
+        setTitle('')
     }
 
-    // Simplification for v1: just append whatever comes in "final"
-    useEffect(() => {
-        if (!isListening) return
+    const handleVoiceCallback = (result: { transcript: string, isFinal: boolean }) => {
+        if (submitTimerRef.current) clearTimeout(submitTimerRef.current)
 
-        // We need a way to invoke toggleListening with a stable callback that knows about current title?
-        // OR we refactor the usage.
-    }, [isListening])
+        if (result.isFinal) {
+            setTitle(prev => {
+                const trailingSpace = prev.length > 0 && !prev.endsWith(' ') ? ' ' : ''
+                let text = result.transcript
+                if (prev.trim().length === 0 && text.length > 0) {
+                    text = text.charAt(0).toUpperCase() + text.slice(1)
+                }
+                return prev + trailingSpace + text
+            })
+
+            // Auto-submit after 2.5s of silence (after final result)
+            submitTimerRef.current = setTimeout(() => {
+                stopListening()
+                submitTaskFromRef()
+            }, 2500)
+        }
+    }
 
     const onVoiceToggle = () => {
-        // Capture start state if needed
-        toggleListening((result) => {
-            // For now, simpler approach: just append result.transcript if final
-            // Or better: update input value directly?
-
-            // Issue: 'transcript' contains the WHOLE phrase for this session if continuous=true
-            // So we should replace the "current voice part"
-
-            // Let's settle on: non-continuous or just append. 
-            // With `continuous=true` in hook, `event.results` accumulates.
-
-            if (result.isFinal) {
-                setTitle(prev => {
-                    const trailingSpace = prev.length > 0 && !prev.endsWith(' ') ? ' ' : ''
-                    let text = result.transcript
-                    if (prev.trim().length === 0 && text.length > 0) {
-                        text = text.charAt(0).toUpperCase() + text.slice(1)
-                    }
-                    return prev + trailingSpace + text
-                })
-            }
-        })
+        if (isListening) {
+            // Manual submit
+            if (submitTimerRef.current) clearTimeout(submitTimerRef.current)
+            stopListening()
+            submitTaskFromRef()
+        } else {
+            setTitle('') // Optional: Clear title on new dictation? Or append? User implies "dictate message", usually fresh.
+            // But existing code allowed appending. I'll keep appending logic in callback, but NOT clear here.
+            startListening(handleVoiceCallback)
+        }
     }
 
     const createTask = async (taskTitle: string) => {
@@ -174,11 +186,15 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
                         onClick={onVoiceToggle}
                         className={clsx(
                             "absolute right-2 p-1.5 rounded-full transition-colors z-10 hover:bg-gray-100",
-                            isListening ? "text-red-500 animate-pulse bg-red-50 hover:bg-red-100" : "text-gray-400 hover:text-gray-600"
+                            isListening ? "text-white bg-blue-500 hover:bg-blue-600 animate-pulse" : "text-gray-400 hover:text-gray-600"
                         )}
-                        title="Dictate"
+                        title={isListening ? "Send" : "Dictate"}
                     >
-                        <Mic size={16} className={clsx(isListening && "fill-current")} />
+                        {isListening ? (
+                            <ArrowUp size={16} strokeWidth={3} />
+                        ) : (
+                            <Mic size={16} />
+                        )}
                     </button>
                 )}
             </div>
