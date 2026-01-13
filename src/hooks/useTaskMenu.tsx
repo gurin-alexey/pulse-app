@@ -1,11 +1,11 @@
 import React from 'react'
-import { Calendar, ArrowRight, SkipForward, FolderInput, Tag as TagIcon, Trash2, Unlink } from 'lucide-react'
+import { Calendar, ArrowRight, SkipForward, FolderInput, Trash2, Unlink, Copy } from 'lucide-react'
 import { format, startOfToday, addDays, nextMonday } from 'date-fns'
 import { toast } from 'sonner'
 import clsx from 'clsx'
 
 import { useUpdateTask } from '@/hooks/useUpdateTask'
-import { useTags, useToggleTaskTag } from '@/hooks/useTags'
+import { useCreateTask } from '@/hooks/useCreateTask'
 import { useSettings } from '@/store/useSettings'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 
@@ -29,8 +29,7 @@ export function useTaskMenu({
     onSkipOccurrence
 }: UseTaskMenuProps) {
     const { mutate: updateTask } = useUpdateTask()
-    const { mutate: toggleTag } = useToggleTaskTag()
-    const { data: allTags } = useTags()
+    const { mutate: createTask } = useCreateTask()
     const { settings } = useSettings()
     const { setOccurrenceStatus } = useTaskOccurrence()
 
@@ -115,25 +114,24 @@ export function useTaskMenu({
         { type: 'separator' as const },
 
         {
-            label: 'Метки',
-            icon: <TagIcon size={14} className="text-gray-400" />,
-            submenu: allTags?.map((tag: any) => ({
-                label: tag.name,
-                icon: (
-                    <div
-                        className={clsx(
-                            "w-2 h-2 rounded-full",
-                            task?.tags?.some((t: any) => t.id === tag.id) ? "ring-2 ring-offset-2 ring-blue-400" : ""
-                        )}
-                        style={{ backgroundColor: tag.color }}
-                    />
-                ),
-                onClick: () => toggleTag({
-                    taskId: taskId,
-                    tagId: tag.id,
-                    isAttached: task?.tags?.some((t: any) => t.id === tag.id)
+            label: 'Дублировать',
+            icon: <Copy size={14} className="text-gray-500" />,
+            onClick: () => {
+                createTask({
+                    title: task.title,
+                    description: task.description,
+                    priority: task.priority,
+                    projectId: task.project_id,
+                    userId: task.user_id,
+                    parentId: task.parent_id,
+                    sectionId: task.section_id,
+                    due_date: task.due_date,
+                    start_time: task.start_time,
+                    end_time: task.end_time,
+                    recurrence_rule: task.recurrence_rule
                 })
-            }))
+                if (showToasts) toast.success("Задача дублирована")
+            }
         },
 
         { type: 'separator' as const },

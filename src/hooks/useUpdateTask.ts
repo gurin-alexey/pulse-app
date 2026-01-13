@@ -12,7 +12,37 @@ export function useUpdateTask() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async ({ taskId, updates }: UpdateTaskParams) => {
+        mutationFn: async (vars: UpdateTaskParams) => {
+            let { taskId, updates } = vars
+
+            // 0. Reverse Cascade (Child -> Parent Move)
+            // If dragging a child to a new list (Project/Section), move the Root Parent instead.
+            // This ensures the whole "Task Family" moves together, satisfying user intent.
+            const isLocationChange = updates.project_id !== undefined || updates.section_id !== undefined
+
+            // ONLY apply if this is a move, and we are NOT explicitly reparenting (moving to a new parent)
+            if (isLocationChange && !updates.parent_id) {
+                const getRoot = async (id: string): Promise<string> => {
+                    const { data } = await supabase.from('tasks').select('id, parent_id').eq('id', id).maybeSingle()
+                    if (data?.parent_id) return getRoot(data.parent_id)
+                    return data?.id || id
+                }
+
+                const rootId = await getRoot(taskId)
+
+                if (rootId !== taskId) {
+                    // We are a child. Switch target to Root.
+                    taskId = rootId
+
+                    // If the drag-and-drop logic tried to detach us (parent_id: null),
+                    // ignore that instruction because we are moving the whole family, maintaining structure.
+                    if (updates.parent_id === null) {
+                        const { parent_id, ...rest } = updates
+                        updates = rest
+                    }
+                }
+            }
+
             // 1. Completion logic
             if (updates.is_completed !== undefined) {
                 updates.completed_at = updates.is_completed ? new Date().toISOString() : null
@@ -91,46 +121,73 @@ export function useUpdateTask() {
 
             return primaryTask as Task
         },
-        onMutate: async ({ taskId, updates }) => {
-            // Cancel outgoing refetches
-            await queryClient.cancelQueries({ queryKey: ['task', taskId] })
-            await queryClient.cancelQueries({ queryKey: ['all-tasks-v2'] })
+        onMutate: async (vars) => {
+            let { taskId, updates } = vars
+
+            // Cancel outgoing refetches (we need to cancel generally since we might switch IDs)
             await queryClient.cancelQueries({ queryKey: ['tasks'] })
             await queryClient.cancelQueries({ queryKey: ['subtasks'] })
+            await queryClient.cancelQueries({ queryKey: ['all-tasks-v2'] })
+            // We'll cancel specific detail queries after we resolve ID
 
-            // Snapshot the previous value
-            const previousTask = queryClient.getQueryData<Task>(['task', taskId])
-            const previousAllTasks = queryClient.getQueryData<any>(['all-tasks-v2'])
-
+            // 0. PREPARE CACHE SNAPSHOTS (Need this first to find Root)
             // We need to find the task in ANY specific project list to update it optimistically
-            // and to know which list to rollback
             const tasksQueries = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
             const subtasksQueries = queryClient.getQueriesData<Task[]>({ queryKey: ['subtasks'] })
+            const previousAllTasks = queryClient.getQueryData<any>(['all-tasks-v2'])
 
-            // Store snapshots of all modified lists
-            const modifiedLists: { queryKey: readonly unknown[], data: Task[] }[] = []
+            // Also check if the task is currently open in detail view (and thus cached individually)
+            // This is crucial if the task isn't in any visible list but is open in a modal
+            const initialDetail = queryClient.getQueryData<Task>(['task', taskId])
 
-            // 1. Gather all unique tasks from all cached queries for descendant lookup
+            // Flatten cache for lookup
             const allCachedTasks: Task[] = []
             const seenIds = new Set<string>()
 
-            const queries = [
-                previousAllTasks?.tasks || [],
-                ...(tasksQueries.flatMap(([_, data]) => data || [])),
-                ...(subtasksQueries.flatMap(([_, data]) => data || []))
-            ]
-
-            queries.forEach((item: Task | Task[]) => {
-                const list = Array.isArray(item) ? item : [item]
-                list.forEach((t: Task) => {
-                    if (!seenIds.has(t.id)) {
+            const addTasks = (list: (Task | undefined)[] | undefined) => {
+                if (!Array.isArray(list)) return
+                list.forEach(t => {
+                    if (t && !seenIds.has(t.id)) {
                         allCachedTasks.push(t)
                         seenIds.add(t.id)
                     }
                 })
-            })
+            }
 
-            // 2. Helper to get all descendant IDs
+            addTasks(previousAllTasks?.tasks)
+            tasksQueries.forEach(([_, data]) => addTasks(data))
+            subtasksQueries.forEach(([_, data]) => addTasks(data))
+            // Ensure the task itself is in our lookup set
+            if (initialDetail) addTasks([initialDetail])
+
+            // 0.5 REVERSE CASCADE LOGIC (Optimistic)
+            const isLocationChange = updates.project_id !== undefined || updates.section_id !== undefined
+            if (isLocationChange && !updates.parent_id) {
+                const findRoot = (id: string): string => {
+                    const t = allCachedTasks.find(x => x.id === id)
+                    if (t?.parent_id) return findRoot(t.parent_id)
+                    return id
+                }
+                const rootId = findRoot(taskId)
+
+                if (rootId !== taskId) {
+                    taskId = rootId
+                    // Ignore detach from optimistic update too
+                    if (updates.parent_id === null) {
+                        const { parent_id, ...rest } = updates
+                        updates = rest
+                    }
+                }
+            }
+
+            // Now cancel specific query for the EFFECTIVE task ID (Root)
+            await queryClient.cancelQueries({ queryKey: ['task', taskId] })
+            const previousTask = queryClient.getQueryData<Task>(['task', taskId])
+
+            // Store snapshots of all modified lists
+            const modifiedLists: { queryKey: readonly unknown[], data: Task[] }[] = []
+
+            // 2. Helper to get all descendant IDs (using effective taskId)
             const getDescendantIds = (parentId: string, tasksToSearch: Task[]): string[] => {
                 const children = tasksToSearch.filter(t => t.parent_id === parentId)
                 let ids = children.map(c => c.id)
@@ -187,7 +244,11 @@ export function useUpdateTask() {
                 }
 
                 // Snapshots of the primary task and its descendants after the proposed update
-                const updatedPrimary = { ...allCachedTasks.find(t => t.id === taskId), ...positionalUpdates, ...contextualUpdates } as Task
+                // Note: taskId here is the Root (if switched)
+                const currentPrimary = allCachedTasks.find(t => t.id === taskId)
+                if (!currentPrimary) return // Should not happen if cache is consistent
+
+                const updatedPrimary = { ...currentPrimary, ...positionalUpdates, ...contextualUpdates } as Task
                 const updatedDescendants = descendantIds.map(did => {
                     const original = allCachedTasks.find(t => t.id === did)
                     return original ? { ...original, ...contextualUpdates } : null
@@ -237,16 +298,25 @@ export function useUpdateTask() {
                 })
             }
 
-            // Update individual task detail cache
+            // Update individual task detail cache (for Root)
             if (previousTask) {
                 queryClient.setQueryData<Task>(['task', taskId], { ...previousTask, ...positionalUpdates, ...contextualUpdates })
             }
+
+            // Update individual descendant detail caches (crucial for UI feedback if a child is the active view)
+            // This ensures that the "Project Picker" in TaskDetail updates instantly when the child is dragged
+            descendantIds.forEach(descId => {
+                const prevDesc = queryClient.getQueryData<Task>(['task', descId])
+                if (prevDesc) {
+                    queryClient.setQueryData<Task>(['task', descId], { ...prevDesc, ...contextualUpdates })
+                }
+            })
 
             // Apply updates to all relevant project/smart lists
             tasksQueries.forEach(([queryKey, data]) => updateList(queryKey, data))
             subtasksQueries.forEach(([queryKey, data]) => updateList(queryKey, data))
 
-            return { previousTask, previousAllTasks, modifiedLists }
+            return { previousTask, previousAllTasks, modifiedLists, effectiveTaskId: taskId }
         },
         onSuccess: (_data, { updates }) => {
             if (updates.is_completed === true) {
@@ -269,12 +339,15 @@ export function useUpdateTask() {
                 })
             }
         },
-        onError: (err, { taskId }, context) => {
-            console.error("Mutation failed for task", taskId, err)
-            alert(`Failed to update task: ${err.message}`)
+        onError: (err, _vars, context) => {
+            // Restore using the effective ID (which might be the Root if we switched)
+            const idToRestore = context?.effectiveTaskId || _vars.taskId
+
+            console.error("Mutation failed for task", idToRestore, err)
+            // alert(`Failed to update task: ${err.message}`) // Optional, toast handles errors usually?
 
             if (context?.previousTask) {
-                queryClient.setQueryData(['task', taskId], context.previousTask)
+                queryClient.setQueryData(['task', idToRestore], context.previousTask)
             }
             if (context?.previousAllTasks) {
                 queryClient.setQueryData(['all-tasks-v2'], context.previousAllTasks)
@@ -284,17 +357,14 @@ export function useUpdateTask() {
                 queryClient.setQueryData(queryKey, data)
             })
         },
-        onSettled: (_data, _error, { taskId }, context) => {
-            queryClient.invalidateQueries({ queryKey: ['task', taskId] })
+        onSettled: (_data, _error, _vars, context) => {
+            const idToInvalidate = context?.effectiveTaskId || _vars.taskId
+
+            queryClient.invalidateQueries({ queryKey: ['task', idToInvalidate] })
             queryClient.invalidateQueries({ queryKey: ['tasks'] }) // Invalidate all lists to be safe
             queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] }) // Invalidate calendar view
-
-            // If we have the updated data and it has a parent_id, invalidate that specific subtask list
-            // But 'data' arg in onSettled might be undefined if error?
-            // Safer to just invalidate all subtasks for now or let the UI handle optimistic updates locally.
-            // Actually, let's just use fuzzy invalidation for all subtasks to be safe and simple.
             queryClient.invalidateQueries({ queryKey: ['subtasks'] })
-            queryClient.invalidateQueries({ queryKey: ['task-history', taskId] })
+            queryClient.invalidateQueries({ queryKey: ['task-history', idToInvalidate] })
         },
     })
 }
