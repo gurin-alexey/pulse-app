@@ -219,7 +219,10 @@ export function Layout() {
         </button>
 
         <button
-          onClick={() => setIsSettingsOpen(true)}
+          onClick={() => {
+            setIsSettingsOpen(true)
+            setIsSidebarOpen(false)
+          }}
           className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           title="Settings"
         >
@@ -227,7 +230,10 @@ export function Layout() {
         </button>
 
         <button
-          onClick={() => useCommandStore.getState().toggle()}
+          onClick={() => {
+            useCommandStore.getState().toggle()
+            setIsSidebarOpen(false)
+          }}
           className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
           title="Search"
         >
