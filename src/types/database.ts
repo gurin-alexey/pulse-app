@@ -72,6 +72,8 @@ export type UserSettings = {
         show_toast_hints?: boolean
         hide_night_time?: boolean
         default_page?: 'dashboard' | 'today' | 'calendar'
+        font_size?: 'small' | 'medium' | 'large'
+        font_family?: 'sans' | 'mono'
         [key: string]: any
     }
     created_at: string

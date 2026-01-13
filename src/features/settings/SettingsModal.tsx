@@ -1,6 +1,6 @@
 import React, { useState, Fragment } from 'react';
 import { Dialog, Transition, Tab } from '@headlessui/react';
-import { X, Moon, Sun, Smartphone, LayoutDashboard, Settings, User, LogOut, Trash2 } from 'lucide-react';
+import { X, Moon, Sun, Smartphone, LayoutDashboard, Settings, User, LogOut, Trash2, Type, MessageSquare } from 'lucide-react';
 import { useSettings } from '../../store/useSettings';
 import { supabase } from '../../lib/supabase';
 import clsx from 'clsx';
@@ -118,6 +118,77 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                                                 <span className="text-sm font-medium">{theme.name}</span>
                                                             </button>
                                                         ))}
+                                                    </div>
+                                                </section>
+
+                                                <section>
+                                                    <h4 className="text-sm font-medium text-zinc-500 mb-4 uppercase tracking-wider">Typography</h4>
+
+                                                    <div className="space-y-6">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+                                                                Font Size
+                                                            </label>
+                                                            <div className="grid grid-cols-3 gap-3">
+                                                                {[
+                                                                    { id: 'small', name: 'Small', size: '16px' },
+                                                                    { id: 'medium', name: 'Medium', size: '18px' },
+                                                                    { id: 'large', name: 'Large', size: '20px' },
+                                                                ].map((option) => (
+                                                                    <button
+                                                                        key={option.id}
+                                                                        onClick={() => updateSettings({
+                                                                            preferences: { ...settings.preferences, font_size: option.id as any }
+                                                                        })}
+                                                                        className={clsx(
+                                                                            "px-3 py-2 rounded-lg border text-sm font-medium transition-colors",
+                                                                            (settings.preferences.font_size || 'small') === option.id
+                                                                                ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
+                                                                                : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-700/50"
+                                                                        )}
+                                                                    >
+                                                                        <div className="text-xs opacity-60 mb-1">{option.size}</div>
+                                                                        {option.name}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+                                                                Font Family
+                                                            </label>
+                                                            <div className="grid grid-cols-2 gap-3">
+                                                                <button
+                                                                    onClick={() => updateSettings({
+                                                                        preferences: { ...settings.preferences, font_family: 'sans' }
+                                                                    })}
+                                                                    className={clsx(
+                                                                        "flex items-center justify-center gap-2 px-3 py-3 rounded-lg border text-sm font-medium transition-colors",
+                                                                        (settings.preferences.font_family || 'sans') === 'sans'
+                                                                            ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
+                                                                            : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-700/50"
+                                                                    )}
+                                                                >
+                                                                    <Type size={16} />
+                                                                    <span className="font-sans">Standard</span>
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => updateSettings({
+                                                                        preferences: { ...settings.preferences, font_family: 'mono' }
+                                                                    })}
+                                                                    className={clsx(
+                                                                        "flex items-center justify-center gap-2 px-3 py-3 rounded-lg border text-sm font-medium transition-colors",
+                                                                        settings.preferences.font_family === 'mono'
+                                                                            ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
+                                                                            : "bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-700/50"
+                                                                    )}
+                                                                >
+                                                                    <div className="font-mono text-xs border border-current rounded px-1">M</div>
+                                                                    <span className="font-mono">JetBrains Mono</span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </section>
 

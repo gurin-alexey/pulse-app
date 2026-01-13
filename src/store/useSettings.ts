@@ -37,6 +37,8 @@ const DEFAULT_SETTINGS: Omit<UserSettings, 'user_id' | 'created_at' | 'updated_a
         hide_night_time: false,
         default_page: 'today',
         dashboard_widget_order: ['greeting', 'weather', 'quick_capture', 'projects', 'ai_chat'],
+        font_size: 'small',
+        font_family: 'sans',
     },
 };
 
@@ -128,6 +130,11 @@ export const useSettings = create<SettingsState>((set, get) => {
                     root.classList.add(settings.theme);
                 }
 
+                // Apply font settings
+                root.setAttribute('data-font-size', settings.preferences.font_size || 'small');
+                root.setAttribute('data-font-family', settings.preferences.font_family || 'sans');
+
+
             } catch (err) {
                 console.error('Unexpected error in fetchSettings:', err);
                 set({ isLoading: false });
@@ -152,6 +159,17 @@ export const useSettings = create<SettingsState>((set, get) => {
                     root.classList.add(systemTheme);
                 } else {
                     root.classList.add(newSettings.theme);
+                }
+            }
+
+            // Apply font settings immediately if changed
+            if (newSettings.preferences) {
+                const root = window.document.documentElement;
+                if (newSettings.preferences.font_size) {
+                    root.setAttribute('data-font-size', newSettings.preferences.font_size);
+                }
+                if (newSettings.preferences.font_family) {
+                    root.setAttribute('data-font-family', newSettings.preferences.font_family);
                 }
             }
 
