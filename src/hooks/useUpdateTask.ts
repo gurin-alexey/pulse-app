@@ -272,6 +272,7 @@ export function useUpdateTask() {
             // Safer to just invalidate all subtasks for now or let the UI handle optimistic updates locally.
             // Actually, let's just use fuzzy invalidation for all subtasks to be safe and simple.
             queryClient.invalidateQueries({ queryKey: ['subtasks'] })
+            queryClient.invalidateQueries({ queryKey: ['task-history', taskId] })
         },
     })
 }

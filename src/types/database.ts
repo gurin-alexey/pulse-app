@@ -77,3 +77,14 @@ export type UserSettings = {
     created_at: string
     updated_at: string
 }
+
+export type TaskHistory = {
+    id: string
+    task_id: string
+    user_id: string
+    operation: 'INSERT' | 'UPDATE' | 'DELETE'
+    old_record: Partial<Task> | null
+    new_record: Partial<Task> | null
+    changed_fields: string[] | null
+    created_at: string
+}

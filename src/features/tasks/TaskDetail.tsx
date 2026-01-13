@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, Fragment } from 'react'
 import { Menu, Transition, Dialog } from '@headlessui/react'
 import TextareaAutosize from 'react-textarea-autosize'
 import { toast } from 'sonner'
-import { Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ArrowUp, Flag, Repeat, MoreHorizontal, Tag as TagIcon, FolderInput, ArrowRight, SkipForward } from 'lucide-react'
+import { Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ArrowUp, Flag, Repeat, MoreHorizontal, Tag as TagIcon, FolderInput, ArrowRight, SkipForward, History } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { format, subDays, addDays, startOfToday, nextMonday } from 'date-fns'
@@ -30,6 +30,7 @@ import { ProjectPicker } from './ProjectPicker'
 import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { RecurrenceEditModal } from '@/components/ui/date-picker/RecurrenceEditModal'
+import { TaskHistoryList } from './components/TaskHistoryList'
 
 type TaskDetailProps = {
     taskId: string
@@ -70,6 +71,8 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const [pendingDescription, setPendingDescription] = useState<string | null>(null)
     const [pendingDateUpdates, setPendingDateUpdates] = useState<any>(null)
     const [recurrenceAction, setRecurrenceAction] = useState<'description' | 'date-time'>('description')
+
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false)
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
@@ -603,6 +606,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                                     </Menu.Items>
                                 </Transition>
                             </Menu>
+
                         </div>
 
                         {/* Breadcrumbs (Moved here) */}
@@ -700,15 +704,24 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                     </div>
                 </div>
 
-                {/* Delete Button (Right) */}
-                <button
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                    title="Delete task"
-                >
-                    {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => setIsHistoryOpen(true)}
+                        className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                        title="История изменений"
+                    >
+                        <History size={20} />
+                    </button>
+                    {/* Delete Button (Right) */}
+                    <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                        title="Delete task"
+                    >
+                        {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+                    </button>
+                </div>
             </div>
             {
                 contextMenu && (
@@ -743,6 +756,61 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 onDeleteAll={handleDeleteAll}
                 isFirstInstance={task?.due_date === occurrenceDateStr}
             />
+
+            {/* History Modal */}
+            <Transition appear show={isHistoryOpen} as={Fragment}>
+                <Dialog as="div" className="relative z-50" onClose={() => setIsHistoryOpen(false)}>
+                    <Transition.Child
+                        as={Fragment}
+                        enter="ease-out duration-300"
+                        enterFrom="opacity-0"
+                        enterTo="opacity-100"
+                        leave="ease-in duration-200"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                    >
+                        <div className="fixed inset-0 bg-black/25 backdrop-blur-sm" />
+                    </Transition.Child>
+
+                    <div className="fixed inset-0 overflow-y-auto">
+                        <div className="flex min-h-full items-center justify-center p-4 text-center">
+                            <Transition.Child
+                                as={Fragment}
+                                enter="ease-out duration-300"
+                                enterFrom="opacity-0 scale-95"
+                                enterTo="opacity-100 scale-100"
+                                leave="ease-in duration-200"
+                                leaveFrom="opacity-100 scale-100"
+                                leaveTo="opacity-0 scale-95"
+                            >
+                                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                                    <Dialog.Title
+                                        as="h3"
+                                        className="text-lg font-medium leading-6 text-gray-900 mb-4 flex items-center gap-2"
+                                    >
+                                        <History size={20} className="text-gray-500" />
+                                        История изменений
+                                    </Dialog.Title>
+
+                                    <div className="max-h-[60vh] overflow-y-auto -mr-2 pr-2">
+                                        <TaskHistoryList taskId={realTaskId} />
+                                    </div>
+
+                                    <div className="mt-8 flex justify-end">
+                                        <button
+                                            type="button"
+                                            className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                                            onClick={() => setIsHistoryOpen(false)}
+                                        >
+                                            Закрыть
+                                        </button>
+                                    </div>
+                                </Dialog.Panel>
+                            </Transition.Child>
+                        </div>
+                    </div>
+                </Dialog>
+            </Transition>
         </div>
     )
 }
