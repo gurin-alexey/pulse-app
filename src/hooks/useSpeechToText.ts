@@ -49,7 +49,7 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
     }, [isListening])
 
     const stopListening = useCallback(() => {
-        if (!recognitionRef.current || !isListening) return
+        if (!recognitionRef.current) return
 
         try {
             recognitionRef.current.stop()
@@ -57,7 +57,7 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
             console.error('Failed to stop speech recognition:', err)
         }
         setIsListening(false)
-    }, [isListening])
+    }, [])
 
     const toggleListening = useCallback((onResult: (result: SpeechToTextResult) => void) => {
         if (isListening) {
