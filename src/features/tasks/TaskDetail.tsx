@@ -31,6 +31,7 @@ import { DatePickerPopover } from '@/components/ui/date-picker/DatePickerPopover
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { RecurrenceEditModal } from '@/components/ui/date-picker/RecurrenceEditModal'
 import { TaskHistoryList } from './components/TaskHistoryList'
+import { VoiceInputButton } from '@/components/ui/VoiceInputButton'
 
 type TaskDetailProps = {
     taskId: string
@@ -612,27 +613,44 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                             </div>
                         )}
 
-                        {/* Title Row */}
-                        <TextareaAutosize
-                            autoFocus={searchParams.get('isNew') === 'true'}
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            onBlur={handleTitleBlur}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    (e.target as HTMLTextAreaElement).blur();
-                                }
-                            }}
-                            onContextMenu={(e) => e.stopPropagation()} // Allow native menu
-                            className={clsx(
-                                "w-full text-xl font-semibold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-snug",
-                                t.is_project && "uppercase tracking-wide text-blue-800"
-                            )}
-                            placeholder="What needs to be done?"
-                            minRows={1}
-                            maxRows={6} // Limit initial growth to prevent massive jump before scroll
-                        />
+
+
+                        {/* Title Row with Mic */}
+                        <div className="relative group/title">
+                            <TextareaAutosize
+                                autoFocus={searchParams.get('isNew') === 'true'}
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                onBlur={handleTitleBlur}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        (e.target as HTMLTextAreaElement).blur();
+                                    }
+                                }}
+                                onContextMenu={(e) => e.stopPropagation()} // Allow native menu
+                                className={clsx(
+                                    "w-full text-xl font-semibold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-snug pr-8",
+                                    t.is_project && "uppercase tracking-wide text-blue-800"
+                                )}
+                                placeholder="What needs to be done?"
+                                minRows={1}
+                                maxRows={6} // Limit initial growth to prevent massive jump before scroll
+                            />
+
+                            {/* Title Mic Button */}
+                            <div className="absolute top-1 right-0 opacity-0 group-hover/title:opacity-100 transition-opacity">
+                                <VoiceInputButton
+                                    onTranscription={(text) => {
+                                        setTitle(prev => {
+                                            const trailingSpace = prev.length > 0 && !prev.endsWith(' ') ? ' ' : ''
+                                            return prev + trailingSpace + text
+                                        })
+                                    }}
+                                    className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600"
+                                />
+                            </div>
+                        </div>
 
                     </div>
 
@@ -802,6 +820,6 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                     </div>
                 </Dialog>
             </Transition>
-        </div>
+        </div >
     )
 }

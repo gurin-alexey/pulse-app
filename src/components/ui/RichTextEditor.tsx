@@ -5,6 +5,7 @@ import Link from '@tiptap/extension-link'
 import { Bold, Italic, List, ListOrdered, Code, Quote, Link as LinkIcon, Minus, Type } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useCallback, useState } from 'react'
+import { VoiceInputButton } from './VoiceInputButton'
 
 type RichTextEditorProps = {
     content: string
@@ -186,6 +187,17 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
                     >
                         <Minus size={16} />
                     </MenuButton>
+
+                    <div className="w-px h-4 bg-gray-200 mx-1" />
+
+                    <VoiceInputButton
+                        onTranscription={(text) => {
+                            if (editor) {
+                                editor.chain().focus().insertContent(text + ' ').run()
+                            }
+                        }}
+                        className="p-1.5 rounded hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
+                    />
                 </div>
             )}
 
