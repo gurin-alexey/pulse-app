@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useCreateTask } from '@/hooks/useCreateTask'
-import { Plus, Mic, ArrowUp } from 'lucide-react'
+import { Plus, Mic, ArrowDown } from 'lucide-react'
 import clsx from 'clsx'
 import { useSpeechToText } from '@/hooks/useSpeechToText'
 
@@ -29,12 +29,17 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
 
     const submitTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
+    const [timerKey, setTimerKey] = useState(0)
+    const [showTimer, setShowTimer] = useState(false)
+
     // Voice Input Logic
     const { isListening, startListening, stopListening, hasSupport } = useSpeechToText({ interimResults: true })
 
     const submitTaskFromRef = async () => {
         const taskTitle = titleRef.current
         if (!taskTitle.trim()) return
+
+        setShowTimer(false) // Hide timer on submit
 
         const { projectId, sectionId, defaultDueDate } = propsRef.current
         const { data: { user } } = await supabase.auth.getUser()
@@ -69,11 +74,18 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
                 return prev + trailingSpace + text
             })
 
-            // Auto-submit after 2.5s of silence (after final result)
+            // Reset and start visual timer
+            setTimerKey(prev => prev + 1)
+            setShowTimer(true)
+
+            // Auto-submit after 2s
             submitTimerRef.current = setTimeout(() => {
                 stopListening()
                 submitTaskFromRef()
-            }, 2500)
+            }, 2000)
+        } else {
+            // Processing interim results - hide timer until silence/final
+            setShowTimer(false)
         }
     }
 
@@ -84,13 +96,12 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
             stopListening()
             submitTaskFromRef()
         } else {
-            setTitle('') // Optional: Clear title on new dictation? Or append? User implies "dictate message", usually fresh.
-            // But existing code allowed appending. I'll keep appending logic in callback, but NOT clear here.
+            setTitle('')
             startListening(handleVoiceCallback)
         }
     }
 
-    const createTask = async (taskTitle: string) => {
+    const createUserTask = async (taskTitle: string) => {
         if (!taskTitle.trim()) return
 
         const { data: { user } } = await supabase.auth.getUser()
@@ -113,7 +124,7 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        await createTask(title)
+        await createUserTask(title)
         setTitle('')
         // Keep focus? Usually yes for rapid entry
         // But if user wants to collapse, they click away.
@@ -133,7 +144,7 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
                 const linesToProcess = [...lines].reverse()
 
                 for (const line of linesToProcess) {
-                    await createTask(line)
+                    await createUserTask(line)
                 }
             } else {
                 const singleLineText = lines.join(' ')
@@ -185,13 +196,30 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
                         type="button"
                         onClick={onVoiceToggle}
                         className={clsx(
-                            "absolute right-2 p-1.5 rounded-full transition-colors z-10 hover:bg-gray-100",
-                            isListening ? "text-white bg-blue-500 hover:bg-blue-600 animate-pulse" : "text-gray-400 hover:text-gray-600"
+                            "absolute right-2 p-1.5 rounded-full transition-colors z-10 hover:bg-gray-100 flex items-center justify-center",
+                            isListening ? "text-white bg-blue-500 hover:bg-blue-600" : "text-gray-400 hover:text-gray-600"
                         )}
                         title={isListening ? "Send" : "Dictate"}
                     >
                         {isListening ? (
-                            <ArrowUp size={16} strokeWidth={3} />
+                            <div className="relative flex items-center justify-center">
+                                {/* SVG Timer Ring */}
+                                {showTimer && (
+                                    <svg className="absolute -top-[5px] -left-[5px] w-[26px] h-[26px] pointer-events-none rotate-[-90deg]">
+                                        <circle
+                                            cx="13"
+                                            cy="13"
+                                            r="11"
+                                            fill="none"
+                                            stroke="white"
+                                            strokeWidth="3"
+                                            strokeOpacity="0.3"
+                                        />
+                                        <CountdownCircle key={timerKey} duration={2000} />
+                                    </svg>
+                                )}
+                                <ArrowDown size={16} strokeWidth={3} />
+                            </div>
                         ) : (
                             <Mic size={16} />
                         )}
@@ -199,5 +227,31 @@ export function CreateTaskInput({ projectId, sectionId, placeholder = "New task"
                 )}
             </div>
         </form>
+    )
+}
+
+function CountdownCircle({ duration, key }: { duration: number, key: number }) {
+    const [active, setActive] = useState(false)
+
+    useEffect(() => {
+        setActive(false)
+        const raf = requestAnimationFrame(() => setActive(true))
+        return () => cancelAnimationFrame(raf)
+    }, [key])
+
+    return (
+        <circle
+            cx="13"
+            cy="13"
+            r="11"
+            fill="none"
+            stroke="white"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray="70"
+            strokeDashoffset={active ? "0" : "70"}
+            className="transition-all ease-linear"
+            style={{ transitionDuration: `${duration}ms` }}
+        />
     )
 }
