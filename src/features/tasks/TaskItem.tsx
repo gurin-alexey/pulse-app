@@ -471,7 +471,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                                 className={clsx(
                                     "w-full bg-transparent border-0 p-0 leading-tight",
                                     "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
-                                    task.is_completed && !disableStrikethrough ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
+                                    task.is_completed && !disableStrikethrough ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-light", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
                                 )}
                             >
                                 {task.title}
@@ -491,7 +491,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                                 className={clsx(
                                     "w-full bg-transparent border-0 outline-none focus:ring-0 p-0 leading-tight resize-none",
                                     "overflow-hidden whitespace-nowrap truncate text-sm block h-full content-center",
-                                    task.is_completed && !disableStrikethrough ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-medium", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
+                                    task.is_completed && !disableStrikethrough ? "text-gray-500 line-through decoration-gray-400" : clsx("text-gray-700 font-light", task.is_project && "uppercase tracking-wide text-blue-800 font-bold")
                                 )}
                                 spellCheck={false}
                             />

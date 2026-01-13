@@ -59,7 +59,7 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex-1 overflow-y-auto">
-                            <TaskDetail taskId={taskId} />
+                            <TaskDetail key={taskId} taskId={taskId} />
                         </div>
                     </div>
                 </div>
@@ -76,7 +76,7 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex-1 overflow-y-auto">
-                        <TaskDetail taskId={taskId} />
+                        <TaskDetail key={taskId} taskId={taskId} />
                     </div>
                 </div>
             </div>
@@ -109,7 +109,7 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
                     <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-2" />
 
                     <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
-                        <TaskDetail taskId={taskId} />
+                        <TaskDetail key={taskId} taskId={taskId} />
                     </div>
                 </Drawer.Content>
             </Drawer.Portal>
