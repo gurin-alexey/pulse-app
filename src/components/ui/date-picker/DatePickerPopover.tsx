@@ -217,7 +217,7 @@ function DatePickerBody({
                 </div>
 
                 <div className="grid grid-cols-7 mb-2">
-                    {weekDays.map(d => <div key={d} className="text-center text-xs text-gray-400 font-medium">{d}</div>)}
+                    {weekDays.map(d => <div key={d} className={clsx("text-center font-medium text-gray-400", isMobile ? "text-sm" : "text-xs")}>{d}</div>)}
                 </div>
                 <div className="grid grid-cols-7 gap-y-1 w-full">
                     {days.map((day) => {
@@ -229,7 +229,8 @@ function DatePickerBody({
                                 key={day.toString()}
                                 onClick={() => setSelectedDate(day)}
                                 className={clsx(
-                                    "h-9 w-9 mx-auto flex items-center justify-center rounded-lg text-xs font-medium transition-all relative",
+                                    "mx-auto flex items-center justify-center rounded-lg font-medium transition-all relative",
+                                    isMobile ? "h-10 w-10 text-sm rounded-xl" : "h-9 w-9 text-xs rounded-lg", // Intermediate size on mobile
                                     isSelected ? "bg-[#2e3b55] text-white shadow-md" : isSameMonthDay ? "text-gray-700 hover:bg-gray-100" : "text-gray-300",
                                     isToday && !isSelected && "font-bold text-blue-600 after:absolute after:bottom-1 after:w-1 after:h-1 after:bg-blue-600 after:rounded-full"
                                 )}

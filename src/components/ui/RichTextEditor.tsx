@@ -59,7 +59,7 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
         editable: editable,
         editorProps: {
             attributes: {
-                class: 'prose prose-sm max-w-none focus:outline-none min-h-[100px] text-gray-600 leading-relaxed',
+                class: 'prose prose-sm max-w-none focus:outline-none min-h-[100px] text-gray-600 leading-relaxed text-[13.8px]', // Explicitly slightly smaller than base 14px if needed, or stick to prose-sm
             },
         },
         onUpdate: ({ editor }) => {
@@ -200,6 +200,10 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
                     float: left;
                     height: 0;
                     pointer-events: none;
+                }
+                .ProseMirror p {
+                    margin-bottom: 1.25em; /* Adjusted spacing */
+                    line-height: 1.75;
                 }
                 .ProseMirror ul {
                     list-style-type: disc;
