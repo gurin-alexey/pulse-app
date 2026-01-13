@@ -15,6 +15,7 @@ export type TaskFilter =
     | { type: 'trash', includeSubtasks?: boolean }
     | { type: 'all', includeSubtasks?: boolean }
     | { type: 'is_project' }
+    | { type: 'completed', period: 'today' | 'yesterday' | 'week' | 'month' | 'all', tags?: string[], projectId?: string, priority?: string }
 
 export async function fetchTasks(filter: TaskFilter) {
     let query = supabase
@@ -29,6 +30,8 @@ export async function fetchTasks(filter: TaskFilter) {
 
     if (filter.type === 'trash') {
         query = query.order('deleted_at', { ascending: false })
+    } else if (filter.type === 'completed') {
+        query = query.order('completed_at', { ascending: false })
     } else {
         query = query.order('created_at', { ascending: false })
     }
@@ -77,6 +80,44 @@ export async function fetchTasks(filter: TaskFilter) {
         query = query
             .eq('is_project', true)
             .not('due_date', 'is', null)
+    } else if (filter.type === 'completed') {
+        query = query.is('is_completed', true)
+
+        // Period Filtering
+        if (filter.period !== 'all') {
+            const now = new Date()
+            const today = new Date(now.getTime() - (now.getTimezoneOffset() * 60000))
+            today.setHours(0, 0, 0, 0)
+
+            if (filter.period === 'today') {
+                const tomorrow = new Date(today)
+                tomorrow.setDate(tomorrow.getDate() + 1)
+                query = query.gte('completed_at', today.toISOString()).lt('completed_at', tomorrow.toISOString())
+            } else if (filter.period === 'yesterday') {
+                const yesterday = new Date(today)
+                yesterday.setDate(yesterday.getDate() - 1)
+                query = query.gte('completed_at', yesterday.toISOString()).lt('completed_at', today.toISOString())
+            } else if (filter.period === 'week') {
+                const weekAgo = new Date(today)
+                weekAgo.setDate(weekAgo.getDate() - 7)
+                query = query.gte('completed_at', weekAgo.toISOString())
+            } else if (filter.period === 'month') {
+                const monthAgo = new Date(today)
+                monthAgo.setDate(monthAgo.getDate() - 30)
+                query = query.gte('completed_at', monthAgo.toISOString())
+            }
+        }
+
+        // Additional Filters
+        if (filter.projectId) {
+            query = query.eq('project_id', filter.projectId)
+        }
+        if (filter.priority) {
+            query = query.eq('priority', filter.priority)
+        }
+        // Tags filtering is tricky with Supabase basic query builder on related tables for "AND" logic
+        // We will likely filter post-fetch for tags to be safe, or use custom RPC if performance needed.
+        // For now, let's filter after fetch for simplicity as list won't be massive typically.
     }
 
     const { data: initialData, error } = await query
@@ -107,11 +148,20 @@ export async function fetchTasks(filter: TaskFilter) {
     }
 
     // Transform to flat structure
-    return finalData.map(task => ({
+    const mappedTasks = finalData.map(task => ({
         ...task,
         tags: task.task_tags.map((tt: any) => tt.tags),
         subtasks_count: task.subtasks?.[0]?.count
     })) as TaskWithTags[]
+
+    // Post-fetch filtering for tags if needed (for completed view)
+    if (filter.type === 'completed' && filter.tags && filter.tags.length > 0) {
+        return mappedTasks.filter(task =>
+            filter.tags!.every(tagId => task.tags.some(t => t.id === tagId))
+        )
+    }
+
+    return mappedTasks
 }
 
 import { useAuth } from './useAuth'

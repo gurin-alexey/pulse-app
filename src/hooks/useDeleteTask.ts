@@ -19,10 +19,10 @@ export function useDeleteTask() {
         },
         onMutate: async (taskId) => {
             // Optimistic Toast
-            toast.success("Task moved to Trash", {
-                description: "You can restore it from the Trash folder.",
+            toast.success("Задача удалена", {
+                description: "Вы можете найти её в корзине",
                 action: {
-                    label: "Undo",
+                    label: "Отменить",
                     onClick: async () => {
                         const { error } = await supabase
                             .from('tasks')
@@ -30,7 +30,7 @@ export function useDeleteTask() {
                             .eq('id', taskId)
 
                         if (!error) {
-                            toast.success("Task restored")
+                            toast.success("Задача восстановлена")
                             queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
                             queryClient.invalidateQueries({ queryKey: ['tasks'] })
                             queryClient.invalidateQueries({ queryKey: ['subtasks'] })

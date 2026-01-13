@@ -7,6 +7,7 @@ import { CalendarPage } from "@/pages/CalendarPage";
 import { ProjectTasks } from "@/pages/ProjectTasks";
 import { TagTasks } from "@/pages/TagTasks";
 import { TrashPage } from "@/pages/TrashPage";
+import { CompletedTasksPage } from "@/pages/CompletedTasksPage";
 
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { Login } from "@/pages/Login";
@@ -63,6 +64,10 @@ export const router = createBrowserRouter([
           {
             path: "trash",
             element: <TrashPage />,
+          },
+          {
+            path: "completed",
+            element: <CompletedTasksPage />,
           },
         ],
       },

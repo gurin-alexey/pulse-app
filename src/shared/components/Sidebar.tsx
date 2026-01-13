@@ -480,6 +480,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
             droppable: false
         },
         { label: "Calendar", path: "/calendar", icon: Calendar, droppable: false },
+        { label: "Completed", path: "/completed", icon: CheckSquare, droppable: false },
     ]
 
     return (

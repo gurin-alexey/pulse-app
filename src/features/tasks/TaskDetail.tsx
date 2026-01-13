@@ -351,16 +351,6 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
         }
 
         deleteTask(realTaskId)
-        if (showToasts) {
-            toast.message("Задача удалена", {
-                description: "Вы можете найти её в корзине",
-                duration: 4000,
-                action: {
-                    label: 'Отменить',
-                    onClick: () => restoreTask.mutate(realTaskId)
-                }
-            })
-        }
     }
 
     const { handleDeleteInstance, handleDeleteFuture, handleDeleteAll } = useDeleteRecurrence({
