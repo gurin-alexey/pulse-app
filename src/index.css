@@ -3,15 +3,15 @@
 
 /* Font Size Customization */
 html[data-font-size="small"] {
-    font-size: 16px;
+    font-size: 15px;
 }
 
 html[data-font-size="medium"] {
-    font-size: 18px;
+    font-size: 16px;
 }
 
 html[data-font-size="large"] {
-    font-size: 20px;
+    font-size: 17px;
 }
 
 /* Font Family Customization */

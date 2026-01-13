@@ -131,9 +131,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                                                             </label>
                                                             <div className="grid grid-cols-3 gap-3">
                                                                 {[
-                                                                    { id: 'small', name: 'Small', size: '16px' },
-                                                                    { id: 'medium', name: 'Medium', size: '18px' },
-                                                                    { id: 'large', name: 'Large', size: '20px' },
+                                                                    { id: 'small', name: 'Small', size: '15px' },
+                                                                    { id: 'medium', name: 'Medium', size: '16px' },
+                                                                    { id: 'large', name: 'Large', size: '17px' },
                                                                 ].map((option) => (
                                                                     <button
                                                                         key={option.id}
