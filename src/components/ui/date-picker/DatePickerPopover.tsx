@@ -5,6 +5,7 @@ import { Calendar as CalendarIcon, Clock, Bell, Repeat, Sun, Sunrise, ChevronRig
 import clsx from 'clsx'
 import { RecurrenceMenu } from './RecurrenceMenu'
 import { RRule } from 'rrule'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 type DatePickerPopoverProps = {
     date: Date | null
@@ -21,6 +22,8 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
     const [selectedTime, setSelectedTime] = useState<string | null>(time)
     const [selectedEndTime, setSelectedEndTime] = useState<string | null>(endTime)
     const [selectedRecurrence, setSelectedRecurrence] = useState<string | null>(recurrenceRule)
+
+    const isMobile = useMediaQuery("(max-width: 768px)")
 
     // Sync state when props change (if controlled)
     useEffect(() => {
@@ -111,7 +114,13 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
                         leaveFrom="opacity-100 translate-y-0"
                         leaveTo="opacity-0 translate-y-1"
                     >
-                        <PopoverPanel anchor="bottom start" className="z-50 mt-2 w-[280px] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden text-sm font-sans">
+                        <PopoverPanel
+                            anchor={isMobile ? undefined : "bottom start"}
+                            className={clsx(
+                                "z-[100] mt-2 w-[280px] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden text-sm font-sans",
+                                isMobile && "absolute left-0" // Manual positioning for mobile/inline
+                            )}
+                        >
                             {/* [REMOVED] Header Tabs: "Date" vs "Duration" */}
 
                             {/* Quick Actions */}

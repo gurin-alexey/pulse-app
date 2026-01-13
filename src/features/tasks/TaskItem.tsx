@@ -116,19 +116,23 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     useEffect(() => {
         if (!isOpen) return
 
-        const handleClickOutside = () => {
+        const handleClickOutside = (e: MouseEvent) => {
+            // Optional: check if target is inside action buttons?
+            // For now, let's just rely on click bubbling.
+            // If the user clicks a button, the button's onClick (with stopPropagation) handles it.
+            // If the user clicks elsewhere, this fires.
             resetSwipe()
         }
+
         // Small delay to prevent immediate closing if the click itself was the release
         const timer = setTimeout(() => {
             window.addEventListener('click', handleClickOutside)
-            window.addEventListener('touchstart', handleClickOutside)
+            // Removed touchstart to avoid pre-emptively closing before button click
         }, 100)
 
         return () => {
             clearTimeout(timer)
             window.removeEventListener('click', handleClickOutside)
-            window.removeEventListener('touchstart', handleClickOutside)
         }
     }, [isOpen])
 
