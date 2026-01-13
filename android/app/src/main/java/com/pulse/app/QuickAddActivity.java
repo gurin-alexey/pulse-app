@@ -40,6 +40,7 @@ public class QuickAddActivity extends Activity {
     private EditText taskInput;
     private ImageButton micBtn;
     private Button sendBtn;
+    private android.os.CountDownTimer autoSendTimer;
 
     private String supabaseUrl;
     private String supabaseKey;
@@ -76,6 +77,24 @@ public class QuickAddActivity extends Activity {
 
         // Ensure focus and keyboard
         taskInput.requestFocus();
+
+        // Cancel auto-send timer if user edits text manually
+        taskInput.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (autoSendTimer != null) {
+                    autoSendTimer.cancel();
+                    autoSendTimer = null;
+                    sendBtn.setText("Send");
+                }
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable s) {}
+        });
 
         micBtn.setOnClickListener(v -> promptSpeechInput());
         
@@ -130,11 +149,36 @@ public class QuickAddActivity extends Activity {
                     taskInput.setText(spokenText);
                 }
                 taskInput.setSelection(taskInput.getText().length());
+                startAutoSendTimer();
             }
         }
     }
 
+    private void startAutoSendTimer() {
+        if (autoSendTimer != null) autoSendTimer.cancel();
+        
+        autoSendTimer = new android.os.CountDownTimer(2500, 1000) {
+            public void onTick(long millisUntilFinished) {
+                if (sendBtn != null) {
+                    sendBtn.setText("Send (" + (millisUntilFinished / 1000 + 1) + ")");
+                }
+            }
+
+            public void onFinish() {
+                if (sendBtn != null) {
+                    sendBtn.setText("Sending...");
+                    sendTask();
+                }
+            }
+        }.start();
+    }
+
     private void sendTask() {
+        // Cancel timer if manually triggered
+        if (autoSendTimer != null) {
+            autoSendTimer.cancel();
+            autoSendTimer = null;
+        }
         String title = taskInput.getText().toString().trim();
         if (title.isEmpty()) {
             Toast.makeText(this, "Enter a task name", Toast.LENGTH_SHORT).show();
