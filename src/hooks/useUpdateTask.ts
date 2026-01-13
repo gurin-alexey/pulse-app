@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { Task } from '@/types/database'
 
@@ -246,6 +247,27 @@ export function useUpdateTask() {
             subtasksQueries.forEach(([queryKey, data]) => updateList(queryKey, data))
 
             return { previousTask, previousAllTasks, modifiedLists }
+        },
+        onSuccess: (_data, { updates }) => {
+            if (updates.is_completed === true) {
+                const messages = [
+                    "Отличная работа! 🚀",
+                    "Так держать! 🔥",
+                    "Еще одна задача готова! ✅",
+                    "Продуктивность на высоте! 📈",
+                    "Шаг за шагом к цели! 🎯",
+                    "Превосходно! ⭐",
+                    "Ты справляешься! 💪",
+                    "Молодец! 👏",
+                    "Задача выполнена! 🎉",
+                    "Вперед к новым вершинам! 🏔️"
+                ]
+                const randomMessage = messages[Math.floor(Math.random() * messages.length)]
+                toast.success(randomMessage, {
+                    duration: 3000,
+                    className: "font-medium"
+                })
+            }
         },
         onError: (err, { taskId }, context) => {
             console.error("Mutation failed for task", taskId, err)
