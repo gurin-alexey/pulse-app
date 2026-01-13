@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Semi-transparent white background (80% opacity) -->
+    <solid android:color="#CCFFFFFF" />
+    
+    <!-- Rounded corners -->
+    <corners android:radius="24dp" />
+    
+    <!-- Subtle border/stroke for glass effect -->
+    <stroke 
+        android:width="1dp" 
+        android:color="#40FFFFFF" />
+        
+    <padding android:left="24dp" android:right="24dp" android:top="24dp" android:bottom="24dp"/>
+</shape>

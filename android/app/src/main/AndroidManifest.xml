@@ -32,6 +32,14 @@
 
         </activity>
 
+        <activity
+            android:name=".QuickAddActivity"
+            android:theme="@style/Theme.AppCompat.Dialog"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:windowSoftInputMode="stateVisible"
+            android:exported="false" />
+
         <receiver
             android:name=".QuickAddWidget"
             android:exported="true">
@@ -41,6 +49,17 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_quick_add_info" />
+        </receiver>
+
+        <receiver
+            android:name=".QuickVoiceWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_voice_info" />
         </receiver>
 
         <provider

@@ -3,6 +3,7 @@ import { RouterProvider } from "react-router-dom"
 import { App as CapacitorApp } from '@capacitor/app'
 import { router } from "@/app/router"
 import { QuickAddModal } from "@/features/tasks/QuickAddModal"
+import { NativeSync } from "@/features/native-sync/NativeSync"
 
 function App() {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false)
@@ -41,6 +42,7 @@ function App() {
 
   return (
     <>
+      <NativeSync />
       <RouterProvider router={router} />
     </>
   )

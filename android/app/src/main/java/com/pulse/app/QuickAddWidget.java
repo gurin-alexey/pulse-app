@@ -23,9 +23,8 @@ public class QuickAddWidget extends AppWidgetProvider {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_quick_add);
 
         // Create an Intent to launch MainActivity
-        Intent intent = new Intent(context, MainActivity.class);
-        intent.setAction(Intent.ACTION_VIEW);
-        intent.setData(Uri.parse("pulse://quick-add"));
+        // Create an Intent to launch QuickAddActivity
+        Intent intent = new Intent(context, QuickAddActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
