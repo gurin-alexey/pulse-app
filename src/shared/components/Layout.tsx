@@ -18,6 +18,7 @@ import { Toaster } from "sonner"
 import { SettingsModal } from "@/features/settings/SettingsModal"
 import { useSettings } from "@/store/useSettings"
 import { usePrefetchData } from "@/hooks/usePrefetchData"
+import { useTasksRealtime } from "@/hooks/useTasksRealtime"
 import { useSelectionStore } from "@/store/useSelectionStore"
 import { useProjects } from "@/hooks/useProjects"
 import { BulkActionsPanel } from "@/features/tasks/BulkActionsPanel"
@@ -56,6 +57,8 @@ export function Layout() {
 
   // Prefetching Strategy
   usePrefetchData()
+  // Realtime Subscriptions
+  useTasksRealtime()
 
   // Motion & Swipe Logic for Sidebar
   const drawerWidth = 280
