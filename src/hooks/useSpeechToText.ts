@@ -53,10 +53,10 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
 
         try {
             recognitionRef.current.stop()
-            setIsListening(false)
         } catch (err) {
             console.error('Failed to stop speech recognition:', err)
         }
+        setIsListening(false)
     }, [isListening])
 
     const toggleListening = useCallback((onResult: (result: SpeechToTextResult) => void) => {
