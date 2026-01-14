@@ -22,6 +22,7 @@ import { addExDateToRRule, addUntilToRRule, updateDTStartInRRule } from '@/utils
 import { useTaskMenu } from '@/hooks/useTaskMenu'
 import { useDeleteRecurrence } from '@/hooks/useDeleteRecurrence'
 import { DeleteRecurrenceModal } from '@/components/ui/date-picker/DeleteRecurrenceModal'
+import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
 
 import { ContextMenu } from '@/shared/components/ContextMenu'
 import { SubtaskList } from './SubtaskList'
@@ -156,162 +157,40 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
         }
     }
 
-    const handleRecurrenceUpdateConfirm = (mode: 'single' | 'following' | 'all') => {
+    const { confirmRecurrenceUpdate } = useRecurrenceUpdate()
+
+    const handleRecurrenceUpdateConfirm = async (mode: 'single' | 'following' | 'all') => {
         if (!task) return
+
+        let updates: any = {}
 
         if (recurrenceAction === 'description') {
             if (pendingDescription === null) return
-
-            if (mode === 'single') {
-                if (occurrenceDateStr) {
-                    setOccurrenceStatus({
-                        taskId: realTaskId,
-                        date: occurrenceDateStr,
-                        status: 'archived'
-                    })
-
-                    let startTime = null
-                    let endTime = null
-                    if (task.start_time) {
-                        const timePart = new Date(task.start_time).toISOString().split('T')[1]
-                        startTime = `${occurrenceDateStr}T${timePart}`
-                        if (task.end_time) {
-                            const startMs = new Date(task.start_time).getTime()
-                            const endMs = new Date(task.end_time).getTime()
-                            const duration = endMs - startMs
-                            endTime = new Date(new Date(startTime).getTime() + duration).toISOString()
-                        }
-                    }
-
-                    createTask({
-                        title: task.title,
-                        description: pendingDescription,
-                        priority: task.priority,
-                        projectId: task.project_id,
-                        userId: task.user_id,
-                        parentId: task.parent_id,
-                        due_date: occurrenceDateStr,
-                        start_time: startTime,
-                        end_time: endTime
-                    })
-                }
-            }
-            else if (mode === 'following') {
-                if (occurrenceDateStr) {
-                    let splitDateMs = new Date(occurrenceDateStr).getTime()
-                    if (task.start_time) {
-                        const timePart = new Date(task.start_time).toISOString().split('T')[1]
-                        splitDateMs = new Date(`${occurrenceDateStr}T${timePart}`).getTime()
-                    }
-
-                    const prevTime = new Date(splitDateMs - 1000)
-                    const oldRuleEnd = addUntilToRRule(task.recurrence_rule || '', prevTime)
-                    updateTask({ taskId: realTaskId, updates: { recurrence_rule: oldRuleEnd } })
-
-                    const newStart = new Date(splitDateMs)
-                    const newRule = updateDTStartInRRule(task.recurrence_rule || '', newStart)
-
-                    let startTime = null
-                    let endTime = null
-                    if (task.start_time) {
-                        startTime = newStart.toISOString()
-                        if (task.end_time) {
-                            const startMs = new Date(task.start_time).getTime()
-                            const endMs = new Date(task.end_time).getTime()
-                            const duration = endMs - startMs
-                            endTime = new Date(newStart.getTime() + duration).toISOString()
-                        }
-                    }
-
-                    createTask({
-                        title: task.title,
-                        description: pendingDescription,
-                        priority: task.priority,
-                        projectId: task.project_id,
-                        userId: task.user_id,
-                        parentId: task.parent_id,
-                        due_date: occurrenceDateStr,
-                        start_time: startTime,
-                        end_time: endTime,
-                        recurrence_rule: newRule
-                    })
-                }
-            }
-            else {
-                updateTask({ taskId: realTaskId, updates: { description: pendingDescription } })
-            }
-            setPendingDescription(null)
+            updates = { description: pendingDescription }
         } else if (recurrenceAction === 'date-time') {
             if (!pendingDateUpdates) return
-
-            // "Single": Detach instance at NEW time
-            if (mode === 'single') {
-                if (occurrenceDateStr) {
-                    // Archive the OLD slot
-                    setOccurrenceStatus({
-                        taskId: realTaskId,
-                        date: occurrenceDateStr,
-                        status: 'archived'
-                    })
-
-                    // Create NEW task with NEW updates
-                    createTask({
-                        title: task.title,
-                        description: task.description,
-                        priority: task.priority,
-                        projectId: task.project_id,
-                        userId: task.user_id,
-                        parentId: task.parent_id,
-                        // Defaults from original task, overwritten by updates
-                        due_date: occurrenceDateStr, // Default to old date, will be overwritten by pendingDateUpdates
-                        start_time: task.start_time ? `${occurrenceDateStr}T${task.start_time.split('T')[1]}` : null,
-                        end_time: task.end_time ? `${occurrenceDateStr}T${task.end_time.split('T')[1]}` : null,
-                        ...pendingDateUpdates
-                    })
-                }
-            }
-            // "Following": Split the series
-            else if (mode === 'following') {
-                if (occurrenceDateStr) {
-                    // 1. Truncate old series at previous instance
-                    let splitDateMs = new Date(occurrenceDateStr).getTime()
-                    if (task.start_time) {
-                        const timePart = new Date(task.start_time).toISOString().split('T')[1]
-                        splitDateMs = new Date(`${occurrenceDateStr}T${timePart}`).getTime()
-                    }
-                    const prevTime = new Date(splitDateMs - 1000)
-                    const oldRuleEnd = addUntilToRRule(task.recurrence_rule || '', prevTime)
-                    updateTask({ taskId: realTaskId, updates: { recurrence_rule: oldRuleEnd } })
-
-                    // 2. Create NEW series
-                    const newStartStr = pendingDateUpdates.start_time ||
-                        (pendingDateUpdates.due_date ? `${pendingDateUpdates.due_date}T00:00:00` : null) ||
-                        new Date(splitDateMs).toISOString()
-
-                    const newStart = new Date(newStartStr)
-                    const newRule = updateDTStartInRRule(task.recurrence_rule || '', newStart)
-
-                    createTask({
-                        title: task.title,
-                        description: task.description,
-                        priority: task.priority,
-                        projectId: task.project_id,
-                        userId: task.user_id,
-                        parentId: task.parent_id,
-                        due_date: pendingDateUpdates.due_date || occurrenceDateStr,
-                        start_time: pendingDateUpdates.start_time || (task.start_time ? newStartStr : null),
-                        end_time: pendingDateUpdates.end_time || null,
-                        recurrence_rule: newRule,
-                    })
-                }
-            }
-            // "All": Update master task
-            else {
-                updateTask({ taskId: realTaskId, updates: pendingDateUpdates })
-            }
-            setPendingDateUpdates(null)
+            updates = pendingDateUpdates
         }
 
+        if (occurrenceDateStr) {
+            await confirmRecurrenceUpdate({
+                task,
+                mode,
+                occurrenceDate: occurrenceDateStr,
+                updates
+            })
+        } else if (mode === 'all') {
+            // Fallback for when we might edit the master task directly without occurrence context
+            await confirmRecurrenceUpdate({
+                task,
+                mode,
+                occurrenceDate: task.due_date || '', // Should not matter for 'all' mode
+                updates
+            })
+        }
+
+        setPendingDescription(null)
+        setPendingDateUpdates(null)
         setRecurrenceEditModalOpen(false)
     }
 

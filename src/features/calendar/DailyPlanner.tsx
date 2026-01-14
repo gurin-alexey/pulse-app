@@ -17,9 +17,10 @@ import { useCreateTask } from '@/hooks/useCreateTask'
 import { useSettings } from "@/store/useSettings"
 import { supabase } from '@/lib/supabase'
 
-import { generateRecurringInstances, addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
+import { generateRecurringInstances } from '@/utils/recurrence'
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
+import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
 
 import './calendar.css'
 
@@ -183,7 +184,9 @@ export function DailyPlanner() {
         setSearchParams(params)
     }
 
-    const handleRecurrenceConfirm = (mode: 'single' | 'following' | 'all') => {
+    const { confirmRecurrenceUpdate } = useRecurrenceUpdate()
+
+    const handleRecurrenceConfirm = async (mode: 'single' | 'following' | 'all') => {
         if (!pendingCalendarUpdate) return
         const { taskId, updates, occurrenceDate } = pendingCalendarUpdate
 
@@ -191,72 +194,12 @@ export function DailyPlanner() {
         const task = tasks?.find(t => t.id === taskId)
         if (!task) return
 
-        if (mode === 'single') {
-            if (occurrenceDate) {
-                // Archive occurrence
-                setOccurrenceStatus({
-                    taskId,
-                    date: occurrenceDate,
-                    status: 'archived'
-                })
-
-                // Create new generic task 
-                // We merge original task props with new updates
-                createTask({
-                    title: task.title,
-                    description: task.description,
-                    priority: task.priority,
-                    projectId: task.project_id,
-                    userId: task.user_id,
-                    parentId: task.parent_id,
-                    // Default values from original, overridden by updates
-                    due_date: updates.due_date || occurrenceDate,
-                    start_time: updates.start_time || (task.start_time ? `${occurrenceDate}T${task.start_time.split('T')[1]}` : null),
-                    end_time: updates.end_time || (task.end_time ? `${occurrenceDate}T${task.end_time.split('T')[1]}` : null),
-                    ...updates
-                })
-            }
-        }
-        else if (mode === 'following') {
-            if (occurrenceDate) {
-                // 1. Truncate old series
-                let splitDateMs = new Date(occurrenceDate).getTime()
-                if (task.start_time) {
-                    const timePart = new Date(task.start_time).toISOString().split('T')[1]
-                    splitDateMs = new Date(`${occurrenceDate}T${timePart}`).getTime()
-                }
-                const prevTime = new Date(splitDateMs - 1000)
-                const oldRuleEnd = addUntilToRRule(task.recurrence_rule || '', prevTime)
-                updateTask({ taskId, updates: { recurrence_rule: oldRuleEnd } })
-
-                // 2. Create NEW series
-                // If we have a new start time from drag, use it.
-                // Otherwise calculate relative to split date.
-                const newStartStr = updates.start_time ||
-                    (updates.due_date ? `${updates.due_date}T00:00:00` : null) ||
-                    new Date(splitDateMs).toISOString()
-
-                const newStart = new Date(newStartStr)
-                const newRule = updateDTStartInRRule(task.recurrence_rule || '', newStart)
-
-                createTask({
-                    title: task.title,
-                    description: task.description,
-                    priority: task.priority,
-                    projectId: task.project_id,
-                    userId: task.user_id,
-                    parentId: task.parent_id,
-                    due_date: updates.due_date || occurrenceDate,
-                    start_time: updates.start_time || (task.start_time ? newStartStr : null),
-                    end_time: updates.end_time || null,
-                    recurrence_rule: newRule,
-                })
-            }
-        }
-        else {
-            // All: Update original task directly
-            updateTask({ taskId, updates })
-        }
+        await confirmRecurrenceUpdate({
+            task,
+            mode,
+            occurrenceDate,
+            updates
+        })
 
         setPendingCalendarUpdate(null)
         setRecurrenceModalOpen(false)

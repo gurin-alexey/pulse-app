@@ -15,7 +15,8 @@ import { Loader2, Settings, ChevronLeft, ChevronRight, Calendar as CalendarIcon,
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
 import { useState, useEffect, useRef, Fragment } from "react"
-import { generateRecurringInstances, addExDateToRRule, addUntilToRRule, updateDTStartInRRule } from "@/utils/recurrence"
+import { generateRecurringInstances } from "@/utils/recurrence"
+import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
 import { Menu, Transition } from "@headlessui/react"
 import { createPortal } from "react-dom"
@@ -280,7 +281,9 @@ export function CalendarPage() {
         })
     }
 
-    const handleRecurrenceConfirm = (mode: 'single' | 'following' | 'all') => {
+    const { confirmRecurrenceUpdate } = useRecurrenceUpdate()
+
+    const handleRecurrenceConfirm = async (mode: 'single' | 'following' | 'all') => {
         const { info } = recurrenceModal
         if (!info) return
 
@@ -304,61 +307,16 @@ export function CalendarPage() {
         const finalStartTime = isAllDay ? null : (newStart?.toISOString() || null)
         const finalEndTime = isAllDay ? null : (newEnd?.toISOString() || null)
 
-        if (mode === 'single') {
-            // Use 'archived' status in task_occurrences to hide the specific instance
-            // keeping the original RRULE clean (no EXDATE clutter)
-            setOccurrenceStatus({
-                taskId: originalId,
-                date: occurrenceDate,
-                status: 'archived'
-            })
-
-            createTask({
-                title: originalTask.title,
-                description: originalTask.description,
-                priority: originalTask.priority,
-                projectId: originalTask.project_id,
-                userId: originalTask.user_id,
-                due_date: dateStr,
-                start_time: finalStartTime,
-                end_time: finalEndTime
-            })
-        }
-        else if (mode === 'following') {
-            // Set until date to just before the current instance start time
-            // We use info.oldEvent.start to get the precise time of the instance being moved
-            const splitDate = info.oldEvent?.start || new Date(occurrenceDate)
-            const prevTime = new Date(splitDate.getTime() - 1000)
-            const oldRuleEnd = addUntilToRRule(originalTask.recurrence_rule || '', prevTime)
-            updateTask({ taskId: originalId, updates: { recurrence_rule: oldRuleEnd } })
-
-            const newRule = updateDTStartInRRule(originalTask.recurrence_rule || '', newStart || new Date())
-
-            createTask({
-                title: originalTask.title,
-                description: originalTask.description,
-                priority: originalTask.priority,
-                projectId: originalTask.project_id,
-                userId: originalTask.user_id,
-                due_date: dateStr,
+        await confirmRecurrenceUpdate({
+            task: originalTask,
+            mode,
+            occurrenceDate,
+            updates: {
                 start_time: finalStartTime,
                 end_time: finalEndTime,
-                recurrence_rule: newRule
-            })
-        }
-        else if (mode === 'all') {
-            const newRule = updateDTStartInRRule(originalTask.recurrence_rule || '', newStart || new Date())
-
-            updateTask({
-                taskId: originalId,
-                updates: {
-                    start_time: finalStartTime,
-                    end_time: finalEndTime,
-                    due_date: dateStr,
-                    recurrence_rule: newRule
-                }
-            })
-        }
+                due_date: dateStr
+            }
+        })
 
         setRecurrenceModal({ isOpen: false, info: null })
     }
