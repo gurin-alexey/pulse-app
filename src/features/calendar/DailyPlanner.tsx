@@ -16,7 +16,7 @@ import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useCreateTask } from '@/hooks/useCreateTask'
 import { useSettings } from "@/store/useSettings"
 import { supabase } from '@/lib/supabase'
-import { TaskDetail } from "@/features/tasks/TaskDetail"
+
 import { generateRecurringInstances, addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
@@ -74,16 +74,7 @@ export function DailyPlanner() {
     useEffect(() => {
         localStorage.setItem('pulse_calendar_show_completed', JSON.stringify(showCompleted))
     }, [showCompleted])
-    const [popup, setPopup] = useState<{ taskId: string, occurrence?: string, x: number, y: number } | null>(null)
 
-    // Close popup on escape
-    useEffect(() => {
-        const handleEsc = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setPopup(null)
-        }
-        window.addEventListener('keydown', handleEsc)
-        return () => window.removeEventListener('keydown', handleEsc)
-    }, [])
 
     const events = useMemo(() => {
         if (!tasks) return []
@@ -157,7 +148,7 @@ export function DailyPlanner() {
 
         const isAllDay = selectInfo.allDay
         let updates: any = {
-            title: 'Новая задача',
+            title: '',
             projectId: null,
             userId: user.id
         }
@@ -176,32 +167,20 @@ export function DailyPlanner() {
 
         createTask(updates, {
             onSuccess: (newTask) => {
-                setSearchParams({ task: newTask.id })
+                setSearchParams({ task: newTask.id, isNew: 'true', origin: 'calendar' })
             }
         })
     }
 
     const handleEventClick = (info: any) => {
         info.jsEvent.preventDefault()
-        const x = info.jsEvent.clientX
-        const y = info.jsEvent.clientY
-
-        // Basic screen edge detection to prevent overflow
-        const winW = window.innerWidth
-        const winH = window.innerHeight
-        const popupW = 400
-        const popupH = 500
-
-        let safeX = x + 10
-        let safeY = y - 50
-
-        if (safeX + popupW > winW) safeX = x - popupW - 10
-        if (safeY + popupH > winH) safeY = winH - popupH - 20
-        if (safeY < 0) safeY = 20
 
         const occurrence = info.event.extendedProps?.occurrence
         const originalId = info.event.extendedProps?.originalId || info.event.id
-        setPopup({ taskId: originalId, occurrence, x: safeX, y: safeY })
+
+        const params: any = { task: originalId, origin: 'calendar' }
+        if (occurrence) params.occurrence = occurrence
+        setSearchParams(params)
     }
 
     const handleRecurrenceConfirm = (mode: 'single' | 'following' | 'all') => {
@@ -461,35 +440,7 @@ export function DailyPlanner() {
                 />
             </div>
 
-            {/* Task Popover */}
-            {popup && (
-                <>
-                    {/* Backdrop */}
-                    <div
-                        className="fixed inset-0 z-40 bg-transparent" // Transparent to allow seeing context, but capturing click
-                        onClick={() => setPopup(null)}
-                    />
-                    {/* Popover Card */}
-                    <div
-                        className="fixed z-50 bg-white rounded-2xl shadow-xl ring-1 ring-black/5 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
-                        style={{
-                            left: popup.x,
-                            top: popup.y,
-                            width: 380,
-                            height: 520,
-                        }}
-                    >
-                        <TaskDetail taskId={popup.taskId} occurrenceDate={popup.occurrence} />
-                        {/* Close Button Overlay */}
-                        <button
-                            onClick={() => setPopup(null)}
-                            className="absolute top-2 right-2 p-1.5 bg-white/80 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors z-20"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-                        </button>
-                    </div>
-                </>
-            )}
+
 
             <RecurrenceEditModal
                 isOpen={recurrenceModalOpen}

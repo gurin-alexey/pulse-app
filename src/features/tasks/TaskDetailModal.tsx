@@ -4,6 +4,7 @@ import clsx from "clsx"
 import { Drawer } from "vaul"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useSearchParams } from "react-router-dom"
+import { X } from 'lucide-react'
 
 export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: () => void }) {
     // Simple media query for mobile check
@@ -44,28 +45,8 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
 
     if (!taskId) return null
 
-    // Desktop: Standard or Popover
+    // Desktop: Always Center Modal
     if (!isMobile) {
-        if (isNew) {
-            return (
-                <div
-                    className="fixed inset-0 z-50 flex items-end justify-end bg-transparent p-0 animate-in fade-in duration-150"
-                    onClick={onClose}
-                >
-                    {/* Invisible backdrop for click-outside */}
-
-                    <div
-                        className="mr-8 mb-24 bg-white shadow-2xl w-full max-w-lg max-h-[75vh] rounded-2xl animate-in zoom-in-95 slide-in-from-bottom-10 duration-200 flex flex-col relative overflow-hidden ring-1 ring-gray-900/5 border border-gray-200"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex-1 overflow-y-auto">
-                            <TaskDetail key={taskId} taskId={taskId} />
-                        </div>
-                    </div>
-                </div>
-            )
-        }
-
         return (
             <div
                 className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-150"
@@ -75,7 +56,14 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
                     className="bg-white shadow-2xl w-full max-w-2xl max-h-[85vh] rounded-2xl animate-in zoom-in-95 duration-150 flex flex-col relative overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="flex-1 overflow-y-auto">
+                    <button
+                        onClick={onClose}
+                        className="absolute top-2 right-2 z-50 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                        title="Close"
+                    >
+                        <X size={20} />
+                    </button>
+                    <div className="flex-1 overflow-y-auto pt-8">
                         <TaskDetail key={taskId} taskId={taskId} />
                     </div>
                 </div>

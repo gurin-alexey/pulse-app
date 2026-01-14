@@ -124,6 +124,7 @@ export function Layout() {
     const newParams = new URLSearchParams(searchParams)
     newParams.delete('task')
     newParams.delete('isNew')
+    newParams.delete('origin')
     setSearchParams(newParams, { replace: true })
   }
 
@@ -359,12 +360,14 @@ export function Layout() {
                     {currentOutlet}
                   </section>
 
+
+
                   {/* Detail Column (Standard Only) */}
                   {!isDashboardPage && (
                     <section className="border-r border-gray-200 bg-white overflow-y-auto h-full hidden lg:block">
                       {selectedIds.size > 1 ? (
                         <BulkActionsPanel />
-                      ) : taskId ? (
+                      ) : taskId && !isNew ? (
                         <TaskDetail taskId={taskId} />
                       ) : (
                         <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -384,10 +387,12 @@ export function Layout() {
           </AnimatePresence>
         </main>
 
-        {/* Modal for Calendar Page OR Mobile List View OR Dashboard Page OR New Task (FAB) */}
-        {taskId && (isCalendarPage || isDashboardPage || !isDesktop || isNew) && (
+        {/* Modal for Calendar Page OR Mobile List View OR Dashboard Page OR New Task (FAB) OR Explicit Origin */}
+        {taskId && (isCalendarPage || isDashboardPage || !isDesktop || isNew || searchParams.get('origin') === 'calendar') && (
           <TaskDetailModal taskId={taskId} onClose={closeModal} />
         )}
+
+
 
         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 

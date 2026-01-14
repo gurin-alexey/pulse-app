@@ -89,7 +89,7 @@ export function RecurrenceMenu({ selectedDate, value, onChange, children }: Recu
 
             <MenuItems
                 anchor="bottom start"
-                className="w-56 bg-white rounded-xl shadow-lg border border-gray-100 p-1 focus:outline-none z-50 origin-top-left text-sm"
+                className="w-56 bg-white rounded-xl shadow-lg border border-gray-100 p-1 focus:outline-none z-[200] origin-top-left text-sm"
             >
                 <MenuItem>
                     {({ active }: { active: boolean }) => (

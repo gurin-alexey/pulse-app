@@ -4,7 +4,7 @@ import { useParams, useSearchParams } from "react-router-dom"
 import { useTasks } from "@/hooks/useTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { AlertCircle, Loader2, MoreHorizontal, Plus, Trash2, Pencil, ChevronRight, GripVertical } from "lucide-react"
-import { CreateTaskInput } from "@/features/tasks/CreateTaskInput"
+import { useCreateTask } from "@/hooks/useCreateTask"
 import { ViewOptions, type SortOption, type GroupOption } from "@/features/tasks/ViewOptions"
 import { useTaskView } from "@/features/tasks/useTaskView"
 import { useSections, useCreateSection, useDeleteSection, useUpdateSection } from "@/hooks/useSections"
@@ -168,6 +168,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
 
     // Mutation Hooks
     const { mutate: updateTask } = useUpdateTask()
+    const { mutate: createTask } = useCreateTask()
     const { mutate: createSection } = useCreateSection()
     const { mutate: deleteSection } = useDeleteSection()
     const { mutate: updateSection } = useUpdateSection()
@@ -439,6 +440,37 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     const toggleStatus = (e: React.MouseEvent, task: any) => {
         e.stopPropagation()
         updateTask({ taskId: task.id, updates: { is_completed: !task.is_completed } })
+    }
+
+    const handleQuickAdd = async () => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const newId = crypto.randomUUID()
+        createTask({
+            id: newId,
+            title: '',
+            userId: user.id,
+            projectId: projectId || null,
+            due_date: targetDate || null
+        })
+        setSearchParams({ task: newId, isNew: 'true' })
+    }
+
+    const handleQuickAddToSection = async (sectionId: string) => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const newId = crypto.randomUUID()
+        createTask({
+            id: newId,
+            title: '',
+            userId: user.id,
+            projectId: projectId || null,
+            sectionId: sectionId,
+            due_date: targetDate || null
+        })
+        setSearchParams({ task: newId, isNew: 'true' })
     }
 
     // Sensors - Removed (Using Global Layout Context)
@@ -763,7 +795,13 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
             <div className="px-4 py-3 border-b border-gray-100 hidden md:flex items-center gap-4 min-h-[4rem] shrink-0 sticky top-0 bg-white z-30">
                 <h2 className="font-bold text-lg text-gray-800 shrink-0">{pageTitle}</h2>
                 <div className="flex-1 max-w-2xl">
-                    <CreateTaskInput projectId={projectId || null} defaultDueDate={targetDate} placeholder="Add a task..." />
+                    <div
+                        onClick={handleQuickAdd}
+                        className="w-full py-2.5 px-4 rounded-xl bg-gray-50 border border-transparent text-gray-500 cursor-pointer hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all flex items-center gap-2 group"
+                    >
+                        <Plus size={20} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+                        <span className="font-medium">Add a task...</span>
+                    </div>
                 </div>
                 <div className="shrink-0">
                     <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />
@@ -949,7 +987,13 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                                                                 <div className="mt-2 border-t border-gray-50/50 pt-2">
                                                                     {projectId && (
                                                                         <div className="hidden md:block">
-                                                                            <CreateTaskInput projectId={projectId} sectionId={section.id} placeholder="Add to section..." defaultDueDate={targetDate} />
+                                                                            <button
+                                                                                onClick={() => handleQuickAddToSection(section.id)}
+                                                                                className="flex items-center gap-2 text-sm text-gray-400 hover:text-blue-600 px-2 py-1.5 rounded-lg transition-colors w-full text-left group/add"
+                                                                            >
+                                                                                <Plus size={16} className="group-hover/add:bg-blue-100 rounded p-0.5 box-content transition-colors" />
+                                                                                <span>Add to section...</span>
+                                                                            </button>
                                                                         </div>
                                                                     )}
                                                                 </div>
