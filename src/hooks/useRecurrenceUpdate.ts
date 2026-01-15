@@ -62,6 +62,7 @@ export function useRecurrenceUpdate() {
 
                 // Create new standalone task
                 // We merge original task props -> defaults for this date -> specific updates
+                // Explicitly set recurrence_rule to null to ensure it's an INDEPENDENT single task.
                 await createTask({
                     title: task.title,
                     description: task.description,
@@ -75,7 +76,9 @@ export function useRecurrenceUpdate() {
                     start_time: defaults.start,
                     end_time: defaults.end,
                     // Overrides:
-                    ...updates
+                    ...updates,
+                    // Force no recurrence for single instance move
+                    recurrence_rule: null
                 })
             }
         }
