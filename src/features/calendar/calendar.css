@@ -36,10 +36,16 @@
 }
 
 .daily-planner-wrapper .fc-v-event {
-    background-color: #eff6ff;
-    border-left: 3px solid #3b82f6;
-    color: #1e40af;
     padding: 2px 4px;
+}
+
+.daily-planner-wrapper .fc-event.is-completed {
+    opacity: 0.7;
+}
+
+.daily-planner-wrapper .fc-event.is-completed .fc-event-title {
+    text-decoration: line-through;
+    color: #9ca3af !important;
 }
 
 .daily-planner-wrapper .fc-timegrid-event .fc-event-time {

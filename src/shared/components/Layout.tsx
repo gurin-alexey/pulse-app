@@ -409,7 +409,7 @@ export function Layout() {
         <GlobalSearch />
       </div>
 
-      <Toaster position="bottom-center" richColors />
+      <Toaster position="top-center" richColors />
 
       {/* Global Drag Overlay */}
       {createPortal(

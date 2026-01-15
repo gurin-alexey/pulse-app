@@ -16,6 +16,8 @@ type CreateTaskParams = {
     description?: string | null
     priority?: string | null
     recurrence_rule?: string | null
+    is_completed?: boolean
+    completed_at?: string | null
 }
 
 const isToday = (dateStr: string | null) => {
@@ -28,7 +30,11 @@ export function useCreateTask() {
     const queryClient = useQueryClient()
 
     return useMutation({
-        mutationFn: async ({ id, title, projectId, userId, parentId, sectionId, due_date, start_time, end_time, description, priority, recurrence_rule }: CreateTaskParams) => {
+        mutationFn: async ({
+            id, title, projectId, userId, parentId, sectionId,
+            due_date, start_time, end_time, description,
+            priority, recurrence_rule, is_completed, completed_at
+        }: CreateTaskParams) => {
             const { data, error } = await supabase
                 .from('tasks')
                 .insert({
@@ -44,6 +50,8 @@ export function useCreateTask() {
                     description: description || null,
                     priority: priority || 'low',
                     recurrence_rule: recurrence_rule || null,
+                    is_completed: is_completed ?? false,
+                    completed_at: completed_at || (is_completed ? new Date().toISOString() : null),
                     sort_order: -Date.now() // Ensure new tasks appear at the top
                 })
                 .select()
@@ -74,12 +82,12 @@ export function useCreateTask() {
                 description: newTodo.description || null,
                 priority: (newTodo.priority as any) || 'low',
                 recurrence_rule: newTodo.recurrence_rule || null,
-                is_completed: false,
+                is_completed: newTodo.is_completed ?? false,
                 is_project: false,
                 created_at: new Date().toISOString(),
                 sort_order: -Date.now(), // Optimistic update
                 deleted_at: null,
-                completed_at: null,
+                completed_at: newTodo.completed_at || (newTodo.is_completed ? new Date().toISOString() : null),
                 tags: [] // Emtpy tags for new task
             }
 

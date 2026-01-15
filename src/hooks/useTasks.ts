@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Task, Tag } from '@/types/database'
 
@@ -175,6 +175,7 @@ export function useTasks(filter: TaskFilter) {
             if (!user) return []
             return fetchTasks(filter)
         },
-        enabled: !!user // Only fetch when we have a user
+        enabled: !!user, // Only fetch when we have a user
+        placeholderData: keepPreviousData
     })
 }

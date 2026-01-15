@@ -247,3 +247,28 @@ export const getPastIncompleteInstances = (
     }
 }
 
+/**
+ * Returns the next occurrence date after the provided completion date.
+ */
+export const getNextOccurrenceDate = (task: Task, completionDate: Date) => {
+    if (!task.recurrence_rule || !task.due_date) return null
+
+    try {
+        let dtstart: Date
+        if (task.start_time) {
+            dtstart = new Date(task.start_time)
+        } else {
+            const dateStr = task.due_date.split('T')[0]
+            dtstart = new Date(dateStr + 'T00:00:00')
+        }
+
+        if (isNaN(dtstart.getTime())) return null
+
+        const rule = getRuleInstance(task.recurrence_rule, dtstart)
+        return rule.after(completionDate, false)
+    } catch (e) {
+        console.error('Failed to get next occurrence', e)
+        return null
+    }
+}
+

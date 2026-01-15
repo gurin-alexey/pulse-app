@@ -14,7 +14,7 @@ import { useSearchParams, useNavigate, useLocation } from "react-router-dom"
 import { Loader2, Settings, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowLeft, ArrowRight, Check } from "lucide-react"
 import type { DateSelectArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
-import { useState, useEffect, useRef, Fragment } from "react"
+import { useState, useEffect, useRef, Fragment, useMemo } from "react"
 import { generateRecurringInstances } from "@/utils/recurrence"
 import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
@@ -24,6 +24,7 @@ import { format } from "date-fns"
 import { ru } from "date-fns/locale"
 import { useSwipeable } from "react-swipeable"
 import { motion, useMotionValue, useTransform, animate } from "framer-motion"
+import clsx from 'clsx'
 
 export function CalendarPage() {
     const location = useLocation()
@@ -43,6 +44,8 @@ export function CalendarPage() {
     const [currentViewType, setCurrentViewType] = useState('timeGridWeek')
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
     const [isSwiping, setIsSwiping] = useState(false)
+
+    const [currentDate, setCurrentDate] = useState(new Date())
 
     // Zoom State
     const ZOOM_LEVELS = ['00:15:00', '00:30:00', '01:00:00', '02:00:00', '04:00:00']
@@ -77,11 +80,6 @@ export function CalendarPage() {
     }>({ isOpen: false, info: null })
 
     const [showCompleted, setShowCompleted] = useState(false)
-
-    // Refetch events when tasks data changes
-    useEffect(() => {
-        calendarRef.current?.getApi().refetchEvents()
-    }, [tasks, showCompleted])
 
     useEffect(() => {
         const handleResize = () => {
@@ -145,7 +143,7 @@ export function CalendarPage() {
         createTask({ id: newId, ...updates, title: '' })
     }
 
-    if (isLoading) {
+    if (isLoading && !tasks) {
         return (
             <div className="h-full flex items-center justify-center text-gray-400">
                 <Loader2 className="animate-spin mr-2" />
@@ -189,6 +187,7 @@ export function CalendarPage() {
             backgroundColor,
             borderColor,
             textColor,
+            classNames: task.is_completed ? 'is-completed' : '',
             extendedProps: {
                 projectId: task.project_id,
                 description: task.description,
@@ -201,11 +200,13 @@ export function CalendarPage() {
         }
     }
 
-    const handleFetchEvents = (fetchInfo: any, successCallback: any) => {
-        if (!tasks) return successCallback([])
+    const events = useMemo(() => {
+        if (!tasks) return []
 
-        const start = fetchInfo.start
-        const end = fetchInfo.end
+        const rangeStart = new Date(currentDate)
+        rangeStart.setMonth(rangeStart.getMonth() - 2)
+        const rangeEnd = new Date(currentDate)
+        rangeEnd.setMonth(rangeEnd.getMonth() + 2)
 
         const allEvents: any[] = []
 
@@ -213,7 +214,7 @@ export function CalendarPage() {
             if (!showCompleted && task.is_completed) return
 
             if (task.recurrence_rule) {
-                const instances = generateRecurringInstances(task, start, end, occurrencesMap)
+                const instances = generateRecurringInstances(task, rangeStart, rangeEnd, occurrencesMap)
                 instances.forEach(instance => {
                     if (!showCompleted && instance.is_completed) return
                     allEvents.push(mapTaskToEvent(instance))
@@ -224,9 +225,8 @@ export function CalendarPage() {
         })
 
         allEvents.sort((a, b) => Number(a.extendedProps.isCompleted) - Number(b.extendedProps.isCompleted))
-
-        successCallback(allEvents)
-    }
+        return allEvents
+    }, [tasks, occurrencesMap, currentDate, showCompleted])
 
     const handleEventDrop = (info: any) => {
         if (info.event.extendedProps.isVirtual) {
@@ -453,23 +453,31 @@ export function CalendarPage() {
     }
 
     const renderEventContent = (eventInfo: any) => {
-        // Hide time for all-day events in generic views if needed, but 'timeText' usually handles formatting
         const { timeText, event } = eventInfo
+        const isCompleted = event.extendedProps.isCompleted
 
-        // List view handles its own layout mostly, but we can return custom content for the main cell
+        const contentClasses = clsx(
+            "flex flex-col w-full h-full px-0.5 py-0 leading-none overflow-hidden",
+            isCompleted && "opacity-75"
+        )
+
+        const titleClasses = clsx(
+            "text-xs font-semibold truncate shrink-0 mb-0.5",
+            isCompleted ? "text-gray-400 line-through decoration-gray-300" : ""
+        )
+
         if (eventInfo.view.type.startsWith('list')) {
             return (
                 <div className="flex items-center gap-2">
-                    <span className="font-medium">{event.title}</span>
+                    <span className={titleClasses}>{event.title}</span>
                     {timeText && <span className="text-gray-500 text-xs">({timeText})</span>}
                 </div>
             )
         }
 
-        // TimeGrid / DayGrid
         return (
-            <div className="flex flex-col w-full h-full px-0.5 py-0 leading-none overflow-hidden">
-                <div className="text-xs font-semibold truncate shrink-0 mb-0.5">{event.title}</div>
+            <div className={contentClasses} style={isCompleted ? { color: '#9ca3af' } : {}}>
+                <div className={titleClasses}>{event.title}</div>
                 {timeText && <div className="text-[10px] opacity-80 truncate min-h-0 shrink">{timeText}</div>}
             </div>
         )
@@ -714,10 +722,11 @@ export function CalendarPage() {
                     datesSet={(arg) => {
                         setCurrentTitle(arg.view.title)
                         setCurrentViewType(arg.view.type)
+                        setCurrentDate(arg.view.currentStart)
                     }}
                     eventOrder="extendedProps.isCompleted,start,-duration,allDay,title"
                     height="100%"
-                    events={handleFetchEvents}
+                    events={events}
                     eventContent={renderEventContent}
                     eventDrop={handleEventDrop}
                     eventResize={handleEventResize}

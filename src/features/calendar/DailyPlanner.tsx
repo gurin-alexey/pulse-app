@@ -120,8 +120,9 @@ export function DailyPlanner() {
                     backgroundColor: bg,
                     borderColor: border,
                     textColor: text,
-                    classNames: clsx(t.is_completed && "opacity-75 line-through decoration-gray-400"),
+                    classNames: clsx(t.is_completed && "is-completed opacity-75 line-through decoration-gray-400"),
                     extendedProps: {
+                        isCompleted: t.is_completed,
                         occurrence: t.occurrence_date,
                         isVirtual: !!t.is_virtual,
                         originalId: t.original_id || t.id
@@ -133,7 +134,7 @@ export function DailyPlanner() {
         return expandedEvents
     }, [tasks, occurrencesMap, currentDate, showCompleted])
 
-    if (isLoading) {
+    if (isLoading && !tasks) {
         return (
             <div className="h-full flex items-center justify-center text-gray-400">
                 <Loader2 className="animate-spin mr-2" />
@@ -399,6 +400,24 @@ export function DailyPlanner() {
                     selectMirror={true}
                     select={handleDateSelect}
                     eventClick={handleEventClick}
+                    eventContent={(eventInfo) => {
+                        const isCompleted = eventInfo.event.extendedProps.isCompleted
+                        return (
+                            <div className={clsx("flex flex-col w-full h-full leading-tight", isCompleted && "text-gray-400")}>
+                                <div className={clsx(
+                                    "text-xs font-semibold truncate shrink-0",
+                                    isCompleted && "line-through decoration-gray-300"
+                                )}>
+                                    {eventInfo.event.title}
+                                </div>
+                                {eventInfo.timeText && (
+                                    <div className="text-[10px] opacity-80 truncate">
+                                        {eventInfo.timeText}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    }}
                     height="100%"
                     events={events}
                     eventDrop={handleEventDrop}

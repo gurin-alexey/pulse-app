@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Task } from '@/types/database'
 
@@ -41,6 +41,7 @@ export function useAllTasks() {
     return useQuery({
         queryKey: ['all-tasks-v2'],
         queryFn: fetchAllTasks,
+        placeholderData: keepPreviousData
         // Since we changed the return type, components consuming this need to handle the object structure.
         // Or we can keep returning tasks array but attach occurrences to them? 
         // No, separation is better. We will update components.

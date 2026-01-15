@@ -158,8 +158,9 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     })
 
     const isInstanceCompleted = occurrenceData?.status === 'completed'
-    // Status logic: if virtual instance, rely on DB record. Default to parent task status if no record.
-    const isCompleted = occurrence ? isInstanceCompleted : task?.is_completed
+    // Status logic: if parent task is completed, then any view of it should be completed. 
+    // Otherwise, check status for specific virtual occurrence.
+    const isCompleted = task?.is_completed || isInstanceCompleted
 
     const handleTitleBlur = () => {
         if (!task) return
@@ -525,7 +526,8 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                                 }}
                                 onContextMenu={(e) => e.stopPropagation()} // Allow native menu
                                 className={clsx(
-                                    "w-full text-xl font-semibold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 text-gray-800 placeholder:text-gray-300 resize-none overflow-hidden leading-snug pr-8",
+                                    "w-full text-xl font-semibold bg-transparent border-none outline-none focus:outline-none focus:ring-0 p-0 placeholder:text-gray-300 resize-none overflow-hidden leading-snug pr-8",
+                                    isCompleted ? "text-gray-400 line-through decoration-gray-300" : "text-gray-800",
                                     t.is_project && "uppercase tracking-wide text-blue-800"
                                 )}
                                 placeholder="What needs to be done?"
