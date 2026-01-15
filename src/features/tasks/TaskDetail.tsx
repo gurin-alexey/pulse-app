@@ -162,9 +162,11 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     // Otherwise, check status for specific virtual occurrence.
     const isCompleted = task?.is_completed || isInstanceCompleted
 
+    const normalize = (s: string | null | undefined) => (s || '').trim()
+
     const handleTitleBlur = () => {
         if (!task) return
-        if (title !== task.title) {
+        if (normalize(title) !== normalize(task.title)) {
             updateTask({ taskId: realTaskId, updates: { title } })
         }
     }
@@ -208,7 +210,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
 
     const handleDescriptionBlur = () => {
         if (!task) return
-        if (description !== task.description) {
+        if (normalize(description) !== normalize(task.description)) {
             // If recurring AND currently on an occurrence (virtual instance), ask user
             if (task.recurrence_rule && occurrenceDateStr && occurrence) {
                 const isFirstInstance = occurrenceDateStr === task.due_date?.split('T')[0]
