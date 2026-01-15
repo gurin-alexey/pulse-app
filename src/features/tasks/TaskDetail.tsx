@@ -33,6 +33,8 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { RecurrenceEditModal } from '@/components/ui/date-picker/RecurrenceEditModal'
 import { TaskHistoryList } from './components/TaskHistoryList'
 import { VoiceInputButton } from '@/components/ui/VoiceInputButton'
+import { useTaskCompletion } from '@/hooks/useTaskCompletion'
+import { OccurrenceCompletionModal } from '@/components/ui/modals/OccurrenceCompletionModal'
 
 type TaskDetailProps = {
     taskId: string
@@ -73,6 +75,15 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const [pendingDescription, setPendingDescription] = useState<string | null>(null)
     const [pendingDateUpdates, setPendingDateUpdates] = useState<any>(null)
     const [recurrenceAction, setRecurrenceAction] = useState<'description' | 'date-time'>('description')
+    const [allowedModes, setAllowedModes] = useState<('single' | 'following' | 'all')[] | undefined>(undefined)
+
+    const {
+        toggleStatus: handleToggleStatus,
+        isModalOpen: completionModalOpen,
+        setIsModalOpen: setCompletionModalOpen,
+        pastInstances,
+        handleConfirmPast
+    } = useTaskCompletion()
 
     const [isHistoryOpen, setIsHistoryOpen] = useState(false)
 
@@ -199,6 +210,12 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
         if (description !== task.description) {
             // If recurring AND currently on an occurrence (virtual instance), ask user
             if (task.recurrence_rule && occurrenceDateStr && occurrence) {
+                const isFirstInstance = occurrenceDateStr === task.due_date?.split('T')[0]
+                if (isFirstInstance) {
+                    setAllowedModes(['single', 'all'])
+                } else {
+                    setAllowedModes(['single', 'following', 'all'])
+                }
                 setPendingDescription(description)
                 setRecurrenceAction('description')
                 setRecurrenceEditModalOpen(true)
@@ -210,18 +227,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
 
     const toggleStatus = () => {
         if (!task) return
-
-        if (occurrence && occurrenceDateStr) {
-            if (isInstanceCompleted) {
-                // If it was completed, we remove the record -> back to pending (not completed)
-                removeOccurrence({ taskId: realTaskId, date: occurrenceDateStr })
-            } else {
-                // Mark as completed
-                setOccurrenceStatus({ taskId: realTaskId, date: occurrenceDateStr, status: 'completed' })
-            }
-        } else {
-            updateTask({ taskId: realTaskId, updates: { is_completed: !task.is_completed } })
-        }
+        handleToggleStatus(task, occurrenceDateStr || undefined)
     }
 
     const handleDelete = () => {
@@ -401,6 +407,16 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
 
                                     // Check for recurrence interception
                                     if (t.recurrence_rule && occurrence && (updates.due_date !== t.due_date || updates.start_time !== t.start_time || updates.end_time !== t.end_time)) {
+                                        const isDateChange = updates.due_date && updates.due_date !== t.due_date
+                                        const isFirstInstance = occurrenceDateStr === t.due_date?.split('T')[0]
+
+                                        if (isDateChange) {
+                                            setAllowedModes(['single', 'following'])
+                                        } else if (isFirstInstance) {
+                                            setAllowedModes(['single', 'all'])
+                                        } else {
+                                            setAllowedModes(['single', 'following', 'all'])
+                                        }
                                         setPendingDateUpdates(updates)
                                         setRecurrenceAction('date-time')
                                         setRecurrenceEditModalOpen(true)
@@ -637,6 +653,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                     }
                 }}
                 onConfirm={handleRecurrenceUpdateConfirm}
+                allowedModes={allowedModes}
                 title={recurrenceAction === 'date-time' ? "Изменение времени повторяющейся задачи" : "Изменение описания повторяющейся задачи"}
             />
             {/* Delete Recurrence Modal */}
@@ -647,6 +664,13 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 onDeleteFuture={handleDeleteFuture}
                 onDeleteAll={handleDeleteAll}
                 isFirstInstance={task?.due_date === occurrenceDateStr}
+            />
+
+            <OccurrenceCompletionModal
+                isOpen={completionModalOpen}
+                onClose={() => setCompletionModalOpen(false)}
+                onConfirm={handleConfirmPast}
+                pastCount={pastInstances.length}
             />
 
             {/* History Modal */}

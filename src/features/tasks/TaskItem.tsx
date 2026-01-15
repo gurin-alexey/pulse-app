@@ -23,6 +23,8 @@ import { addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
 import { useTaskMenu } from '@/hooks/useTaskMenu'
 import { useDeleteRecurrence } from '@/hooks/useDeleteRecurrence'
 import { DeleteRecurrenceModal } from '@/components/ui/date-picker/DeleteRecurrenceModal'
+import { useTaskCompletion } from '@/hooks/useTaskCompletion'
+import { OccurrenceCompletionModal } from '@/components/ui/modals/OccurrenceCompletionModal'
 
 interface TaskItemProps {
     task: any
@@ -38,9 +40,10 @@ interface TaskItemProps {
     onOutdent?: () => void
     viewMode?: 'today' | 'tomorrow' | 'inbox' | 'project' | 'all'
     disableStrikethrough?: boolean
+    occurrencesMap?: Record<string, string>
 }
 
-export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent, viewMode, disableStrikethrough }: TaskItemProps) {
+export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent, viewMode, disableStrikethrough, occurrencesMap }: TaskItemProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
@@ -54,8 +57,18 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const isMobile = useMediaQuery("(max-width: 768px)")
 
+    // Task Completion logic
+    const {
+        toggleStatus: handleToggleStatus,
+        isModalOpen: completionModalOpen,
+        setIsModalOpen: setCompletionModalOpen,
+        pastInstances,
+        handleConfirmPast
+    } = useTaskCompletion()
+
     // Recurrence Logic
     const [recurrenceEditModalOpen, setRecurrenceEditModalOpen] = useState(false)
+    const [allowedModes, setAllowedModes] = useState<('single' | 'following' | 'all')[] | undefined>()
     const [pendingDateUpdate, setPendingDateUpdate] = useState<string | null>(null)
     const { mutate: createTask } = useCreateTask()
     const { setOccurrenceStatus, removeOccurrence } = useTaskOccurrence()
@@ -155,15 +168,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const toggleStatus = (e?: React.MouseEvent | React.TouchEvent) => {
         e?.stopPropagation()
-        if (isVirtual && virtualDate) {
-            if (task.is_completed) {
-                removeOccurrence({ taskId: realTaskId, date: virtualDate })
-            } else {
-                setOccurrenceStatus({ taskId: realTaskId, date: virtualDate, status: 'completed' })
-            }
-        } else {
-            updateTask({ taskId: realTaskId, updates: { is_completed: !task.is_completed } })
-        }
+        handleToggleStatus(task, virtualDate || undefined, occurrencesMap)
     }
 
     const saveTitle = () => {
@@ -331,6 +336,19 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
         const dateStr = format(newDate, 'yyyy-MM-dd')
 
         if (task.recurrence_rule) {
+            const isFirstInstance = targetDate?.split('T')[0] === task.due_date?.split('T')[0]
+            const isDateChange = dateStr !== targetDate
+
+            let modes: ('single' | 'following' | 'all')[] = []
+            if (isDateChange) {
+                modes = ['single', 'following']
+            } else if (isFirstInstance) {
+                modes = ['single', 'all']
+            } else {
+                modes = ['single', 'following', 'all']
+            }
+
+            setAllowedModes(modes)
             setPendingDateUpdate(dateStr)
             setRecurrenceEditModalOpen(true)
             resetSwipe()
@@ -347,6 +365,19 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
         task,
         taskId: realTaskId,
         onDateChangeRequest: (dateStr) => {
+            const isFirstInstance = targetDate?.split('T')[0] === task.due_date?.split('T')[0]
+            const isDateChange = dateStr !== targetDate
+
+            let modes: ('single' | 'following' | 'all')[] = []
+            if (isDateChange) {
+                modes = ['single', 'following']
+            } else if (isFirstInstance) {
+                modes = ['single', 'all']
+            } else {
+                modes = ['single', 'following', 'all']
+            }
+
+            setAllowedModes(modes)
             setPendingDateUpdate(dateStr)
             setRecurrenceEditModalOpen(true)
         },
@@ -617,8 +648,10 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 onClose={() => {
                     setRecurrenceEditModalOpen(false)
                     setPendingDateUpdate(null)
+                    setAllowedModes(undefined)
                 }}
                 onConfirm={handleRecurrenceUpdateConfirm}
+                allowedModes={allowedModes}
                 title="Изменение даты повторяющейся задачи"
             />
 
@@ -629,6 +662,13 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 onDeleteFuture={handleDeleteFuture}
                 onDeleteAll={handleDeleteAll}
                 isFirstInstance={task.due_date === targetDate}
+            />
+
+            <OccurrenceCompletionModal
+                isOpen={completionModalOpen}
+                onClose={() => setCompletionModalOpen(false)}
+                onConfirm={handleConfirmPast}
+                pastCount={pastInstances.length}
             />
         </motion.div>
     )

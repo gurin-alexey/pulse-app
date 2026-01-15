@@ -179,3 +179,71 @@ export const updateDTStartInRRule = (currentRule: string, newDtStart: Date) => {
     }
 }
 
+/**
+ * Returns a list of past dates (as YYYY-MM-DD strings) that should have had 
+ * recurring instances but are not marked as completed/skipped/archived.
+ * @param task The master task
+ * @param occurrencesMap Map of existing performance records
+ * @param referenceDate The date to check against (exclusive, usually "today")
+ */
+export const getPastIncompleteInstances = (
+    task: Task,
+    occurrencesMap: Record<string, string> | Map<string, string>,
+    referenceDate: Date = new Date()
+) => {
+    if (!task.recurrence_rule || !task.due_date) return []
+
+    try {
+        let dtstart: Date
+        if (task.start_time) {
+            dtstart = new Date(task.start_time)
+        } else {
+            const dateStr = task.due_date.split('T')[0]
+            dtstart = new Date(dateStr + 'T00:00:00')
+        }
+
+        if (isNaN(dtstart.getTime())) return []
+
+        const rule = getRuleInstance(task.recurrence_rule, dtstart)
+
+        // We want all instances starting from the first one, up until (but NOT including) referenceDate
+        // referenceDate is usually "Today 00:00:00" in local time to check past days.
+        const endOfYesterday = new Date(referenceDate)
+        endOfYesterday.setHours(0, 0, 0, 0)
+
+        // between(after, before, inc)
+        const dates = rule.between(dtstart, endOfYesterday, true)
+
+        const incomplete: string[] = []
+
+        dates.forEach(date => {
+            const dateStr = [
+                date.getFullYear(),
+                String(date.getMonth() + 1).padStart(2, '0'),
+                String(date.getDate()).padStart(2, '0')
+            ].join('-')
+
+            // If it's today or later, it's not a "past" instance for our logic
+            if (dateStr >= endOfYesterday.toISOString().split('T')[0]) return
+
+            const lookupKey = `${task.id}_${dateStr}`
+            let status: string | undefined
+            if (occurrencesMap instanceof Map) {
+                status = occurrencesMap.get(lookupKey)
+            } else {
+                status = (occurrencesMap as any)?.[lookupKey]
+            }
+
+            // If no status or status is 'pending' (though not usually stored), it's incomplete
+            if (!status) {
+                incomplete.push(dateStr)
+            }
+        })
+
+        return incomplete
+    } catch (e) {
+        console.error('Failed to calculate past instances', e)
+        return []
+    }
+}
+

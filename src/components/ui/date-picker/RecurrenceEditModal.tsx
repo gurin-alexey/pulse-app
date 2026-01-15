@@ -1,40 +1,62 @@
 import { Dialog, Transition } from '@headlessui/react'
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useEffect, useMemo } from 'react'
 import { Repeat, Calendar, ListFilter } from 'lucide-react'
 import clsx from 'clsx'
 
-type RecurrenceEditMode = 'single' | 'following' | 'all'
+export type RecurrenceEditMode = 'single' | 'following' | 'all'
 
 interface RecurrenceEditModalProps {
     isOpen: boolean
     onClose: () => void
     onConfirm: (mode: RecurrenceEditMode) => void
     title?: string
+    allowedModes?: RecurrenceEditMode[]
 }
 
-export function RecurrenceEditModal({ isOpen, onClose, onConfirm, title = "Изменение повторяющегося мероприятия" }: RecurrenceEditModalProps) {
+export function RecurrenceEditModal({
+    isOpen,
+    onClose,
+    onConfirm,
+    title = "Изменение повторяющегося мероприятия",
+    allowedModes
+}: RecurrenceEditModalProps) {
     const [selectedMode, setSelectedMode] = useState<RecurrenceEditMode>('single')
 
-    const options = [
+    const allOptions = [
         {
-            id: 'single',
+            id: 'single' as RecurrenceEditMode,
             name: 'Только это мероприятие',
             description: 'Изменения коснутся только этого экземпляра.',
             icon: Calendar
         },
         {
-            id: 'following',
+            id: 'following' as RecurrenceEditMode,
             name: 'Это и последующие мероприятия',
             description: 'Изменения коснутся этого и всех будущих экземпляров.',
             icon: ListFilter
         },
         {
-            id: 'all',
+            id: 'all' as RecurrenceEditMode,
             name: 'Все мероприятия',
             description: 'Изменения коснутся всех экземпляров в серии.',
             icon: Repeat
         }
     ]
+
+    const filteredOptions = useMemo(() => {
+        if (!allowedModes) return allOptions
+        return allOptions.filter(opt => allowedModes.includes(opt.id))
+    }, [allowedModes])
+
+    // Ensure selectedMode is valid when options change or modal opens
+    useEffect(() => {
+        if (isOpen && filteredOptions.length > 0) {
+            // If current selectedMode is not in filtered, or just resetting on open
+            if (!filteredOptions.find(o => o.id === selectedMode)) {
+                setSelectedMode(filteredOptions[0].id)
+            }
+        }
+    }, [isOpen, filteredOptions, selectedMode])
 
     return (
         <Transition appear show={isOpen} as={Fragment}>
@@ -68,7 +90,7 @@ export function RecurrenceEditModal({ isOpen, onClose, onConfirm, title = "Из�
                                 </Dialog.Title>
 
                                 <div className="space-y-3">
-                                    {options.map((option) => (
+                                    {filteredOptions.map((option) => (
                                         <label
                                             key={option.id}
                                             className={clsx(
@@ -83,7 +105,7 @@ export function RecurrenceEditModal({ isOpen, onClose, onConfirm, title = "Из�
                                                 name="recurrence-mode"
                                                 value={option.id}
                                                 checked={selectedMode === option.id}
-                                                onChange={() => setSelectedMode(option.id as RecurrenceEditMode)}
+                                                onChange={() => setSelectedMode(option.id)}
                                                 className="sr-only"
                                             />
                                             <div className="flex w-full items-center justify-between">

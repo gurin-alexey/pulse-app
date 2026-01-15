@@ -45,5 +45,26 @@ export function useTaskOccurrence() {
         }
     })
 
-    return { setOccurrenceStatus, removeOccurrence }
+    const { mutate: batchSetOccurrenceStatus } = useMutation({
+        mutationFn: async ({ taskId, dates, status }: { taskId: string, dates: string[], status: 'completed' | 'skipped' | 'archived' }) => {
+            const records = dates.map(date => ({
+                task_id: taskId,
+                original_date: date,
+                status
+            }))
+
+            const { error } = await supabase
+                .from('task_occurrences')
+                .upsert(records, { onConflict: 'task_id, original_date' })
+
+            if (error) throw error
+        },
+        onSuccess: (_data, { taskId }) => {
+            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
+            queryClient.invalidateQueries({ queryKey: ['task_occurrences'] })
+            queryClient.invalidateQueries({ queryKey: ['occurrence', taskId] })
+        }
+    })
+
+    return { setOccurrenceStatus, removeOccurrence, batchSetOccurrenceStatus }
 }

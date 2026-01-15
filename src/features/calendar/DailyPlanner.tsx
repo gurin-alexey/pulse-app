@@ -42,6 +42,7 @@ export function DailyPlanner() {
     // Recurrence Modal State
     const [recurrenceModalOpen, setRecurrenceModalOpen] = useState(false)
     const [pendingCalendarUpdate, setPendingCalendarUpdate] = useState<any>(null)
+    const [allowedModes, setAllowedModes] = useState<('single' | 'following' | 'all')[] | undefined>(undefined)
 
     const [_, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
@@ -122,6 +123,7 @@ export function DailyPlanner() {
                     classNames: clsx(t.is_completed && "opacity-75 line-through decoration-gray-400"),
                     extendedProps: {
                         occurrence: t.occurrence_date,
+                        isVirtual: !!t.is_virtual,
                         originalId: t.original_id || t.id
                     }
                 })
@@ -203,6 +205,7 @@ export function DailyPlanner() {
 
         setPendingCalendarUpdate(null)
         setRecurrenceModalOpen(false)
+        setAllowedModes(undefined)
     }
 
     const handleEventDrop = (info: EventDropArg) => {
@@ -215,6 +218,7 @@ export function DailyPlanner() {
         const task = tasks?.find(t => t.id === taskId)
         const isRecurring = !!task?.recurrence_rule
         const occurrence = info.event.extendedProps?.occurrence
+        const isVirtual = !!info.event.extendedProps?.isVirtual
 
         const isAllDay = info.event.allDay
         let updates: any = {}
@@ -242,6 +246,30 @@ export function DailyPlanner() {
 
         if (isRecurring && occurrence) {
             info.revert() // Rollback UI
+
+            // Calculate allowed modes
+            const oldDate = occurrence
+            const newDate = updates.due_date
+            const isDateChange = oldDate !== newDate
+            const isFirstInstance = oldDate?.split('T')[0] === task.due_date?.split('T')[0]
+
+            let modes: ('single' | 'following' | 'all')[] = []
+            if (isDateChange) {
+                // Rule 3: Date changed -> only Single and Following
+                modes = ['single', 'following']
+            } else {
+                // Only time change
+                if (isFirstInstance) {
+                    // For first instance, 'following' and 'all' are identical. Show only 'all'.
+                    modes = ['single', 'all']
+                } else if (isVirtual) {
+                    modes = ['single', 'following', 'all']
+                } else {
+                    modes = ['single', 'all']
+                }
+            }
+
+            setAllowedModes(modes)
             setPendingCalendarUpdate({ taskId, updates, occurrenceDate: occurrence })
             setRecurrenceModalOpen(true)
         } else {
@@ -258,6 +286,7 @@ export function DailyPlanner() {
         const task = tasks?.find(t => t.id === taskId)
         const isRecurring = !!task?.recurrence_rule
         const occurrence = info.event.extendedProps?.occurrence
+        const isVirtual = !!info.event.extendedProps?.isVirtual
 
         const updates = {
             start_time: info.event.start?.toISOString() || null,
@@ -266,6 +295,16 @@ export function DailyPlanner() {
 
         if (isRecurring && occurrence) {
             info.revert()
+
+            // Resize is always time change, never date change (FullCalendar restricts this typically)
+            let modes: ('single' | 'following' | 'all')[] = []
+            if (isVirtual) {
+                modes = ['single', 'following', 'all']
+            } else {
+                modes = ['single', 'all']
+            }
+
+            setAllowedModes(modes)
             setPendingCalendarUpdate({ taskId, updates, occurrenceDate: occurrence })
             setRecurrenceModalOpen(true)
         } else {
@@ -390,8 +429,10 @@ export function DailyPlanner() {
                 onClose={() => {
                     setRecurrenceModalOpen(false)
                     setPendingCalendarUpdate(null)
+                    setAllowedModes(undefined)
                 }}
                 onConfirm={handleRecurrenceConfirm}
+                allowedModes={allowedModes}
                 title="Изменение времени повторяющейся задачи"
             />
         </div>

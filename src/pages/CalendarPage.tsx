@@ -73,6 +73,7 @@ export function CalendarPage() {
     const [recurrenceModal, setRecurrenceModal] = useState<{
         isOpen: boolean;
         info: any;
+        allowedModes?: ('single' | 'following' | 'all')[];
     }>({ isOpen: false, info: null })
 
     const [showCompleted, setShowCompleted] = useState(false)
@@ -229,8 +230,25 @@ export function CalendarPage() {
 
     const handleEventDrop = (info: any) => {
         if (info.event.extendedProps.isVirtual) {
-            setRecurrenceModal({ isOpen: true, info })
-            return
+            const originalId = info.event.extendedProps.originalId
+            const occurrenceDate = info.event.extendedProps.occurrenceDate
+            const originalTask = tasks?.find(t => t.id === originalId)
+
+            if (originalTask) {
+                const isDateChange = info.event.start && format(info.event.start, 'yyyy-MM-dd') !== occurrenceDate
+                const isFirstInstance = occurrenceDate === originalTask.due_date?.split('T')[0]
+
+                let modes: ('single' | 'following' | 'all')[] = []
+                if (isDateChange) {
+                    modes = ['single', 'following']
+                } else if (isFirstInstance) {
+                    modes = ['single', 'all']
+                } else {
+                    modes = ['single', 'following', 'all']
+                }
+                setRecurrenceModal({ isOpen: true, info, allowedModes: modes })
+                return
+            }
         }
 
         const taskId = info.event.id
@@ -264,8 +282,17 @@ export function CalendarPage() {
 
     const handleEventResize = (info: any) => {
         if (info.event.extendedProps.isVirtual) {
-            setRecurrenceModal({ isOpen: true, info })
-            return
+            const originalId = info.event.extendedProps.originalId
+            const occurrenceDate = info.event.extendedProps.occurrenceDate
+            const originalTask = tasks?.find(t => t.id === originalId)
+
+            if (originalTask) {
+                const isFirstInstance = occurrenceDate === originalTask.due_date?.split('T')[0]
+                const modes: ('single' | 'following' | 'all')[] = isFirstInstance ? ['single', 'all'] : ['single', 'following', 'all']
+
+                setRecurrenceModal({ isOpen: true, info, allowedModes: modes })
+                return
+            }
         }
 
         const taskId = info.event.id
@@ -457,6 +484,7 @@ export function CalendarPage() {
                     setRecurrenceModal({ isOpen: false, info: null });
                 }}
                 onConfirm={handleRecurrenceConfirm}
+                allowedModes={recurrenceModal.allowedModes}
             />
 
             {/* Unified Custom Header (Desktop Only) */}

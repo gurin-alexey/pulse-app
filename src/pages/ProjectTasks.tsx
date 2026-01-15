@@ -166,6 +166,17 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
         enabled: (mode === 'today' || mode === 'tomorrow') && !!targetDate
     })
 
+    // Convert occurrences array to Record for TaskItem
+    const formattedOccurrencesMap = useMemo(() => {
+        const map: Record<string, string> = {}
+        if (Array.isArray(occurrences)) {
+            occurrences.forEach((o: any) => {
+                map[`${o.task_id}_${o.original_date.split('T')[0]}`] = o.status
+            })
+        }
+        return map
+    }, [occurrences])
+
     // Mutation Hooks
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
@@ -771,6 +782,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                         onIndent={() => handleSwipeIndent(task)}
                         onOutdent={() => handleSwipeOutdent(task)}
                         viewMode={mode || 'project'}
+                        occurrencesMap={formattedOccurrencesMap}
                     />
                 )}
             </SortableTaskItem>
@@ -885,6 +897,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                                                         key={task.id}
                                                         task={task}
                                                         isActive={activeTaskId === task.id}
+                                                        occurrencesMap={formattedOccurrencesMap}
                                                     />
                                                 ))}
                                             </div>
@@ -1040,6 +1053,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                                                         key={task.id}
                                                         task={task}
                                                         isActive={activeTaskId === task.id}
+                                                        occurrencesMap={formattedOccurrencesMap}
                                                     />
                                                 ))}
                                             </div>
