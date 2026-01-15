@@ -672,7 +672,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 isOpen={completionModalOpen}
                 onClose={() => setCompletionModalOpen(false)}
                 onConfirm={handleConfirmPast}
-                pastCount={pastInstances.length}
+                pastInstances={pastInstances}
             />
 
             {/* History Modal */}

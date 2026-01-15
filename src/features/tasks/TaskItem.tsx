@@ -668,7 +668,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                 isOpen={completionModalOpen}
                 onClose={() => setCompletionModalOpen(false)}
                 onConfirm={handleConfirmPast}
-                pastCount={pastInstances.length}
+                pastInstances={pastInstances}
             />
         </motion.div>
     )

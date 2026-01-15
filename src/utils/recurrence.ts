@@ -224,7 +224,13 @@ export const getPastIncompleteInstances = (
             ].join('-')
 
             // If it's today or later, it's not a "past" instance for our logic
-            if (dateStr >= endOfYesterday.toISOString().split('T')[0]) return
+            const referenceDateStr = [
+                endOfYesterday.getFullYear(),
+                String(endOfYesterday.getMonth() + 1).padStart(2, '0'),
+                String(endOfYesterday.getDate()).padStart(2, '0')
+            ].join('-')
+
+            if (dateStr >= referenceDateStr) return
 
             const lookupKey = `${task.id}_${dateStr}`
             let status: string | undefined
