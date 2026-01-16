@@ -39,6 +39,7 @@ export function CalendarPage() {
     const [_, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
     const calendarRef = useRef<FullCalendar>(null)
+    const calendarContainerRef = useRef<HTMLDivElement>(null)
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
     const [currentTitle, setCurrentTitle] = useState('')
     const [currentViewType, setCurrentViewType] = useState('timeGridWeek')
@@ -649,8 +650,9 @@ export function CalendarPage() {
                     swipeRef(node)
                     // @ts-ignore
                     containerRef.current = node
+                    calendarContainerRef.current = node
                 }}
-                className="flex-1 min-h-0 relative touch-pan-y"
+                className="flex-1 min-h-0 relative touch-pan-y pulse-calendar"
                 {...swipeHandlers}
                 style={{ x, opacity }}
             >
@@ -686,7 +688,7 @@ export function CalendarPage() {
                     editable={true}
                     selectable={true}
                     selectMirror={true}
-                    expandRows={true}
+                    dayMaxEventRows={8}
                     select={handleDateSelectWrapper}
                     datesSet={(arg) => {
                         setCurrentTitle(arg.view.title)

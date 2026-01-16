@@ -48,6 +48,7 @@ export function DailyPlanner() {
     const hideNightTime = settings?.preferences?.hide_night_time ?? false
 
     const calendarRef = useRef<FullCalendar>(null)
+    const calendarContainerRef = useRef<HTMLDivElement>(null)
     const [currentDate, setCurrentDate] = useState(new Date())
 
     const handlePrev = () => {
@@ -338,7 +339,7 @@ export function DailyPlanner() {
                 </Menu>
             </div>
 
-            <div className="flex-1 overflow-hidden relative daily-planner-wrapper">
+            <div ref={calendarContainerRef} className="flex-1 overflow-hidden relative daily-planner-wrapper pulse-calendar">
                 <FullCalendar
                     ref={calendarRef}
                     plugins={[timeGridPlugin, interactionPlugin]}
@@ -353,6 +354,7 @@ export function DailyPlanner() {
                     editable={true}
                     selectable={true}
                     selectMirror={true}
+                    dayMaxEventRows={8}
                     select={handleDateSelect}
                     eventClick={handleEventClick}
                     eventContent={renderCalendarEventContent}
