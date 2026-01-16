@@ -405,7 +405,7 @@ export function DailyPlanner() {
                         minute: '2-digit',
                         hour12: false
                     }}
-                    eventClassNames="text-[13px] font-medium rounded-md px-1 shadow-sm border-0"
+                    eventClassNames="text-xs font-medium rounded-md px-1 shadow-sm border-0"
                 />
             </div>
 
