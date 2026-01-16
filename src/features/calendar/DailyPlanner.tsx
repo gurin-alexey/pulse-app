@@ -365,7 +365,7 @@ export function DailyPlanner() {
                 </Menu>
             </div>
 
-            <div ref={calendarContainerRef} className="flex-1 overflow-hidden relative daily-planner-wrapper pulse-calendar">
+            <div ref={calendarContainerRef} className="flex-1 overflow-visible relative daily-planner-wrapper pulse-calendar">
                 <FullCalendar
                     ref={calendarRef}
                     plugins={[timeGridPlugin, interactionPlugin]}

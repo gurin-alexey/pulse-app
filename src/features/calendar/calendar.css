@@ -51,3 +51,19 @@
 .daily-planner-wrapper .fc-timegrid-event .fc-event-time {
     font-weight: 600;
 }
+
+/* Fix popover being cut off by overflow-hidden */
+.fc-popover {
+    position: fixed !important;
+    z-index: 9999 !important;
+}
+
+.fc-more-popover {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Make sure the popover container allows overflow */
+.pulse-calendar .fc-daygrid-day-events {
+    overflow: visible;
+}
