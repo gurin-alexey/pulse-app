@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+
+# Build outputs (Vercel builds from source)
+dist
+dist-ssr
+build
+
+# Native app builds - very large, not needed for web
+android
+src-tauri/target
+
+# Logs
+*.log
+logs
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode
+.idea
+.DS_Store
+
+# Git
+.git
+
+# Other
+*.local
