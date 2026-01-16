@@ -133,71 +133,54 @@ export function useRecurrenceUpdate() {
             }
         }
         // 3. All Instances Update
-        // 3. All Instances Update
         else {
             const finalUpdates = { ...updates }
-            let newRule = task.recurrence_rule
+            const baseRule = updates.recurrence_rule ?? task.recurrence_rule ?? ''
+            let newRule = baseRule
 
-            // Logic: Users want to keep the Master Task on its original DATE, 
-            // but update the TIME if it changed.
-            // "Date changes will be later" — so we ignore due_date shifts for now.
+            const hasStartTimeField = Object.prototype.hasOwnProperty.call(updates, 'start_time')
+            const hasDueDateField = Object.prototype.hasOwnProperty.call(updates, 'due_date')
 
+            if (hasStartTimeField) {
+                // TIMED series (start_time provided)
             if (updates.start_time) {
-                // 1. Get the original date from the Master Task
-                // If master didn't have start_time, use due_date. 
-                // We rely on the fact that the Master Task holds the "Show Date".
-                const masterDateStr = task.start_time
-                    ? task.start_time.split('T')[0]
-                    : (task.due_date || new Date().toISOString().split('T')[0])
+                    // If a date was provided, we intentionally shift the whole series to that date.
+                    // This enables "move all occurrences to this weekday" via drag.
+                    const masterDateStr = (hasDueDateField && updates.due_date)
+                        ? updates.due_date
+                        : (task.start_time ? task.start_time.split('T')[0] : (task.due_date || new Date().toISOString().split('T')[0]))
 
-                // 2. Get the new time from the updates
-                const newTimePart = updates.start_time.split('T')[1] // "15:00:00.000Z"
-
-                // 3. Combine Original Date + New Time
+                    const newTimePart = updates.start_time.split('T')[1]
                 const newMasterStart = `${masterDateStr}T${newTimePart}`
                 finalUpdates.start_time = newMasterStart
+                    finalUpdates.due_date = masterDateStr
 
-                // 4. Handle End Time (preserve duration or use new time?)
-                // If we also have an end time, we should calculate the duration of the *updated instance*
-                // and apply it to the new master start.
                 if (updates.end_time) {
                     const updateStart = new Date(updates.start_time).getTime()
                     const updateEnd = new Date(updates.end_time).getTime()
                     const duration = updateEnd - updateStart
-
                     const newMasterStartMs = new Date(newMasterStart).getTime()
-                    const newMasterEnd = new Date(newMasterStartMs + duration).toISOString()
-                    finalUpdates.end_time = newMasterEnd
-                } else {
-                    // If no end time in update, but master had one? 
-                    // Usually updates come in pairs. If not, we might lose duration if we don't recalc.
-                    // But assume safe if updates is partial.
-                    // If master had end_time, we should probably shift it too?
-                    if (task.end_time && task.start_time) {
+                        finalUpdates.end_time = new Date(newMasterStartMs + duration).toISOString()
+                    } else if (task.end_time && task.start_time) {
                         const oldDuration = new Date(task.end_time).getTime() - new Date(task.start_time).getTime()
                         const newMasterStartMs = new Date(newMasterStart).getTime()
                         finalUpdates.end_time = new Date(newMasterStartMs + oldDuration).toISOString()
                     }
-                }
 
-                // 5. Ensure due_date matches the Original Date (Time changes shouldn't move the date)
-                finalUpdates.due_date = masterDateStr
+                    newRule = updateDTStartInRRule(baseRule, new Date(newMasterStart))
+                } else {
+                    // ALL-DAY series (start_time cleared)
+                    finalUpdates.start_time = null
+                    finalUpdates.end_time = null
 
-                // 6. Update the RRULE's DTSTART to match the new time
-                // This ensures the pattern generation starts at the correct time of day
-                const newStartObj = new Date(newMasterStart)
-                newRule = updateDTStartInRRule(task.recurrence_rule || '', newStartObj)
-            }
-            else {
-                // If NO start_time (e.g. all-day move), the user said "Date changes will be later".
-                // So we STRIP due_date changes if they try to move it to another day.
-                // We only allow title/description/priority updates here.
-                if (finalUpdates.due_date && finalUpdates.due_date !== task.due_date) {
-                    delete finalUpdates.due_date
+                    if (hasDueDateField && updates.due_date) {
+                        finalUpdates.due_date = updates.due_date
+                        newRule = updateDTStartInRRule(baseRule, new Date(`${updates.due_date}T00:00:00`))
+                    }
                 }
             }
 
-            // Always update rule
+            // Always update rule if it exists
             finalUpdates.recurrence_rule = newRule
 
             await updateTask({

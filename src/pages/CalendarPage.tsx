@@ -228,6 +228,30 @@ export function CalendarPage() {
         return allEvents
     }, [tasks, occurrencesMap, currentDate, showCompleted])
 
+    const isTimedEvent = (event: any) => {
+        const startStr = event?.startStr
+        if (typeof startStr === 'string' && startStr.includes('T')) return true
+
+        const start = event?.start
+        const end = event?.end
+        if (start && end) {
+            const durationMs = end.getTime() - start.getTime()
+            if (durationMs > 0 && durationMs < 24 * 60 * 60 * 1000) return true
+        }
+
+        if (start) {
+            const hasTime =
+                start.getHours() !== 0 ||
+                start.getMinutes() !== 0 ||
+                start.getSeconds() !== 0
+            if (hasTime) return true
+        }
+
+        return false
+    }
+
+    const isAllDayEvent = (event: any) => !isTimedEvent(event)
+
     const handleEventDrop = (info: any) => {
         if (info.event.extendedProps.isVirtual) {
             const originalId = info.event.extendedProps.originalId
@@ -235,7 +259,14 @@ export function CalendarPage() {
             const originalTask = tasks?.find(t => t.id === originalId)
 
             if (originalTask) {
-                const isDateChange = info.event.start && format(info.event.start, 'yyyy-MM-dd') !== occurrenceDate
+                const eventStartDateStr = info.event.startStr?.split('T')[0] ||
+                    (info.event.start ? format(info.event.start, 'yyyy-MM-dd') : null)
+                const wasAllDaySeries = !originalTask.start_time
+                const isNowTimed = isTimedEvent(info.event)
+                const treatAsTimeOnlyChange = wasAllDaySeries && isNowTimed
+                const isDateChange = treatAsTimeOnlyChange
+                    ? false
+                    : (eventStartDateStr ? eventStartDateStr !== occurrenceDate : false)
                 const isFirstInstance = occurrenceDate === originalTask.due_date?.split('T')[0]
 
                 let modes: ('single' | 'following' | 'all')[] = []
@@ -252,7 +283,7 @@ export function CalendarPage() {
         }
 
         const taskId = info.event.id
-        const isAllDay = info.event.allDay
+        const isAllDay = isAllDayEvent(info.event)
 
         if (isAllDay && info.event.start) {
             const dateStr = format(info.event.start, 'yyyy-MM-dd')
@@ -325,14 +356,37 @@ export function CalendarPage() {
             return;
         }
 
-        const isAllDay = event.allDay
+        const isAllDay = isAllDayEvent(event)
         const newStart = event.start
         const newEnd = event.end
-        const dateStr = newStart ? format(newStart, 'yyyy-MM-dd') : null
+        let dateStr = newStart ? format(newStart, 'yyyy-MM-dd') : null
 
         // If it's All Day, we MUST clear the times
-        const finalStartTime = isAllDay ? null : (newStart?.toISOString() || null)
-        const finalEndTime = isAllDay ? null : (newEnd?.toISOString() || null)
+        let finalStartTime = isAllDay ? null : (newStart?.toISOString() || null)
+        let finalEndTime = isAllDay ? null : (newEnd?.toISOString() || null)
+
+        // If dragging a virtual occurrence and choosing "all",
+        // keep the master series date anchored.
+        if (mode === 'all' && event.extendedProps.isVirtual && originalTask) {
+            const masterDateStr = originalTask.start_time
+                ? originalTask.start_time.split('T')[0]
+                : (originalTask.due_date || '').split('T')[0]
+            if (masterDateStr) {
+                dateStr = masterDateStr
+                if (!isAllDay && newStart) {
+                    const timePart = newStart.toISOString().split('T')[1]
+                    // Re-anchor start/end to master date to avoid shifting series start.
+                    const anchoredStart = `${masterDateStr}T${timePart}`
+                    const anchoredStartMs = new Date(anchoredStart).getTime()
+                    const durationMs = newEnd && newStart ? (newEnd.getTime() - newStart.getTime()) : null
+                    const anchoredEnd = durationMs !== null
+                        ? new Date(anchoredStartMs + durationMs).toISOString()
+                        : null
+                    finalStartTime = anchoredStart
+                    finalEndTime = anchoredEnd
+                }
+            }
+        }
 
         await confirmRecurrenceUpdate({
             task: originalTask,

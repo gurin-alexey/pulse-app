@@ -28,6 +28,20 @@ html[data-font-family="mono"] input {
     font-family: 'JetBrains Mono', monospace !important;
 }
 
+/* Ensure FullCalendar time/all-day labels are visible */
+.fc .fc-timegrid-axis-cushion,
+.fc .fc-timegrid-slot-label-cushion,
+.fc .fc-col-header-cell-cushion {
+    color: #6b7280;
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 1;
+}
+
+.fc .fc-timegrid-axis-cushion {
+    text-transform: none;
+}
+
 @media (max-width: 768px) {
 
     /* Compact and Centered Title */
