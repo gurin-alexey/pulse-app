@@ -19,6 +19,7 @@ import { buildCalendarEvents, renderCalendarEventContent } from '@/features/cale
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
+import { useAllDayResizer } from '@/features/calendar/useAllDayResizer'
 
 import './calendar.css'
 
@@ -50,6 +51,34 @@ export function DailyPlanner() {
     const calendarRef = useRef<FullCalendar>(null)
     const calendarContainerRef = useRef<HTMLDivElement>(null)
     const [currentDate, setCurrentDate] = useState(new Date())
+
+    // Zoom State (same as CalendarPage)
+    const ZOOM_LEVELS = ['00:15:00', '00:30:00', '01:00:00', '02:00:00', '04:00:00']
+    const [zoomIndex, setZoomIndex] = useState(2) // Default 01:00:00
+
+    // All-day resizer
+    const { maxRows: allDayMaxRows } = useAllDayResizer({ containerRef: calendarContainerRef })
+
+    // Zoom with Ctrl+Scroll
+    useEffect(() => {
+        const container = calendarContainerRef.current
+        if (!container) return
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.ctrlKey) {
+                e.preventDefault()
+                const direction = e.deltaY > 0 ? 1 : -1
+                setZoomIndex(prev => {
+                    const next = prev + direction
+                    if (next >= 0 && next < ZOOM_LEVELS.length) return next
+                    return prev
+                })
+            }
+        }
+
+        container.addEventListener('wheel', handleWheel, { passive: false })
+        return () => container.removeEventListener('wheel', handleWheel)
+    }, [])
 
     const handlePrev = () => {
         calendarRef.current?.getApi().prev()
@@ -348,13 +377,13 @@ export function DailyPlanner() {
                     datesSet={(arg) => setCurrentDate(arg.view.currentStart)}
                     headerToolbar={false}
                     allDaySlot={true}
-                    slotDuration="00:30:00"
-                    slotLabelInterval="01:00"
+                    slotDuration={ZOOM_LEVELS[zoomIndex]}
                     dayHeaderFormat={{ weekday: 'short', month: 'numeric', day: 'numeric', omitCommas: true }}
                     editable={true}
                     selectable={true}
                     selectMirror={true}
-                    dayMaxEventRows={8}
+                    expandRows={true}
+                    dayMaxEventRows={allDayMaxRows}
                     select={handleDateSelect}
                     eventClick={handleEventClick}
                     eventContent={renderCalendarEventContent}
