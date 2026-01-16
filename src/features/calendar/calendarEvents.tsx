@@ -137,7 +137,7 @@ export const renderCalendarEventContent = (eventInfo: any) => {
     )
 
     const titleClasses = clsx(
-        "text-xs font-semibold truncate shrink-0 mb-0.5",
+        "text-[13px] font-semibold truncate shrink-0 mb-0.5",
         isCompleted ? "text-gray-400 line-through decoration-gray-300" : ""
     )
 
@@ -145,7 +145,7 @@ export const renderCalendarEventContent = (eventInfo: any) => {
         return (
             <div className="flex items-center gap-2">
                 <span className={titleClasses}>{event.title}</span>
-                {timeText && <span className="text-gray-500 text-xs">({timeText})</span>}
+                {timeText && <span className="text-gray-500 text-[13px]">({timeText})</span>}
             </div>
         )
     }
