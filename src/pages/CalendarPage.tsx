@@ -156,6 +156,17 @@ export function CalendarPage() {
         let start = task.start_time || task.due_date
         let end = task.end_time
 
+        const getDateStr = (value: string | null | undefined) => {
+            if (!value) return null
+            return value.split('T')[0]
+        }
+
+        const originalTaskId = task.original_id || task.id
+        const originalTask = tasks?.find(t => t.id === originalTaskId) || task
+        const masterDateStr = getDateStr(originalTask.start_time) || getDateStr(originalTask.due_date)
+        const occurrenceDateStr = task.occurrence_date || getDateStr(task.start_time) || getDateStr(task.due_date)
+        const isMaster = !!task.recurrence_rule && !task.is_virtual && !!masterDateStr && occurrenceDateStr === masterDateStr
+
         // Priority-based colors
         let backgroundColor = '#94a3b8' // Default Gray (None)
         let borderColor = '#64748b'
@@ -178,9 +189,12 @@ export function CalendarPage() {
             }
         }
 
+        const baseTitle = task.title || 'Untitled Task'
+        const displayTitle = isMaster ? `[R] ${baseTitle}` : baseTitle
+
         return {
             id: task.id,
-            title: task.title || 'Untitled Task',
+            title: displayTitle,
             start: start || undefined,
             end: end || undefined,
             allDay: !task.start_time,
@@ -195,7 +209,9 @@ export function CalendarPage() {
                 originalId: task.original_id || task.id,
                 isVirtual: task.is_virtual || false,
                 occurrenceDate: task.occurrence_date || null,
-                priority: task.priority
+                priority: task.priority,
+                recurrenceRule: task.recurrence_rule || null,
+                isMaster
             }
         }
     }
@@ -214,9 +230,15 @@ export function CalendarPage() {
             if (!showCompleted && task.is_completed) return
 
             if (task.recurrence_rule) {
+                // 1) Render the master task itself.
+                allEvents.push(mapTaskToEvent(task))
+
+                // 2) Render following occurrences, skipping the master date to avoid duplicates.
+                const masterDateStr = (task.start_time || task.due_date || '').split('T')[0]
                 const instances = generateRecurringInstances(task, rangeStart, rangeEnd, occurrencesMap)
                 instances.forEach(instance => {
                     if (!showCompleted && instance.is_completed) return
+                    if (instance.occurrence_date === masterDateStr) return
                     allEvents.push(mapTaskToEvent(instance))
                 })
             } else {
@@ -509,6 +531,7 @@ export function CalendarPage() {
     const renderEventContent = (eventInfo: any) => {
         const { timeText, event } = eventInfo
         const isCompleted = event.extendedProps.isCompleted
+        const isMaster = !!event.extendedProps.isMaster
 
         const contentClasses = clsx(
             "flex flex-col w-full h-full px-0.5 py-0 leading-none overflow-hidden",
