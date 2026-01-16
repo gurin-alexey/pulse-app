@@ -18,7 +18,7 @@ import { useSettings } from '@/store/useSettings'
 import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
-import { addExDateToRRule, addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
+import { addExDateToRRule, addUntilToRRule, updateDTStartInRRule, updateRRuleByDay } from '@/utils/recurrence'
 import { useTaskMenu } from '@/hooks/useTaskMenu'
 import { useDeleteRecurrence } from '@/hooks/useDeleteRecurrence'
 import { DeleteRecurrenceModal } from '@/components/ui/date-picker/DeleteRecurrenceModal'
@@ -401,6 +401,14 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                                             updates.end_time = null
                                         }
                                         updates.recurrence_rule = recurrenceRule
+
+                                        // Keep weekly rules in sync with the selected weekday
+                                        if (updates.due_date && recurrenceRule) {
+                                            updates.recurrence_rule = updateRRuleByDay(
+                                                recurrenceRule,
+                                                new Date(updates.due_date)
+                                            )
+                                        }
                                     } else {
                                         updates.due_date = null
                                         updates.start_time = null

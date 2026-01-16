@@ -7,6 +7,7 @@ import { RecurrenceMenu } from './RecurrenceMenu'
 import { RRule } from 'rrule'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { Drawer } from 'vaul'
+import { updateRRuleByDay } from '@/utils/recurrence'
 
 type DatePickerPopoverProps = {
     date: Date | null
@@ -34,6 +35,15 @@ export function DatePickerPopover({ date, time, endTime, recurrenceRule, onUpdat
         setSelectedEndTime(endTime)
         setSelectedRecurrence(recurrenceRule)
     }, [date, time, endTime, recurrenceRule, isOpen]) // Re-sync on open
+
+    // Keep weekly recurrence label in sync with selected date
+    useEffect(() => {
+        if (!selectedDate || !selectedRecurrence) return
+        const updated = updateRRuleByDay(selectedRecurrence, selectedDate)
+        if (updated && updated !== selectedRecurrence) {
+            setSelectedRecurrence(updated)
+        }
+    }, [selectedDate, selectedRecurrence])
 
     const handleApply = (close?: () => void) => {
         onUpdate({
