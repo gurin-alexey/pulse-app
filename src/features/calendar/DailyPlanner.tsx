@@ -1,11 +1,11 @@
 import { useState, useEffect, Fragment, useRef, useMemo } from 'react'
 import { Menu, Transition } from '@headlessui/react'
-import { isToday, subMonths, addMonths } from 'date-fns'
+import { subMonths, addMonths } from 'date-fns'
 import ruLocale from '@fullcalendar/core/locales/ru'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { Loader2, Calendar, ArrowLeft, Settings, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, ArrowLeft, Settings } from 'lucide-react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import type { DateSelectArg } from "@fullcalendar/core"
 
@@ -301,36 +301,33 @@ export function DailyPlanner() {
 
     return (
         <div className="h-full flex flex-col bg-white overflow-hidden relative">
-            {/* Toolbar */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 z-10 shrink-0">
+            {/* Toolbar - unified with CalendarPage */}
+            <div className="flex items-center justify-between px-4 py-4 shrink-0 relative">
+                {/* Left: Back to week button - expands on hover */}
                 <button
                     onClick={() => navigate('/calendar')}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border border-blue-100 shadow-sm hover:bg-blue-100 transition-all"
+                    className="group flex items-center gap-0 hover:gap-2 p-3 hover:px-4 text-sm font-medium text-gray-500 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl transition-all duration-200 shadow-sm z-10"
                 >
-                    <ArrowLeft size={16} />
-                    Показать неделю
+                    <ArrowLeft size={22} className="shrink-0" />
+                    <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-[140px] transition-all duration-200 font-medium">
+                        Показать неделю
+                    </span>
                 </button>
 
-                <div className="flex items-center gap-2">
-                    <button onClick={handlePrev} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-                        <ChevronLeft size={18} />
+                {/* Center: Navigation */}
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 bg-gray-100 p-1 rounded-lg shadow-sm">
+                    <button onClick={handlePrev} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
+                        ←
                     </button>
-                    <button
-                        onClick={handleToday}
-                        className="p-2 hover:bg-gray-50 rounded-full transition-all group"
-                        title="Вернуться к сегодня"
-                    >
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${isToday(currentDate) ? 'border-slate-500' : 'border-gray-300 group-hover:border-gray-400'
-                            }`}>
-                            <div className={`w-1.5 h-1.5 rounded-full transition-all ${isToday(currentDate) ? 'bg-slate-500' : 'bg-transparent'
-                                }`} />
-                        </div>
+                    <button onClick={handleToday} className="px-3 py-1 text-sm font-semibold hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-700">
+                        Сегодня
                     </button>
-                    <button onClick={handleNext} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-                        <ChevronRight size={18} />
+                    <button onClick={handleNext} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
+                        →
                     </button>
                 </div>
 
+                {/* Right: Settings */}
                 <Menu as="div" className="relative inline-block text-left">
                     <Menu.Button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200">
                         <Settings size={20} />
