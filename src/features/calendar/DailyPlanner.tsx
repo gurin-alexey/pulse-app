@@ -1,7 +1,6 @@
 import { useState, useEffect, Fragment, useRef, useMemo } from 'react'
 import { Menu, Transition } from '@headlessui/react'
-import { format, isToday, subMonths, addMonths } from 'date-fns'
-import { ru } from 'date-fns/locale'
+import { isToday, subMonths, addMonths } from 'date-fns'
 import ruLocale from '@fullcalendar/core/locales/ru'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -9,7 +8,6 @@ import interactionPlugin from '@fullcalendar/interaction'
 import { Loader2, Calendar, ArrowLeft, Settings, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import type { DateSelectArg } from "@fullcalendar/core"
-import clsx from 'clsx'
 
 import { useAllTasks } from '@/hooks/useAllTasks'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
@@ -17,7 +15,7 @@ import { useCreateTask } from '@/hooks/useCreateTask'
 import { useSettings } from "@/store/useSettings"
 import { supabase } from '@/lib/supabase'
 
-import { generateRecurringInstances } from '@/utils/recurrence'
+import { buildCalendarEvents, renderCalendarEventContent } from '@/features/calendar/calendarEvents'
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
@@ -79,59 +77,16 @@ export function DailyPlanner() {
 
 
     const events = useMemo(() => {
-        if (!tasks) return []
-
-        const expandedEvents: any[] = []
         const rangeStart = subMonths(currentDate, 3)
         const rangeEnd = addMonths(currentDate, 3)
 
-        tasks.forEach(task => {
-            let instances: any[] = []
-            if (task.recurrence_rule) {
-                instances = generateRecurringInstances(task, rangeStart, rangeEnd, occurrencesMap)
-            } else {
-                instances = [task]
-            }
-
-            instances.forEach(t => {
-                if (!showCompleted && t.is_completed) return
-
-                let start = t.start_time || t.due_date
-                let end = t.end_time
-
-                let bg = '', border = '', text = ''
-                if (t.is_completed) {
-                    bg = '#f3f4f6'; border = '#e5e7eb'; text = '#9ca3af'
-                } else {
-                    switch (t.priority) {
-                        case 'high': bg = '#fee2e2'; border = '#f87171'; text = '#b91c1c'; break;
-                        case 'medium': bg = '#ffedd5'; border = '#fb923c'; text = '#c2410c'; break;
-                        case 'low': bg = '#dbeafe'; border = '#60a5fa'; text = '#1d4ed8'; break;
-                        default: bg = '#f3f4f6'; border = '#9ca3af'; text = '#374151'; break;
-                    }
-                }
-
-                expandedEvents.push({
-                    id: t.id,
-                    title: t.title,
-                    start: start || undefined,
-                    end: end || undefined,
-                    allDay: !t.start_time,
-                    backgroundColor: bg,
-                    borderColor: border,
-                    textColor: text,
-                    classNames: clsx(t.is_completed && "is-completed opacity-75 line-through decoration-gray-400"),
-                    extendedProps: {
-                        isCompleted: t.is_completed,
-                        occurrence: t.occurrence_date,
-                        isVirtual: !!t.is_virtual,
-                        originalId: t.original_id || t.id
-                    }
-                })
-            })
+        return buildCalendarEvents({
+            tasks,
+            occurrencesMap,
+            rangeStart,
+            rangeEnd,
+            showCompleted
         })
-
-        return expandedEvents
     }, [tasks, occurrencesMap, currentDate, showCompleted])
 
     if (isLoading && !tasks) {
@@ -179,7 +134,7 @@ export function DailyPlanner() {
     const handleEventClick = (info: any) => {
         info.jsEvent.preventDefault()
 
-        const occurrence = info.event.extendedProps?.occurrence
+        const occurrence = info.event.extendedProps?.occurrenceDate
         const originalId = info.event.extendedProps?.originalId || info.event.id
 
         const params: any = { task: originalId, origin: 'calendar' }
@@ -218,7 +173,7 @@ export function DailyPlanner() {
         // Check if task is recurring
         const task = tasks?.find(t => t.id === taskId)
         const isRecurring = !!task?.recurrence_rule
-        const occurrence = info.event.extendedProps?.occurrence
+        const occurrence = info.event.extendedProps?.occurrenceDate
         const isVirtual = !!info.event.extendedProps?.isVirtual
 
         const isAllDay = info.event.allDay
@@ -286,7 +241,7 @@ export function DailyPlanner() {
 
         const task = tasks?.find(t => t.id === taskId)
         const isRecurring = !!task?.recurrence_rule
-        const occurrence = info.event.extendedProps?.occurrence
+        const occurrence = info.event.extendedProps?.occurrenceDate
         const isVirtual = !!info.event.extendedProps?.isVirtual
 
         const updates = {
@@ -400,26 +355,11 @@ export function DailyPlanner() {
                     selectMirror={true}
                     select={handleDateSelect}
                     eventClick={handleEventClick}
-                    eventContent={(eventInfo) => {
-                        const isCompleted = eventInfo.event.extendedProps.isCompleted
-                        return (
-                            <div className={clsx("flex flex-col w-full h-full leading-tight", isCompleted && "text-gray-400")}>
-                                <div className={clsx(
-                                    "text-xs font-semibold truncate shrink-0",
-                                    isCompleted && "line-through decoration-gray-300"
-                                )}>
-                                    {eventInfo.event.title}
-                                </div>
-                                {eventInfo.timeText && (
-                                    <div className="text-[10px] opacity-80 truncate">
-                                        {eventInfo.timeText}
-                                    </div>
-                                )}
-                            </div>
-                        )
-                    }}
+                    eventContent={renderCalendarEventContent}
                     height="100%"
                     events={events}
+                    eventOrder="isCompleted,priorityRank,start,-duration,allDay,title"
+                    eventOrderStrict={true}
                     eventDrop={handleEventDrop}
                     eventResize={handleEventResize}
                     allDayText="Весь день"
