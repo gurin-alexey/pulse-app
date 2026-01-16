@@ -208,7 +208,7 @@ export function CalendarPage() {
                 isCompleted: task.is_completed,
                 originalId: task.original_id || task.id,
                 isVirtual: task.is_virtual || false,
-                occurrenceDate: task.occurrence_date || null,
+                occurrenceDate: task.occurrence_date || occurrenceDateStr || null,
                 priority: task.priority,
                 recurrenceRule: task.recurrence_rule || null,
                 isMaster
@@ -305,6 +305,11 @@ export function CalendarPage() {
         }
 
         const taskId = info.event.id
+        const task = tasks?.find(t => t.id === taskId)
+        if (task?.recurrence_rule) {
+            setRecurrenceModal({ isOpen: true, info, allowedModes: ['single', 'all'] })
+            return
+        }
         const isAllDay = isAllDayEvent(info.event)
 
         if (isAllDay && info.event.start) {

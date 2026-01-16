@@ -1,7 +1,7 @@
 import { useUpdateTask } from './useUpdateTask'
 import { useCreateTask } from './useCreateTask'
 import { useTaskOccurrence } from './useTaskOccurrence'
-import { addUntilToRRule, updateDTStartInRRule, updateRRuleByDay } from '@/utils/recurrence'
+import { addUntilToRRule, updateDTStartInRRule, updateRRuleByDay, getNextOccurrenceDate } from '@/utils/recurrence'
 import type { Task } from '@/types/database'
 
 export type RecurrenceUpdateMode = 'single' | 'following' | 'all'
@@ -80,6 +80,47 @@ export function useRecurrenceUpdate() {
                     // Force no recurrence for single instance move
                     recurrence_rule: null
                 })
+
+                // If the moved instance is the master occurrence, advance the master to next repeat
+                const masterDateStr = task.start_time
+                    ? task.start_time.split('T')[0]
+                    : (task.due_date || '').split('T')[0]
+                const isMasterOccurrence = masterDateStr && occurrenceDate === masterDateStr
+
+                if (isMasterOccurrence) {
+                    const baseTime = task.start_time
+                        ? task.start_time.split('T')[1]
+                        : '00:00:00'
+                    const completionBase = new Date(`${occurrenceDate}T${baseTime}`)
+                    const nextDate = getNextOccurrenceDate(task, completionBase)
+
+                    if (nextDate) {
+                        const year = nextDate.getFullYear()
+                        const month = String(nextDate.getMonth() + 1).padStart(2, '0')
+                        const day = String(nextDate.getDate()).padStart(2, '0')
+                        const nextDateStr = `${year}-${month}-${day}`
+
+                        let newStart = null
+                        let newEnd = null
+
+                        if (task.start_time) {
+                            newStart = nextDate.toISOString()
+                            if (task.end_time) {
+                                const duration = new Date(task.end_time).getTime() - new Date(task.start_time).getTime()
+                                newEnd = new Date(nextDate.getTime() + duration).toISOString()
+                            }
+                        }
+
+                        await updateTask({
+                            taskId: task.id,
+                            updates: {
+                                due_date: nextDateStr,
+                                start_time: newStart,
+                                end_time: newEnd
+                            }
+                        })
+                    }
+                }
             }
         }
         // 2. Following Instances Update
@@ -102,6 +143,13 @@ export function useRecurrenceUpdate() {
 
                 const oldRuleEnd = addUntilToRRule(task.recurrence_rule || '', prevTime)
                 await updateTask({ taskId: task.id, updates: { recurrence_rule: oldRuleEnd } })
+
+                // Ensure the split occurrence is not rendered from the old series
+                setOccurrenceStatus({
+                    taskId: task.id,
+                    date: occurrenceDate,
+                    status: 'archived'
+                })
 
                 // B. Create NEW series
                 // The new series starts at the new time (updates.start_time) or the old time on this date
