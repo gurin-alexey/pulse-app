@@ -381,6 +381,17 @@ export function DailyPlanner() {
                     selectMirror={true}
                     expandRows={true}
                     dayMaxEventRows={allDayMaxRows}
+                    moreLinkClick={(info: any) => {
+                        // Match popover width to day cell width
+                        setTimeout(() => {
+                            const popover = document.querySelector('.fc-more-popover') as HTMLElement
+                            const dayCell = info.dayEl as HTMLElement
+                            if (popover && dayCell) {
+                                popover.style.width = `${dayCell.offsetWidth}px`
+                            }
+                        }, 0)
+                        return 'popover'
+                    }}
                     select={handleDateSelect}
                     eventClick={handleEventClick}
                     eventContent={renderCalendarEventContent}
