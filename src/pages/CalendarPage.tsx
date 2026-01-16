@@ -235,10 +235,24 @@ export function CalendarPage() {
 
                 // 2) Render following occurrences, skipping the master date to avoid duplicates.
                 const masterDateStr = (task.start_time || task.due_date || '').split('T')[0]
+                const rangeStartStr = format(rangeStart, 'yyyy-MM-dd')
+                const rangeEndStr = format(rangeEnd, 'yyyy-MM-dd')
+                const isMasterInRange = !!masterDateStr && masterDateStr >= rangeStartStr && masterDateStr <= rangeEndStr
+
                 const instances = generateRecurringInstances(task, rangeStart, rangeEnd, occurrencesMap)
-                instances.forEach(instance => {
-                    if (!showCompleted && instance.is_completed) return
-                    if (instance.occurrence_date === masterDateStr) return
+                let filtered = instances.filter(instance => {
+                    if (!showCompleted && instance.is_completed) return false
+                    if (isMasterInRange && instance.occurrence_date === masterDateStr) return false
+                    return true
+                })
+
+                // Fallback: if the master date is in range but no instance matched it,
+                // drop the first occurrence to avoid a phantom duplicate day.
+                if (isMasterInRange && filtered.length === instances.length && filtered.length > 0) {
+                    filtered = filtered.slice(1)
+                }
+
+                filtered.forEach(instance => {
                     allEvents.push(mapTaskToEvent(instance))
                 })
             } else {
@@ -313,7 +327,7 @@ export function CalendarPage() {
         const isAllDay = isAllDayEvent(info.event)
 
         if (isAllDay && info.event.start) {
-            const dateStr = format(info.event.start, 'yyyy-MM-dd')
+            const dateStr = info.event.startStr?.split('T')[0] || format(info.event.start, 'yyyy-MM-dd')
             updateTask({
                 taskId,
                 updates: {
@@ -386,7 +400,7 @@ export function CalendarPage() {
         const isAllDay = isAllDayEvent(event)
         const newStart = event.start
         const newEnd = event.end
-        let dateStr = newStart ? format(newStart, 'yyyy-MM-dd') : null
+        let dateStr = event.startStr?.split('T')[0] || (newStart ? format(newStart, 'yyyy-MM-dd') : null)
 
         // If it's All Day, we MUST clear the times
         let finalStartTime = isAllDay ? null : (newStart?.toISOString() || null)

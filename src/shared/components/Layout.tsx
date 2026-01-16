@@ -1,9 +1,10 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams, matchPath, useOutlet } from "react-router-dom"
 import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus, RefreshCw, Search } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Fragment } from "react"
 import { useQueryClient, useIsFetching } from "@tanstack/react-query"
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion"
 import clsx from "clsx"
+import { Dialog, Transition } from "@headlessui/react"
 import { supabase } from "@/lib/supabase"
 import { TaskDetail } from "@/features/tasks/TaskDetail"
 import { TaskDetailModal } from "@/features/tasks/TaskDetailModal"
@@ -36,6 +37,7 @@ export function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { selectedIds } = useSelectionStore()
+  const [timezonePrompt, setTimezonePrompt] = useState<{ from: string; to: string } | null>(null)
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -49,6 +51,30 @@ export function Layout() {
   useEffect(() => {
     fetchSettings()
   }, [])
+
+  useEffect(() => {
+    const currentTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const storedTz = localStorage.getItem('pulse.timezone')
+    const suppressPrompt = localStorage.getItem('pulse.timezonePromptDisabled') === 'true'
+
+    if (!storedTz) {
+      localStorage.setItem('pulse.timezone', currentTz)
+      return
+    }
+
+    if (storedTz !== currentTz && !suppressPrompt) {
+      setTimezonePrompt({ from: storedTz, to: currentTz })
+    }
+  }, [])
+
+  const handleTimezonePromptClose = (disablePrompt = false) => {
+    const currentTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    localStorage.setItem('pulse.timezone', currentTz)
+    if (disablePrompt) {
+      localStorage.setItem('pulse.timezonePromptDisabled', 'true')
+    }
+    setTimezonePrompt(null)
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -255,6 +281,63 @@ export function Layout() {
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
     >
+      {timezonePrompt && (
+        <Transition appear show={true} as={Fragment}>
+          <Dialog as="div" className="relative z-[100]" onClose={() => handleTimezonePromptClose()}>
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-200"
+              enterFrom="opacity-0"
+              enterTo="opacity-100"
+              leave="ease-in duration-150"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
+            </Transition.Child>
+
+            <div className="fixed inset-0 overflow-y-auto">
+              <div className="flex min-h-full items-center justify-center p-4">
+                <Transition.Child
+                  as={Fragment}
+                  enter="ease-out duration-200"
+                  enterFrom="opacity-0 scale-95"
+                  enterTo="opacity-100 scale-100"
+                  leave="ease-in duration-150"
+                  leaveFrom="opacity-100 scale-100"
+                  leaveTo="opacity-0 scale-95"
+                >
+                  <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+                    <Dialog.Title as="h3" className="text-lg font-semibold text-gray-900">
+                      Сменился часовой пояс
+                    </Dialog.Title>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Обнаружена смена часового пояса: <span className="font-medium">{timezonePrompt.from}</span> →{' '}
+                      <span className="font-medium">{timezonePrompt.to}</span>. Тайм‑задачи будут отображаться в локальном времени устройства.
+                    </p>
+                    <div className="mt-6 flex justify-end gap-3">
+                      <button
+                        type="button"
+                        className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+                        onClick={() => handleTimezonePromptClose(true)}
+                      >
+                        Не показывать снова
+                      </button>
+                      <button
+                        type="button"
+                        className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-500/30 transition-all active:scale-95"
+                        onClick={() => handleTimezonePromptClose()}
+                      >
+                        Ок
+                      </button>
+                    </div>
+                  </Dialog.Panel>
+                </Transition.Child>
+              </div>
+            </div>
+          </Dialog>
+        </Transition>
+      )}
       <div {...swipeHandlers} className="flex h-screen overflow-hidden bg-gray-50 flex-col md:flex-row">
         {/* Mobile Top Header */}
         <header className="md:hidden min-h-16 h-auto bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-[60] pt-[env(safe-area-inset-top)]">

@@ -159,7 +159,12 @@ export function useRecurrenceUpdate() {
                     new Date(splitDateMs).toISOString()
 
                 const newStart = new Date(newStartStr)
-                let newRule = updateDTStartInRRule(task.recurrence_rule || '', newStart)
+                const isAllDaySeries = !updates.start_time && !task.start_time
+                let newRule = task.recurrence_rule || ''
+
+                if (!isAllDaySeries) {
+                    newRule = updateDTStartInRRule(newRule, newStart)
+                }
                 newRule = updateRRuleByDay(newRule, newStart)
 
                 await createTask({
@@ -226,8 +231,8 @@ export function useRecurrenceUpdate() {
                     if (hasDueDateField && updates.due_date) {
                         finalUpdates.due_date = updates.due_date
                         const newMasterStart = new Date(`${updates.due_date}T00:00:00`)
-                        newRule = updateDTStartInRRule(baseRule, newMasterStart)
-                        newRule = updateRRuleByDay(newRule, newMasterStart)
+                        // For all-day series, avoid shifting by timezone via DTSTART.
+                        newRule = updateRRuleByDay(baseRule, newMasterStart)
                     }
                 }
             }
