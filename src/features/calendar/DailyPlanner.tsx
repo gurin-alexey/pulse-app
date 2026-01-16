@@ -19,7 +19,6 @@ import { buildCalendarEvents, renderCalendarEventContent } from '@/features/cale
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
-import { useAllDayResizer } from '@/features/calendar/useAllDayResizer'
 
 import './calendar.css'
 
@@ -56,8 +55,6 @@ export function DailyPlanner() {
     const ZOOM_LEVELS = ['00:15:00', '00:30:00', '01:00:00', '02:00:00', '04:00:00']
     const [zoomIndex, setZoomIndex] = useState(2) // Default 01:00:00
 
-    // All-day resizer
-    const { maxRows: allDayMaxRows } = useAllDayResizer({ containerRef: calendarContainerRef })
 
     // Zoom with Ctrl+Scroll
     useEffect(() => {
@@ -380,18 +377,7 @@ export function DailyPlanner() {
                     selectable={true}
                     selectMirror={true}
                     expandRows={true}
-                    dayMaxEventRows={allDayMaxRows}
-                    moreLinkClick={(info: any) => {
-                        // Match popover width to day cell width
-                        setTimeout(() => {
-                            const popover = document.querySelector('.fc-more-popover') as HTMLElement
-                            const dayCell = info.dayEl as HTMLElement
-                            if (popover && dayCell) {
-                                popover.style.width = `${dayCell.offsetWidth}px`
-                            }
-                        }, 0)
-                        return 'popover'
-                    }}
+                    dayMaxEventRows={false}
                     select={handleDateSelect}
                     eventClick={handleEventClick}
                     eventContent={renderCalendarEventContent}

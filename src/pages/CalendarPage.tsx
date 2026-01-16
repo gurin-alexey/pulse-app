@@ -25,7 +25,6 @@ import { ru } from "date-fns/locale"
 import { useSwipeable } from "react-swipeable"
 import { motion, useMotionValue, useTransform, animate } from "framer-motion"
 import clsx from 'clsx'
-import { useAllDayResizer } from "@/features/calendar/useAllDayResizer"
 
 export function CalendarPage() {
     const location = useLocation()
@@ -54,8 +53,6 @@ export function CalendarPage() {
     const [zoomIndex, setZoomIndex] = useState(2) // Default 01:00:00
     const containerRef = useRef<HTMLDivElement>(null)
 
-    // All-day resizer
-    const { maxRows: allDayMaxRows } = useAllDayResizer({ containerRef: calendarContainerRef })
 
     useEffect(() => {
         const container = containerRef.current
@@ -696,18 +693,7 @@ export function CalendarPage() {
                     selectable={true}
                     selectMirror={true}
                     expandRows={true}
-                    dayMaxEventRows={allDayMaxRows}
-                    moreLinkClick={(info: any) => {
-                        // Match popover width to day cell width
-                        setTimeout(() => {
-                            const popover = document.querySelector('.fc-more-popover') as HTMLElement
-                            const dayCell = info.dayEl as HTMLElement
-                            if (popover && dayCell) {
-                                popover.style.width = `${dayCell.offsetWidth}px`
-                            }
-                        }, 0)
-                        return 'popover'
-                    }}
+                    dayMaxEventRows={false}
                     select={handleDateSelectWrapper}
                     datesSet={(arg) => {
                         setCurrentTitle(arg.view.title)

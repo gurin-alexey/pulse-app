@@ -52,44 +52,28 @@
     font-weight: 600;
 }
 
-/* Style the "more" popover dropdown */
-.pulse-calendar .fc-popover {
-    z-index: 9999 !important;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-    border: 1px solid #e5e7eb;
+/* All-day section with scroll on hover */
+.pulse-calendar .fc-daygrid-body {
+    max-height: var(--all-day-max-height, 80px);
     overflow: hidden;
+    transition: max-height 0.2s ease;
 }
 
-.pulse-calendar .fc-popover-header {
-    background: #f9fafb;
-    padding: 8px 12px;
-    font-weight: 600;
-    font-size: 13px;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.pulse-calendar .fc-popover-body {
-    padding: 4px;
-    max-height: 300px;
+.pulse-calendar .fc-daygrid-body:hover {
+    max-height: 200px;
     overflow-y: auto;
 }
 
-.pulse-calendar .fc-popover-body .fc-event {
-    margin: 2px 0;
-    border-radius: 4px;
-}
-
-/* Custom scrollbar for popover */
-.pulse-calendar .fc-popover-body::-webkit-scrollbar {
+/* Custom scrollbar for all-day section */
+.pulse-calendar .fc-daygrid-body::-webkit-scrollbar {
     width: 6px;
 }
 
-.pulse-calendar .fc-popover-body::-webkit-scrollbar-track {
+.pulse-calendar .fc-daygrid-body::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.pulse-calendar .fc-popover-body::-webkit-scrollbar-thumb {
+.pulse-calendar .fc-daygrid-body::-webkit-scrollbar-thumb {
     background-color: #d1d5db;
     border-radius: 20px;
 }
