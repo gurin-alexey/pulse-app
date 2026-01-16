@@ -656,6 +656,7 @@ export function CalendarPage() {
                     swipeRef(node)
                     // @ts-ignore
                     containerRef.current = node
+                    // @ts-ignore
                     calendarContainerRef.current = node
                 }}
                 className="flex-1 min-h-0 relative touch-pan-y pulse-calendar"
