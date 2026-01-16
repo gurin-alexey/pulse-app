@@ -88,6 +88,13 @@ export function useUpdateTask() {
                 }
             })
 
+            // If a parent is completed, complete all descendants.
+            if (updates.is_completed === true) {
+                cascadeUpdates.is_completed = true
+                cascadeUpdates.completed_at = updates.completed_at || new Date().toISOString()
+                needsCascade = true
+            }
+
             if (needsCascade) {
                 // Recursive function to update all children of a parent
                 const cascadeToDescendants = async (parentId: string) => {
@@ -212,6 +219,11 @@ export function useUpdateTask() {
                     contextualUpdates[key] = value
                 }
             })
+
+            if (updates.is_completed === true) {
+                contextualUpdates.is_completed = true
+                contextualUpdates.completed_at = updates.completed_at || new Date().toISOString()
+            }
 
             // If moving to a new parent, try to infer project/section from that parent in cache
             if (updates.parent_id) {
