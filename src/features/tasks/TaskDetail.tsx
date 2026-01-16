@@ -76,6 +76,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const [pendingDateUpdates, setPendingDateUpdates] = useState<any>(null)
     const [recurrenceAction, setRecurrenceAction] = useState<'description' | 'date-time'>('description')
     const [allowedModes, setAllowedModes] = useState<('single' | 'following' | 'all')[] | undefined>(undefined)
+    const [forcedOccurrenceDate, setForcedOccurrenceDate] = useState<string | null>(null)
 
     const {
         toggleStatus: handleToggleStatus,
@@ -186,11 +187,12 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
             updates = pendingDateUpdates
         }
 
-        if (occurrenceDateStr) {
+        const effectiveOccurrenceDate = occurrenceDateStr || forcedOccurrenceDate
+        if (effectiveOccurrenceDate) {
             await confirmRecurrenceUpdate({
                 task,
                 mode,
-                occurrenceDate: occurrenceDateStr,
+                occurrenceDate: effectiveOccurrenceDate,
                 updates
             })
         } else if (mode === 'all') {
@@ -205,14 +207,14 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
 
         setPendingDescription(null)
         setPendingDateUpdates(null)
+        setForcedOccurrenceDate(null)
         setRecurrenceEditModalOpen(false)
     }
 
     const handleDescriptionBlur = () => {
         if (!task) return
         if (normalize(description) !== normalize(task.description)) {
-            // If recurring AND currently on an occurrence (virtual instance), ask user
-            if (task.recurrence_rule && occurrenceDateStr && occurrence) {
+            if (task.recurrence_rule && occurrenceDateStr) {
                 const isFirstInstance = occurrenceDateStr === task.due_date?.split('T')[0]
                 if (isFirstInstance) {
                     setAllowedModes(['single', 'all'])
@@ -222,6 +224,16 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 setPendingDescription(description)
                 setRecurrenceAction('description')
                 setRecurrenceEditModalOpen(true)
+            } else if (task.recurrence_rule) {
+                // Master edit without occurrence context: allow single or all
+                setAllowedModes(['single', 'all'])
+                setPendingDescription(description)
+                setRecurrenceAction('description')
+                setRecurrenceEditModalOpen(true)
+                const masterDateStr = task.start_time
+                    ? task.start_time.split('T')[0]
+                    : (task.due_date || '').split('T')[0]
+                setForcedOccurrenceDate(masterDateStr || null)
             } else {
                 updateTask({ taskId: realTaskId, updates: { description } })
             }
@@ -659,6 +671,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                     setRecurrenceEditModalOpen(false)
                     setPendingDescription(null)
                     setPendingDateUpdates(null)
+                    setForcedOccurrenceDate(null)
                     // Revert description if needed
                     if (recurrenceAction === 'description') {
                         setDescription(task?.description || '')
