@@ -257,22 +257,38 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 for (const task of tasks) {
                     if (task.recurrence_rule) {
                         try {
-                            // Generate instance for target date
-                            // We use expanded range to avoid edge-case exclusions at 00:00
-                            const start = new Date(targetDate + 'T00:00:00')
-                            start.setMinutes(-15) // small buffer
+                            // For "today" mode, include overdue recurring instances
+                            // Start from task's due_date or 3 months ago, whichever is later
+                            let start: Date
+                            if (mode === 'today') {
+                                const taskStart = task.due_date ? new Date(task.due_date.split('T')[0] + 'T00:00:00') : new Date()
+                                const threeMonthsAgo = new Date(targetDate + 'T00:00:00')
+                                threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+                                start = taskStart > threeMonthsAgo ? taskStart : threeMonthsAgo
+                            } else {
+                                start = new Date(targetDate + 'T00:00:00')
+                            }
+                            start.setMinutes(start.getMinutes() - 15) // small buffer
 
                             const end = new Date(targetDate + 'T23:59:59')
-                            end.setMinutes(15)
+                            end.setMinutes(end.getMinutes() + 15)
 
-                            // Correct signature: task, start, end, map
                             const instances = generateRecurringInstances(task, start, end, occurrencesMap)
-                            if (instances.length > 0) {
-                                expanded.push(...instances)
+                            
+                            // Filter: for today show target date + overdue incomplete
+                            // For tomorrow show only target date
+                            const filtered = instances.filter(instance => {
+                                const instanceDate = instance.due_date?.split('T')[0]
+                                if (instanceDate === targetDate) return true
+                                if (mode === 'today' && instanceDate && instanceDate < targetDate && !instance.is_completed) {
+                                    return true // overdue incomplete
+                                }
+                                return false
+                            })
+                            
+                            if (filtered.length > 0) {
+                                expanded.push(...filtered)
                             }
-
-                            // Note: If generating instances returns empty, it means the recurrence doesn't occur today.
-                            // So we don't add the master.
                         } catch (e) {
                             console.error('Error expanding task recurrence', task.id, e)
                         }

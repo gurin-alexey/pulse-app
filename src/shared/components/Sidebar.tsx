@@ -289,25 +289,48 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
             localDate.setDate(localDate.getDate() + 1)
         }
         const dateStr = localDate.toISOString().split('T')[0]
-        const rangeStart = new Date(dateStr + 'T00:00:00')
-        rangeStart.setMinutes(-15)
+        
         const rangeEnd = new Date(dateStr + 'T23:59:59')
-        rangeEnd.setMinutes(15)
+        rangeEnd.setMinutes(rangeEnd.getMinutes() + 15)
 
         let count = 0
         for (const task of allTasks) {
             if (task.recurrence_rule) {
                 try {
+                    // For "today" mode, include overdue recurring instances
+                    let rangeStart: Date
+                    if (mode === 'today') {
+                        const taskStart = task.due_date ? new Date(task.due_date.split('T')[0] + 'T00:00:00') : new Date()
+                        const threeMonthsAgo = new Date(dateStr + 'T00:00:00')
+                        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+                        rangeStart = taskStart > threeMonthsAgo ? taskStart : threeMonthsAgo
+                    } else {
+                        rangeStart = new Date(dateStr + 'T00:00:00')
+                    }
+                    rangeStart.setMinutes(rangeStart.getMinutes() - 15)
+                    
                     const instances = generateRecurringInstances(task, rangeStart, rangeEnd, occurrencesMap as any)
-                    // Must filter by date match because range is buffered
-                    count += instances.filter((i: any) => !i.is_completed && i.due_date === dateStr).length
+                    
+                    // Count: today's instances + overdue incomplete (for today mode)
+                    count += instances.filter((i: any) => {
+                        if (i.is_completed) return false
+                        const instanceDate = i.due_date?.split('T')[0]
+                        if (instanceDate === dateStr) return true
+                        if (mode === 'today' && instanceDate && instanceDate < dateStr) return true
+                        return false
+                    }).length
                 } catch (e) {
                     console.error(e)
                 }
             } else {
-                // Ignore time part in due_date match
-                if (!task.is_completed && task.due_date?.split('T')[0] === dateStr) {
-                    count++
+                // Non-recurring: match date OR overdue (for today mode)
+                const d = task.due_date?.split('T')[0]
+                if (!task.is_completed) {
+                    if (d === dateStr) {
+                        count++
+                    } else if (mode === 'today' && d && d < dateStr) {
+                        count++ // overdue
+                    }
                 }
             }
         }

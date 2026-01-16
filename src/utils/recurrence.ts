@@ -64,10 +64,11 @@ export const generateRecurringInstances = (
         const activeInstances: any[] = []
 
         dates.forEach((date) => {
+            // RRule returns UTC dates, use UTC methods for consistency
             const instanceDueStr = [
-                date.getFullYear(),
-                String(date.getMonth() + 1).padStart(2, '0'),
-                String(date.getDate()).padStart(2, '0')
+                date.getUTCFullYear(),
+                String(date.getUTCMonth() + 1).padStart(2, '0'),
+                String(date.getUTCDate()).padStart(2, '0')
             ].join('-')
 
             // Check if there is an exception for this specific date
@@ -258,10 +259,11 @@ export const getPastIncompleteInstances = (
         const incomplete: string[] = []
 
         dates.forEach(date => {
+            // RRule returns UTC dates, use UTC methods for consistency
             const dateStr = [
-                date.getFullYear(),
-                String(date.getMonth() + 1).padStart(2, '0'),
-                String(date.getDate()).padStart(2, '0')
+                date.getUTCFullYear(),
+                String(date.getUTCMonth() + 1).padStart(2, '0'),
+                String(date.getUTCDate()).padStart(2, '0')
             ].join('-')
 
             // If it's today or later, it's not a "past" instance for our logic
