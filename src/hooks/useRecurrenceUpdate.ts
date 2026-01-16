@@ -1,7 +1,7 @@
 import { useUpdateTask } from './useUpdateTask'
 import { useCreateTask } from './useCreateTask'
 import { useTaskOccurrence } from './useTaskOccurrence'
-import { addUntilToRRule, updateDTStartInRRule } from '@/utils/recurrence'
+import { addUntilToRRule, updateDTStartInRRule, updateRRuleByDay } from '@/utils/recurrence'
 import type { Task } from '@/types/database'
 
 export type RecurrenceUpdateMode = 'single' | 'following' | 'all'
@@ -111,7 +111,8 @@ export function useRecurrenceUpdate() {
                     new Date(splitDateMs).toISOString()
 
                 const newStart = new Date(newStartStr)
-                const newRule = updateDTStartInRRule(task.recurrence_rule || '', newStart)
+                let newRule = updateDTStartInRRule(task.recurrence_rule || '', newStart)
+                newRule = updateRRuleByDay(newRule, newStart)
 
                 await createTask({
                     title: task.title,
@@ -168,6 +169,7 @@ export function useRecurrenceUpdate() {
                     }
 
                     newRule = updateDTStartInRRule(baseRule, new Date(newMasterStart))
+                    newRule = updateRRuleByDay(newRule, new Date(newMasterStart))
                 } else {
                     // ALL-DAY series (start_time cleared)
                     finalUpdates.start_time = null
@@ -175,7 +177,9 @@ export function useRecurrenceUpdate() {
 
                     if (hasDueDateField && updates.due_date) {
                         finalUpdates.due_date = updates.due_date
-                        newRule = updateDTStartInRRule(baseRule, new Date(`${updates.due_date}T00:00:00`))
+                        const newMasterStart = new Date(`${updates.due_date}T00:00:00`)
+                        newRule = updateDTStartInRRule(baseRule, newMasterStart)
+                        newRule = updateRRuleByDay(newRule, newMasterStart)
                     }
                 }
             }

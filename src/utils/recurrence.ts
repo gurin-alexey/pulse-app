@@ -121,6 +121,38 @@ export const addExDateToRRule = (currentRule: string, dateToExclude: Date) => {
 }
 
 /**
+ * Updates BYDAY in a weekly RRULE to match the provided date's weekday.
+ */
+export const updateRRuleByDay = (currentRule: string, newDate: Date) => {
+    if (!currentRule) return currentRule
+
+    const weekdayMap = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+    const newByDay = weekdayMap[newDate.getDay()]
+
+    const lines = currentRule.split('\n')
+    let updated = false
+
+    const newLines = lines.map(line => {
+        const isRuleLine = line.startsWith('RRULE:') || (!line.includes(':') && line.includes('FREQ='))
+        if (!isRuleLine) return line
+
+        let ruleContent = line.startsWith('RRULE:') ? line.substring(6) : line
+        if (!ruleContent.includes('FREQ=WEEKLY')) return line
+
+        if (ruleContent.includes('BYDAY=')) {
+            ruleContent = ruleContent.replace(/BYDAY=[^;]+/, `BYDAY=${newByDay}`)
+        } else {
+            ruleContent = `${ruleContent};BYDAY=${newByDay}`
+        }
+
+        updated = true
+        return line.startsWith('RRULE:') ? `RRULE:${ruleContent}` : ruleContent
+    })
+
+    return updated ? newLines.join('\n') : currentRule
+}
+
+/**
  * Adds or updates an UNTIL date in the recurrence rule string.
  */
 export const addUntilToRRule = (currentRule: string, untilDate: Date) => {
