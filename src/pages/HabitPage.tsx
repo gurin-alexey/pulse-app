@@ -6,6 +6,7 @@ import { useHabitLogs } from "@/hooks/useHabitLogs"
 import { useUpsertHabitLog } from "@/hooks/useUpsertHabitLog"
 import { useDeleteHabitLog } from "@/hooks/useDeleteHabitLog"
 import { supabase } from "@/lib/supabase"
+import type { HabitLog } from "@/types/database"
 import {
     format,
     subDays,
