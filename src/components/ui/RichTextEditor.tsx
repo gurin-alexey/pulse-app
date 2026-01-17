@@ -4,10 +4,13 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Link from '@tiptap/extension-link'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import { Bold, Italic, List, ListOrdered, Code, Quote, Link as LinkIcon, Minus, Type, CheckSquare } from 'lucide-react'
+import Image from '@tiptap/extension-image'
+import { Bold, Italic, List, ListOrdered, Code, Quote, Link as LinkIcon, Minus, Type, CheckSquare, Image as ImageIcon } from 'lucide-react'
 import clsx from 'clsx'
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { VoiceInputButton } from './VoiceInputButton'
+import { uploadImage } from '@/utils/imageUpload'
+import { ImageViewer } from './ImageViewer'
 
 type RichTextEditorProps = {
     content: string
@@ -44,6 +47,19 @@ const MenuButton = ({
 
 export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a description...", className, editable = true }: RichTextEditorProps) {
     const [showToolbar, setShowToolbar] = useState(false)
+    const [previewImage, setPreviewImage] = useState<string | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const handleImageUpload = async (file: File) => {
+        if (!file.type.startsWith('image/')) return
+
+        // Show loading state or optimized placeholder if needed?
+        // For now, we await upload.
+        const url = await uploadImage(file)
+        if (url && editor) {
+            editor.chain().focus().setImage({ src: url }).run()
+        }
+    }
 
     const editor = useEditor({
         extensions: [
@@ -61,6 +77,10 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
             TaskItem.configure({
                 nested: true,
             }),
+            Image.configure({
+                inline: true,
+                allowBase64: true, // fallback
+            }),
         ],
         content: content,
         editable: editable,
@@ -68,6 +88,41 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
             attributes: {
                 class: 'prose prose-sm max-w-none focus:outline-none min-h-[100px] text-gray-600 leading-relaxed text-[13.8px]', // Explicitly slightly smaller than base 14px if needed, or stick to prose-sm
             },
+            handleClick: (view, pos, event) => {
+                const target = event.target as HTMLElement
+                if (target.tagName === 'IMG' && target.hasAttribute('src')) {
+                    setPreviewImage(target.getAttribute('src'))
+                    return true
+                }
+                return false
+            },
+            handlePaste: (view, event) => {
+                const items = Array.from(event.clipboardData?.items || [])
+                const images = items.filter(item => item.type.indexOf('image') === 0)
+
+                if (images.length > 0) {
+                    event.preventDefault()
+                    images.forEach(item => {
+                        const file = item.getAsFile()
+                        if (file) handleImageUpload(file)
+                    })
+                    return true
+                }
+                return false
+            },
+            handleDrop: (view, event, slice, moved) => {
+                if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+                    const files = Array.from(event.dataTransfer.files)
+                    const images = files.filter(f => f.type.startsWith('image/'))
+
+                    if (images.length > 0) {
+                        event.preventDefault()
+                        images.forEach(file => handleImageUpload(file))
+                        return true
+                    }
+                }
+                return false
+            }
         },
         onUpdate: ({ editor }) => {
             onChange(editor.getHTML())
@@ -201,6 +256,23 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
                         <Minus size={16} />
                     </MenuButton>
 
+                    <MenuButton
+                        onClick={() => fileInputRef.current?.click()}
+                        isActive={false}
+                        title="Upload Image"
+                    >
+                        <ImageIcon size={16} />
+                    </MenuButton>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => {
+                            if (e.target.files?.[0]) handleImageUpload(e.target.files[0])
+                        }}
+                    />
+
                     <div className="w-px h-4 bg-gray-200 mx-1" />
 
                     <VoiceInputButton
@@ -217,6 +289,8 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
             <div className="px-1 pb-1">
                 <EditorContent editor={editor} className="min-h-[80px]" />
             </div>
+
+            <ImageViewer src={previewImage} onClose={() => setPreviewImage(null)} />
 
             <style>{`
                 .ProseMirror p.is-editor-empty:first-child::before {
