@@ -45,6 +45,19 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
 
     if (!taskId) return null
 
+    // Handle Escape key
+    React.useEffect(() => {
+        if (!isMobile) {
+            const handleEscape = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    onClose()
+                }
+            }
+            window.addEventListener('keydown', handleEscape)
+            return () => window.removeEventListener('keydown', handleEscape)
+        }
+    }, [isMobile, onClose])
+
     // Desktop: Always Center Modal
     if (!isMobile) {
         return (
