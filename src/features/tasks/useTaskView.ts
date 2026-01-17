@@ -249,6 +249,31 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects, t
             keys.forEach(k => orderedGroups[k] = organizeByHierarchy(groups[k]))
             if (groups['No Tags']) orderedGroups['No Tags'] = organizeByHierarchy(groups['No Tags'])
             return orderedGroups
+        } else if (groupBy === 'complexity') {
+            const visibleIds = new Set(filtered.map(t => t.id))
+            const visibleParentIds = new Set(filtered.map(t => t.parent_id).filter(Boolean))
+
+            filtered.forEach(task => {
+                const isProject = task.is_project
+                const isParent = visibleParentIds.has(task.id)
+                // A task is a child in this context if it has a parent AND that parent is also in the current view
+                // If parent is missing, we treat it as an independent root (Single Action) unless it is a project itself
+                const hasVisibleParent = task.parent_id && visibleIds.has(task.parent_id)
+
+                // Complex if: It's a Project OR It's a Parent OR It belongs to a Parent
+                const isComplex = isProject || isParent || hasVisibleParent
+
+                const key = isComplex ? 'Multi-step Tasks' : 'Single Actions'
+
+                if (!groups[key]) groups[key] = []
+                groups[key].push(task)
+            })
+
+            const orderedGroups: Record<string, TaskWithTags[]> = {}
+            if (groups['Multi-step Tasks']) orderedGroups['Multi-step Tasks'] = organizeByHierarchy(groups['Multi-step Tasks'])
+            if (groups['Single Actions']) orderedGroups['Single Actions'] = organizeByHierarchy(groups['Single Actions'])
+
+            return orderedGroups
         }
 
         return groups

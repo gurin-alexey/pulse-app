@@ -3,7 +3,7 @@ import { Settings2, CheckCircle2, Circle, Calendar, SortAsc, LayoutList, Flag, F
 import clsx from 'clsx'
 
 export type SortOption = 'manual' | 'date_created' | 'due_date' | 'alphabetical'
-export type GroupOption = 'none' | 'date' | 'priority' | 'project' | 'tag'
+export type GroupOption = 'none' | 'date' | 'priority' | 'project' | 'tag' | 'complexity'
 
 type ViewOptionsProps = {
     sortBy: SortOption
@@ -106,6 +106,12 @@ function GroupDropdown({ groupBy, setGroupBy }: { groupBy: GroupOption, setGroup
                         onClick={() => setGroupBy('tag')}
                         icon={<TagIcon size={16} />}
                         label="Tags"
+                    />
+                    <GroupItem
+                        active={groupBy === 'complexity'}
+                        onClick={() => setGroupBy('complexity')}
+                        icon={<ListTree size={16} />}
+                        label="Complexity"
                     />
                 </div>
             )}
