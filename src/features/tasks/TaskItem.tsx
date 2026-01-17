@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
-import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight, Repeat, SkipForward } from "lucide-react"
+import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight, Repeat, SkipForward, Maximize2 } from "lucide-react"
 import { useTags, useToggleTaskTag } from '@/hooks/useTags'
 import clsx from "clsx"
 import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion"
@@ -41,9 +41,10 @@ interface TaskItemProps {
     viewMode?: 'today' | 'tomorrow' | 'inbox' | 'project' | 'all'
     disableStrikethrough?: boolean
     occurrencesMap?: Record<string, string>
+    isSubtaskMode?: boolean
 }
 
-export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent, viewMode, disableStrikethrough, occurrencesMap }: TaskItemProps) {
+export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent, viewMode, disableStrikethrough, occurrencesMap, isSubtaskMode }: TaskItemProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
@@ -163,6 +164,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             // If open, let the outside click handler close it, don't navigate
             return
         }
+        if (isSubtaskMode) return
         setSearchParams({ task: task.id })
     }
 
@@ -179,11 +181,6 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            (e.currentTarget as HTMLTextAreaElement).blur()
-        }
-
         if (e.key === 'Enter') {
             e.preventDefault();
             (e.currentTarget as HTMLTextAreaElement).blur()
@@ -267,6 +264,7 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
 
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault()
+        e.stopPropagation()
         setContextMenu({ x: e.clientX, y: e.clientY })
     }
 
@@ -419,14 +417,14 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                         onClick={addToProject}
                         className="flex-1 bg-blue-500 flex flex-col items-center justify-center text-white gap-0.5 active:bg-blue-600"
                     >
-                        <FolderInput size={16} />
+                        <FolderInput size={14} />
                         <span className="text-[9px] font-bold">Проект</span>
                     </button>
                     <button
                         onClick={addToList}
                         className="flex-1 bg-indigo-500 flex flex-col items-center justify-center text-white gap-0.5 border-l border-white/20 active:bg-indigo-600"
                     >
-                        <List size={16} />
+                        <List size={14} />
                         <span className="text-[9px] font-bold">Список</span>
                     </button>
                 </motion.div>
@@ -440,21 +438,21 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                         onClick={(e) => setDate(e, 'today')}
                         className="flex-1 bg-green-500 flex flex-col items-center justify-center text-white gap-0.5 border-r border-white/20 active:bg-green-600"
                     >
-                        <Calendar size={16} />
+                        <Calendar size={14} />
                         <span className="text-[9px] font-bold">Сегодня</span>
                     </button>
                     <button
                         onClick={(e) => setDate(e, 'tomorrow')}
                         className="flex-1 bg-orange-500 flex flex-col items-center justify-center text-white gap-0.5 border-r border-white/20 active:bg-orange-600"
                     >
-                        <ArrowRight size={16} />
+                        <ArrowRight size={14} />
                         <span className="text-[9px] font-bold">Завтра</span>
                     </button>
                     <button
                         onClick={(e) => setDate(e, 'monday')}
                         className="flex-1 bg-purple-500 flex flex-col items-center justify-center text-white gap-0.5 active:bg-purple-600"
                     >
-                        <Calendar size={16} />
+                        <Calendar size={14} />
                         <span className="text-[9px] font-bold">ПН</span>
                     </button>
                 </motion.div>
@@ -515,7 +513,9 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                                 onKeyDown={handleKeyDown}
                                 onFocus={() => {
                                     setIsEditing(true)
-                                    setSearchParams({ task: task.id })
+                                    if (!isSubtaskMode) {
+                                        setSearchParams({ task: task.id })
+                                    }
                                 }}
                                 onClick={(e) => e.stopPropagation()}
                                 minRows={1}
@@ -630,6 +630,20 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
                         >
                             <ChevronRight size={16} className="text-gray-400" />
                         </div>
+
+                        {/* Open Button for Subtasks */}
+                        {isSubtaskMode && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setSearchParams({ task: task.id })
+                                }}
+                                className="w-6 h-6 flex items-center justify-center cursor-pointer hover:bg-gray-200 rounded shrink-0 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="Open Task"
+                            >
+                                <Maximize2 size={14} />
+                            </button>
+                        )}
                     </div>
                 </motion.div>
             </div>

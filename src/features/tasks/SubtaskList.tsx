@@ -40,6 +40,7 @@ function SortableSubtaskItem({ task }: { task: any }) {
                     isActive={isDragging}
                     listeners={listeners}
                     attributes={attributes}
+                    isSubtaskMode={true}
                 />
             </div>
         </div>
