@@ -62,6 +62,13 @@ export type Habit = {
     color: string | null
     is_archived: boolean
     order_index: number
+    description?: string | null
+    frequency_type?: 'daily' | 'weekly' | 'interval' | null
+    days_of_week?: number[] | null
+    interval_days?: number | null
+    goal_per_day?: number | null
+    reminder_enabled?: boolean | null
+    reminder_time?: string | null
 }
 
 export type HabitLog = {

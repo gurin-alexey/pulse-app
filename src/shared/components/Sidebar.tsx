@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise, RefreshCw, FolderInput, LogOut } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise, RefreshCw, FolderInput, LogOut, Check } from "lucide-react"
 import { useQueryClient, useIsFetching } from "@tanstack/react-query" // Import react-query hooks
 
 // ... existing code ...
@@ -15,6 +15,9 @@ import { useHabits } from "@/hooks/useHabits"
 import { useCreateHabit } from "@/hooks/useCreateHabit"
 import { useUpdateHabit } from "@/hooks/useUpdateHabit"
 import { useDeleteHabit } from "@/hooks/useDeleteHabit"
+import { useHabitLogs } from "@/hooks/useHabitLogs"
+import { useUpsertHabitLog } from "@/hooks/useUpsertHabitLog"
+import { useDeleteHabitLog } from "@/hooks/useDeleteHabitLog"
 import { supabase } from "@/lib/supabase"
 import { useDraggable, useDroppable, useDndMonitor, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
@@ -24,9 +27,9 @@ import { useAllTasks } from "@/hooks/useAllTasks"
 import { useTasks } from "@/hooks/useTasks"
 import { expandTasksForDate } from "@/utils/taskExpansion"
 import { useTags } from "@/hooks/useTags"
-import { isToday, isTomorrow, parseISO } from "date-fns"
+import { isToday, isTomorrow, parseISO, subDays } from "date-fns"
 import { CATEGORIES } from "@/constants/categories"
-import type { Habit } from "@/types/database"
+import type { Habit, HabitLog } from "@/types/database"
 
 type SidebarProps = {
     activePath: string
@@ -325,6 +328,8 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const { mutate: createHabit, isPending: isHabitCreating } = useCreateHabit()
     const { mutate: updateHabit } = useUpdateHabit()
     const { mutate: deleteHabit } = useDeleteHabit()
+    const { mutate: upsertHabitLog } = useUpsertHabitLog()
+    const { mutate: deleteHabitLog } = useDeleteHabitLog()
 
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
     useEffect(() => {
@@ -366,6 +371,15 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         return [...ordered, ...missing]
     }
 
+    const getLocalDateStr = (date: Date) => {
+        const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
+        return local.toISOString().split('T')[0]
+    }
+
+    const todayStr = getLocalDateStr(new Date())
+    const logsFromStr = getLocalDateStr(subDays(new Date(), 30))
+    const { data: habitLogs } = useHabitLogs({ from: logsFromStr, to: todayStr })
+
     const orderedHabits = useMemo(() => {
         if (!habits) return []
         if (habitOrder.length === 0) {
@@ -376,6 +390,51 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         const missing = habits.filter(habit => !habitOrder.includes(habit.id)).sort((a, b) => a.name.localeCompare(b.name))
         return [...ordered, ...missing]
     }, [habits, habitOrder])
+
+    const habitStats = useMemo(() => {
+        if (!habitLogs) return new Map<string, { today?: string, todayLogId?: string, done7: number, streak: number }>()
+
+        const byHabitDate = new Map<string, Map<string, { id: string, status: HabitLog['status'] }>>()
+        habitLogs.forEach((log) => {
+            if (!byHabitDate.has(log.habit_id)) {
+                byHabitDate.set(log.habit_id, new Map())
+            }
+            byHabitDate.get(log.habit_id)!.set(log.log_date, { id: log.id, status: log.status })
+        })
+
+        const stats = new Map<string, { today?: string, todayLogId?: string, done7: number, streak: number }>()
+        orderedHabits.forEach((habit) => {
+            const logMap = byHabitDate.get(habit.id) || new Map()
+            const todayLog = logMap.get(todayStr)
+            let done7 = 0
+            let streak = 0
+
+            for (let i = 0; i < 7; i += 1) {
+                const dayStr = getLocalDateStr(subDays(new Date(), i))
+                if (logMap.get(dayStr)?.status === 'done') {
+                    done7 += 1
+                }
+            }
+
+            for (let i = 0; i < 31; i += 1) {
+                const dayStr = getLocalDateStr(subDays(new Date(), i))
+                if (logMap.get(dayStr)?.status === 'done') {
+                    streak += 1
+                } else {
+                    break
+                }
+            }
+
+            stats.set(habit.id, {
+                today: todayLog?.status,
+                todayLogId: todayLog?.id,
+                done7,
+                streak
+            })
+        })
+
+        return stats
+    }, [habitLogs, orderedHabits, todayStr, logsFromStr])
 
     useDndMonitor({
         onDragStart: (event) => {
@@ -558,6 +617,24 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                 }
             })
         }
+    }
+
+    const handleToggleHabitToday = async (habit: Habit) => {
+        const stats = habitStats.get(habit.id)
+        if (stats?.today === 'done' && stats.todayLogId) {
+            deleteHabitLog(stats.todayLogId)
+            return
+        }
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        upsertHabitLog({
+            habitId: habit.id,
+            userId: user.id,
+            logDate: todayStr,
+            status: 'done'
+        })
     }
 
     const renderProjectItem = (project: any) => {
@@ -949,6 +1026,18 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                 key={habit.id}
                                 className="group/habit flex items-center gap-2 px-3 py-1 text-sm text-gray-600 rounded hover:bg-gray-50 transition-colors"
                             >
+                                <button
+                                    onClick={() => handleToggleHabitToday(habit)}
+                                    className={clsx(
+                                        "w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors",
+                                        habitStats.get(habit.id)?.today === 'done'
+                                            ? "bg-emerald-500 border-emerald-500 text-white"
+                                            : "border-gray-300 text-transparent hover:border-emerald-400"
+                                    )}
+                                    title="Mark done today"
+                                >
+                                    <Check size={12} />
+                                </button>
                                 {habit.emoji ? (
                                     <span className="text-base">{habit.emoji}</span>
                                 ) : (
@@ -957,7 +1046,24 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                         style={{ backgroundColor: habit.color || "#93c5fd" }}
                                     />
                                 )}
-                                <span className="truncate flex-1">{habit.name}</span>
+                                <Link
+                                    to={`/habits/${habit.id}`}
+                                    onClick={onItemClick}
+                                    className={clsx(
+                                        "truncate flex-1",
+                                        activePath === `/habits/${habit.id}` ? "text-blue-600" : "text-gray-600"
+                                    )}
+                                >
+                                    {habit.name}
+                                </Link>
+                                <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                    {habitStats.get(habit.id)?.done7 || 0}/7
+                                </span>
+                                {habitStats.get(habit.id)?.streak ? (
+                                    <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                        streak {habitStats.get(habit.id)?.streak}
+                                    </span>
+                                ) : null}
                                 <button
                                     onClick={() => handleRenameHabit(habit)}
                                     className="opacity-0 group-hover/habit:opacity-100 text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors"

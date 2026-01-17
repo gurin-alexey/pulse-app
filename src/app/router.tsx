@@ -8,6 +8,7 @@ import { ProjectTasks } from "@/pages/ProjectTasks";
 import { TagTasks } from "@/pages/TagTasks";
 import { TrashPage } from "@/pages/TrashPage";
 import { CompletedTasksPage } from "@/pages/CompletedTasksPage";
+import { HabitPage } from "@/pages/HabitPage";
 
 import { ProtectedRoute } from "@/shared/components/ProtectedRoute";
 import { Login } from "@/pages/Login";
@@ -56,6 +57,10 @@ export const router = createBrowserRouter([
           {
             path: "projects/:projectId",
             element: <ProjectTasks />,
+          },
+          {
+            path: "habits/:habitId",
+            element: <HabitPage />,
           },
           {
             path: "tags/:tagId",
