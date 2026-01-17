@@ -44,7 +44,7 @@ export function useAppDragAndDrop() {
         // SIDEBAR ZONE: Exclusive area for sidebar targets (left 270px) - ONLY ON DESKTOP
         if (isDesktop && pointerCoordinates.x < 270) {
             const sidebarContainers = args.droppableContainers.filter((c: any) =>
-                ['Nav', 'Project', 'Folder'].includes(c.data?.current?.type)
+                ['Nav', 'Project', 'ProjectSortable', 'Folder'].includes(c.data?.current?.type)
             )
 
             // Use closestCenter for magnetic feel
@@ -85,6 +85,11 @@ export function useAppDragAndDrop() {
         if (activeData?.task) {
             const activeTask = activeData.task
             const overType = over.data.current?.type
+
+            // Disable dropping tasks into sidebar lists/projects/folders
+            if (overType === 'Nav' || overType === 'Project' || overType === 'Folder') {
+                return
+            }
 
             // Task -> Sidebar Project
             if (overType === 'Project') {
@@ -150,7 +155,7 @@ export function useAppDragAndDrop() {
         }
 
         // --- 2. HANDLE PROJECTS ---
-        else if (activeData?.type === 'Project') {
+        else if (activeData?.type === 'Project' || activeData?.type === 'ProjectSortable') {
             const activeProject = activeData.project
             const overType = over.data.current?.type
 
@@ -171,31 +176,9 @@ export function useAppDragAndDrop() {
                 }
             }
 
-            // Project -> Project (Group together)
-            else if (overType === 'Project') {
-                const targetProject = over.data.current?.project
-                if (targetProject.id === activeProject.id) return
-
-                // If target is already in a group, join it
-                if (targetProject.group_id) {
-                    if (activeProject.group_id !== targetProject.group_id) {
-                        updateProject({ projectId: activeProject.id, updates: { group_id: targetProject.group_id } })
-                    }
-                } else {
-                    // Both are ungrouped. Create new group.
-                    // Prevent accidental grouping if dragging quickly over list? No, explicit intent.
-                    const newGroupName = "New Group" // Or prompt? Can't prompt easily here.
-                    // Create group then move both
-                    // Need user ID
-                    if (activeProject.user_id) {
-                        createProjectGroup({ name: newGroupName, userId: activeProject.user_id }, {
-                            onSuccess: (newGroup) => {
-                                updateProject({ projectId: targetProject.id, updates: { group_id: newGroup.id } })
-                                updateProject({ projectId: activeProject.id, updates: { group_id: newGroup.id } })
-                            }
-                        })
-                    }
-                }
+            // Project -> Project (ignore, handled by sortable reorder)
+            else if (overType === 'Project' || overType === 'ProjectSortable') {
+                return
             }
         }
     }

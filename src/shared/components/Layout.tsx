@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate, useSearchParams, matchPath, useOutlet } from "react-router-dom"
-import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus, RefreshCw, Search } from "lucide-react"
+import { Menu, LogOut, ChevronRight, Trash2, Settings, GripVertical, Plus, RefreshCw, Search, Folder } from "lucide-react"
 import { useState, useEffect, Fragment } from "react"
 import { useQueryClient, useIsFetching } from "@tanstack/react-query"
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion"
@@ -496,7 +496,7 @@ export function Layout() {
 
       {/* Global Drag Overlay */}
       {createPortal(
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
           {activeDragData?.type === 'Task' ? (
             <div className="opacity-100 cursor-grabbing pointer-events-none scale-100">
               <TaskItem task={activeDragData.task} isActive={true} />
@@ -506,6 +506,13 @@ export function Layout() {
               <div className="flex items-center gap-2">
                 <GripVertical size={14} className="text-gray-400" />
                 <h3 className="font-bold text-sm text-gray-800">{activeDragData.section.name}</h3>
+              </div>
+            </div>
+          ) : activeDragData?.type === 'ProjectSortable' ? (
+            <div className="cursor-grabbing pointer-events-none bg-white border-2 border-blue-400 rounded-lg shadow-2xl px-3 py-1.5 w-52">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Folder size={16} className="text-blue-500" />
+                <span className="truncate">{activeDragData.project?.name}</span>
               </div>
             </div>
           ) : null}

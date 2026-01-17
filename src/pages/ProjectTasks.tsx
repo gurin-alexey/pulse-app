@@ -25,9 +25,9 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { TaskItem } from "@/features/tasks/TaskItem"
-import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/lib/supabase"
-import { generateRecurringInstances } from "@/utils/recurrence"
+import { expandTasksForDate } from "@/utils/taskExpansion"
+import { useAllTasks } from "@/hooks/useAllTasks"
 
 // Draggable Task Item Wrapper
 // Sortable Task Item Wrapper
@@ -154,28 +154,14 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
         return undefined
     }, [mode])
 
-    // Data Hooks
-    // Fetch occurrences for Today/Tomorrow to support Status check and generation
-    const { data: occurrences } = useQuery({
-        queryKey: ['task_occurrences', mode, targetDate],
-        queryFn: async () => {
-            if (!targetDate) return []
-            const { data } = await supabase.from('task_occurrences').select('*').eq('original_date', targetDate)
-            return data || []
-        },
-        enabled: (mode === 'today' || mode === 'tomorrow') && !!targetDate
-    })
+    // Use shared data source for occurrences (same as Sidebar)
+    const { data: allTasksData } = useAllTasks()
+    const sharedOccurrencesMap = allTasksData?.occurrencesMap
 
-    // Convert occurrences array to Record for TaskItem
+    // Convert to Record format for TaskItem compatibility
     const formattedOccurrencesMap = useMemo(() => {
-        const map: Record<string, string> = {}
-        if (Array.isArray(occurrences)) {
-            occurrences.forEach((o: any) => {
-                map[`${o.task_id}_${o.original_date.split('T')[0]}`] = o.status
-            })
-        }
-        return map
-    }, [occurrences])
+        return sharedOccurrencesMap || {}
+    }, [sharedOccurrencesMap])
 
     // Mutation Hooks
     const { mutate: updateTask } = useUpdateTask()
@@ -240,88 +226,32 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
             let processedTasks = [...tasks]
 
             // For Today/Tomorrow, we must expand recurring tasks
-            if ((mode === 'today' || mode === 'tomorrow') && targetDate && occurrences) {
-                const expanded: any[] = []
-
-                // Create lookup map for occurrences
-                const occurrencesMap = new Map()
-                if (Array.isArray(occurrences)) {
-                    occurrences.forEach((o: any) => {
-                        occurrencesMap.set(`${o.task_id}_${o.original_date}`, o.status)
-                    })
-                }
-
-                // Helper to check if task matches the target date
+            if ((mode === 'today' || mode === 'tomorrow') && targetDate && sharedOccurrencesMap) {
                 // Tasks from useTasks are either due exactly today OR are recurring
-
-                for (const task of tasks) {
-                    if (task.recurrence_rule) {
-                        try {
-                            // For "today" mode, include overdue recurring instances
-                            // Start from task's due_date or 3 months ago, whichever is later
-                            let start: Date
-                            if (mode === 'today') {
-                                const taskStart = task.due_date ? new Date(task.due_date.split('T')[0] + 'T00:00:00') : new Date()
-                                const threeMonthsAgo = new Date(targetDate + 'T00:00:00')
-                                threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-                                start = taskStart > threeMonthsAgo ? taskStart : threeMonthsAgo
-                            } else {
-                                start = new Date(targetDate + 'T00:00:00')
-                            }
-                            start.setMinutes(start.getMinutes() - 15) // small buffer
-
-                            const end = new Date(targetDate + 'T23:59:59')
-                            end.setMinutes(end.getMinutes() + 15)
-
-                            const instances = generateRecurringInstances(task, start, end, occurrencesMap)
-                            
-                            // Filter: for today show target date + overdue incomplete
-                            // For tomorrow show only target date
-                            const filtered = instances.filter(instance => {
-                                const instanceDate = instance.due_date?.split('T')[0]
-                                if (instanceDate === targetDate) return true
-                                if (mode === 'today' && instanceDate && instanceDate < targetDate && !instance.is_completed) {
-                                    return true // overdue incomplete
-                                }
-                                return false
-                            })
-                            
-                            if (filtered.length > 0) {
-                                expanded.push(...filtered)
-                            }
-                        } catch (e) {
-                            console.error('Error expanding task recurrence', task.id, e)
-                        }
-                    } else {
-                        // Non-recurring: Match target date OR overdue (if today)
-                        const d = task.due_date?.split('T')[0]
-                        const isMatch = d === targetDate
-                        const isOverdue = mode === 'today' && d && targetDate && d < targetDate && !task.is_completed
-
-                        if (isMatch || isOverdue) {
-                            expanded.push(task)
-                        }
-                    }
-                }
-
-                processedTasks = expanded
+                const expanded = expandTasksForDate(tasks, targetDate, sharedOccurrencesMap, mode)
+                const completedFromSource = (tasks || []).filter(t => t.is_completed)
+                const completedIds = new Set(completedFromSource.map(t => t.id))
+                const uniqueCompleted = expanded.completed.filter(t => !completedIds.has(t.id))
+                processedTasks = [...expanded.active, ...uniqueCompleted, ...completedFromSource]
             } else if (mode === 'today' || mode === 'tomorrow') {
                 // If occurrences not loaded yet, or if simple list needed?
                 // Just use filtering by due_date for safety if recurrence expansion not ready
                 // But better to wait/show loading? Or show raw?
                 // Showing raw might show old recurring tasks.
                 // We'll trust the filter.
-                processedTasks = processedTasks.filter(t => {
+                const activeOnly = processedTasks.filter(t => {
                     const d = t.due_date?.split('T')[0]
                     const isMatch = d === targetDate
                     const isOverdue = mode === 'today' && d && targetDate && d < targetDate && !t.is_completed
                     return (isMatch || isOverdue) && !t.recurrence_rule
                 })
+                const completedFromSource = (tasks || []).filter(t => t.is_completed)
+                processedTasks = [...activeOnly, ...completedFromSource]
             }
 
             setLocalTasks(processedTasks.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
         }
-    }, [tasks, occurrences, mode, targetDate])
+    }, [tasks, sharedOccurrencesMap, mode, targetDate])
 
     // Derived tasks to use for rendering
     const activeTasks = localTasks.filter((t: any) => !t.is_completed)

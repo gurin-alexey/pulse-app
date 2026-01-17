@@ -12,14 +12,16 @@ import { useProjectGroups, useCreateProjectGroup, useDeleteProjectGroup, useUpda
 import { useCreateProject } from "@/hooks/useCreateProject"
 import { useUpdateProject } from "@/hooks/useUpdateProject"
 import { supabase } from "@/lib/supabase"
-import { useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core'
+import { useDraggable, useDroppable, useDndMonitor, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useDeleteProject } from "@/hooks/useDeleteProject"
 import { useAllTasks } from "@/hooks/useAllTasks"
+import { useTasks } from "@/hooks/useTasks"
+import { expandTasksForDate } from "@/utils/taskExpansion"
 import { useTags } from "@/hooks/useTags"
 import { isToday, isTomorrow, parseISO } from "date-fns"
 import { CATEGORIES } from "@/constants/categories"
-import { generateRecurringInstances } from "@/utils/recurrence"
 
 type SidebarProps = {
     activePath: string
@@ -196,27 +198,17 @@ function GroupActionsMenu({ group, onAddProject, onRename, onDelete }: any) {
     )
 }
 
-function DraggableProject({ project, activePath, children }: { project: any, activePath: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
-    const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
+function SortableProjectItem({ project, activePath, children }: { project: any, activePath: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: project.id,
-        data: { project, type: 'Project' }
+        data: { project, type: 'ProjectSortable', groupId: project.group_id || null }
     })
 
-    const { setNodeRef: setDropRef, isOver } = useDroppable({
-        id: project.id,
-        data: { project, type: 'Project' }
-    })
-
-    const style = {
-        transform: CSS.Translate.toString(transform),
-        opacity: isDragging ? 0.5 : 1,
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
         touchAction: 'none'
-    }
-
-    // Compose refs
-    const setNodeRef = (node: HTMLElement | null) => {
-        setDragRef(node)
-        setDropRef(node)
     }
 
     return (
@@ -226,16 +218,16 @@ function DraggableProject({ project, activePath, children }: { project: any, act
             {...listeners}
             {...attributes}
             className={clsx(
-                "transition-all duration-200 border-l-4 border-transparent w-full",
-                isOver ? "bg-blue-600 border-blue-400 shadow-lg scale-[1.02] z-20" : "hover:bg-gray-50/50"
+                "relative w-full cursor-grab active:cursor-grabbing",
+                "hover:bg-gray-50/50"
             )}
         >
-            {typeof children === 'function' ? children(isOver) : children}
+            {typeof children === 'function' ? children(false) : children}
         </div>
     )
 }
 
-function DroppableZone({ id, data, children, className }: { id: string, data?: any, children?: React.ReactNode, className?: string }) {
+function DroppableZone({ id, data, children, className, suppressHighlight }: { id: string, data?: any, children?: React.ReactNode, className?: string, suppressHighlight?: boolean }) {
     const { setNodeRef, isOver } = useDroppable({ id, data })
 
     return (
@@ -244,7 +236,7 @@ function DroppableZone({ id, data, children, className }: { id: string, data?: a
             className={clsx(
                 className,
                 "transition-all duration-200",
-                isOver && "bg-blue-600/10 ring-4 ring-blue-400/50 rounded-xl"
+                isOver && !suppressHighlight && "bg-blue-600/10 ring-4 ring-blue-400/50 rounded-xl"
             )}
         >
             {children}
@@ -253,21 +245,14 @@ function DroppableZone({ id, data, children, className }: { id: string, data?: a
 }
 
 export function DroppableNavItem({ label, children, className }: { label: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode), className?: string }) {
-    const { setNodeRef, isOver } = useDroppable({
-        id: `nav-${label.toLowerCase()}`,
-        data: { type: 'Nav', label }
-    })
-
     return (
         <div
-            ref={setNodeRef}
             className={clsx(
                 "transition-all duration-200",
-                isOver ? "bg-blue-600 border-blue-400 shadow-lg scale-[1.02] z-20" : "",
                 className
             )}
         >
-            {typeof children === 'function' ? children(isOver) : children}
+            {typeof children === 'function' ? children(false) : children}
         </div>
     )
 }
@@ -276,12 +261,24 @@ export function DroppableNavItem({ label, children, className }: { label: string
 
 export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const { data } = useAllTasks()
-    const allTasks = data?.tasks
     const occurrencesMap = data?.occurrencesMap
+    const allTasks = data?.tasks
+    const { data: todayTasks } = useTasks({ type: 'today', includeSubtasks: true })
+    const { data: tomorrowTasks } = useTasks({ type: 'tomorrow', includeSubtasks: true })
+    const [projectOrder, setProjectOrder] = useState<Record<string, string[]>>(() => {
+        try {
+            const raw = localStorage.getItem('pulse_project_order')
+            return raw ? JSON.parse(raw) : {}
+        } catch {
+            return {}
+        }
+    })
+    const [isProjectDragging, setIsProjectDragging] = useState(false)
 
     // Calculate Counts for recurring tasks support
     const getCount = (mode: 'today' | 'tomorrow') => {
-        if (!allTasks) return 0
+        const tasksForMode = mode === 'today' ? todayTasks : tomorrowTasks
+        if (!tasksForMode) return 0
 
         const targetDate = new Date()
         const localDate = new Date(targetDate.getTime() - (targetDate.getTimezoneOffset() * 60000))
@@ -289,52 +286,10 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
             localDate.setDate(localDate.getDate() + 1)
         }
         const dateStr = localDate.toISOString().split('T')[0]
-        
-        const rangeEnd = new Date(dateStr + 'T23:59:59')
-        rangeEnd.setMinutes(rangeEnd.getMinutes() + 15)
+        if (!occurrencesMap) return tasksForMode.length
 
-        let count = 0
-        for (const task of allTasks) {
-            if (task.recurrence_rule) {
-                try {
-                    // For "today" mode, include overdue recurring instances
-                    let rangeStart: Date
-                    if (mode === 'today') {
-                        const taskStart = task.due_date ? new Date(task.due_date.split('T')[0] + 'T00:00:00') : new Date()
-                        const threeMonthsAgo = new Date(dateStr + 'T00:00:00')
-                        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-                        rangeStart = taskStart > threeMonthsAgo ? taskStart : threeMonthsAgo
-                    } else {
-                        rangeStart = new Date(dateStr + 'T00:00:00')
-                    }
-                    rangeStart.setMinutes(rangeStart.getMinutes() - 15)
-                    
-                    const instances = generateRecurringInstances(task, rangeStart, rangeEnd, occurrencesMap as any)
-                    
-                    // Count: today's instances + overdue incomplete (for today mode)
-                    count += instances.filter((i: any) => {
-                        if (i.is_completed) return false
-                        const instanceDate = i.due_date?.split('T')[0]
-                        if (instanceDate === dateStr) return true
-                        if (mode === 'today' && instanceDate && instanceDate < dateStr) return true
-                        return false
-                    }).length
-                } catch (e) {
-                    console.error(e)
-                }
-            } else {
-                // Non-recurring: match date OR overdue (for today mode)
-                const d = task.due_date?.split('T')[0]
-                if (!task.is_completed) {
-                    if (d === dateStr) {
-                        count++
-                    } else if (mode === 'today' && d && d < dateStr) {
-                        count++ // overdue
-                    }
-                }
-            }
-        }
-        return count
+        const expanded = expandTasksForDate(tasksForMode, dateStr, occurrencesMap, mode)
+        return expanded.active.length
     }
 
     const { data: projects, isError: projectsError, error: pError } = useProjects()
@@ -351,6 +306,59 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const { mutate: deleteProject } = useDeleteProject()
 
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+    useEffect(() => {
+        try {
+            localStorage.setItem('pulse_project_order', JSON.stringify(projectOrder))
+        } catch {
+            // ignore
+        }
+    }, [projectOrder])
+
+    const getOrderKey = (groupId?: string | null) => (groupId ? `group:${groupId}` : 'root')
+
+    const getOrderedProjects = (list: any[] | undefined, key: string) => {
+        if (!list) return []
+        const order = projectOrder[key] || []
+        const byId = new Map(list.map(p => [p.id, p]))
+        const ordered = order.map(id => byId.get(id)).filter(Boolean) as any[]
+        const missing = list.filter(p => !order.includes(p.id)).sort((a, b) => a.name.localeCompare(b.name))
+        return [...ordered, ...missing]
+    }
+
+    useDndMonitor({
+        onDragStart: (event) => {
+            const activeData = event.active.data.current
+            if (activeData?.type === 'ProjectSortable') {
+                setIsProjectDragging(true)
+            }
+        },
+        onDragEnd: (event) => {
+            setIsProjectDragging(false)
+            const { active, over } = event
+            if (!over) return
+            const activeData = active.data.current
+            const overData = over.data.current
+            if (activeData?.type !== 'ProjectSortable' || overData?.type !== 'ProjectSortable') return
+
+            const groupId = activeData.groupId || null
+            if ((overData.groupId || null) !== groupId) return
+
+            const key = getOrderKey(groupId)
+            const currentProjects = groupId
+                ? projects?.filter(p => p.group_id === groupId)
+                : projects?.filter(p => !p.group_id)
+            const orderedProjects = getOrderedProjects(currentProjects, key)
+            const ids = orderedProjects.map(p => p.id)
+            const oldIndex = ids.indexOf(active.id)
+            const newIndex = ids.indexOf(over.id)
+            if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+            const newIds = arrayMove(ids, oldIndex, newIndex)
+            setProjectOrder(prev => ({ ...prev, [key]: newIds }))
+        },
+        onDragCancel: () => {
+            setIsProjectDragging(false)
+        }
+    })
 
     // Create Project State
     const [isCreatingProjectIn, setIsCreatingProjectIn] = useState<string | null>(null) // 'ungrouped' or groupId
@@ -446,36 +454,34 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const renderProjectItem = (project: any) => {
         const isActive = activePath === `/projects/${project.id}`
         return (
-            <DraggableProject key={project.id} project={project} activePath={activePath}>
-                {(isOver) => (
-                    <div className="relative group/project">
-                        <Link
-                            to={`/projects/${project.id}`}
-                            onClick={onItemClick}
-                            className={clsx(
-                                "flex items-center gap-2 px-3 py-1 transition-colors text-sm",
-                                isOver ? "text-white" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600"),
-                                "font-medium"
-                            )}
-                        >
-                            <Folder size={16} />
-                            <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
-                                {project.name}
-                            </span>
+            <SortableProjectItem key={project.id} project={project} activePath={activePath}>
+                <div className="relative group/project">
+                    <Link
+                        to={`/projects/${project.id}`}
+                        onClick={onItemClick}
+                        className={clsx(
+                            "flex items-center gap-2 px-3 py-1 transition-colors text-sm",
+                            isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600",
+                            "font-medium"
+                        )}
+                    >
+                        <Folder size={16} />
+                        <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
+                            {project.name}
+                        </span>
 
-                            <ProjectActionsMenu
-                                project={project}
-                                onRename={handleRenameProject}
-                                onDelete={handleDeleteProject}
-                                isOver={isOver}
-                                groups={groups}
-                                onMoveToGroup={(groupId: string | null) => updateProject({ projectId: project.id, updates: { group_id: groupId } })}
-                                onCreateGroup={handleCreateGroup}
-                            />
-                        </Link>
-                    </div>
-                )}
-            </DraggableProject>
+                        <ProjectActionsMenu
+                            project={project}
+                            onRename={handleRenameProject}
+                            onDelete={handleDeleteProject}
+                            isOver={false}
+                            groups={groups}
+                            onMoveToGroup={(groupId: string | null) => updateProject({ projectId: project.id, updates: { group_id: groupId } })}
+                            onCreateGroup={handleCreateGroup}
+                        />
+                    </Link>
+                </div>
+            </SortableProjectItem>
         )
     }
 
@@ -681,6 +687,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                     key={group.id}
                                     id={group.id}
                                     data={{ type: 'Folder', group }}
+                                    suppressHighlight={isProjectDragging}
                                     className={clsx(
                                         "transition-all duration-200"
                                     )}
@@ -728,7 +735,14 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                                 </form>
                                             )}
 
-                                            {groupProjects?.map(renderProjectItem)}
+                                            {(() => {
+                                                const ordered = getOrderedProjects(groupProjects, getOrderKey(group.id))
+                                                return (
+                                                    <SortableContext items={ordered.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                                                        {ordered.map(renderProjectItem)}
+                                                    </SortableContext>
+                                                )
+                                            })()}
                                             {groupProjects?.length === 0 && !isCreatingProjectIn && (
                                                 <div className="px-3 py-2 text-xs text-gray-300 italic text-center border-2 border-dashed border-gray-100 rounded-lg mx-2">
                                                     Drop projects here
@@ -741,7 +755,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                         })}
 
                         {/* 2. Ungrouped (Root) Projects */}
-                        <DroppableZone id="projects-root" data={{ type: 'Folder', root: true }} className="space-y-0.5 min-h-[50px]">
+                        <DroppableZone id="projects-root" data={{ type: 'Folder', root: true }} suppressHighlight={isProjectDragging} className="space-y-0.5 min-h-[50px]">
                             {isCreatingProjectIn === 'ungrouped' && (
                                 <form onSubmit={(e) => handleCreateProjectSubmit(e, undefined)} className="px-3 py-1 mb-1">
                                     <input
@@ -757,7 +771,15 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                                 </form>
                             )}
 
-                            {projects?.filter(p => !p.group_id).map(renderProjectItem)}
+                            {(() => {
+                                const rootProjects = projects?.filter(p => !p.group_id)
+                                const ordered = getOrderedProjects(rootProjects, getOrderKey(null))
+                                return (
+                                    <SortableContext items={ordered.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                                        {ordered.map(renderProjectItem)}
+                                    </SortableContext>
+                                )
+                            })()}
 
                             {/* Empty state hint only if absolutely nothing exists */}
                             {projects?.length === 0 && groups?.length === 0 && !isCreatingProjectIn && (
