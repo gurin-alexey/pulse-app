@@ -85,9 +85,7 @@
     vertical-align: top !important;
     padding-top: 8px !important;
     padding-left: 8px !important;
-}
-
-.pulse-calendar .fc-timegrid-axis-frame,
+}.pulse-calendar .fc-timegrid-axis-frame,
 .daily-planner-wrapper .fc-timegrid-axis-frame {
     text-align: left !important;
     justify-content: flex-start !important;

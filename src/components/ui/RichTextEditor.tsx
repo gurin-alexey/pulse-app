@@ -2,7 +2,9 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Link from '@tiptap/extension-link'
-import { Bold, Italic, List, ListOrdered, Code, Quote, Link as LinkIcon, Minus, Type } from 'lucide-react'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
+import { Bold, Italic, List, ListOrdered, Code, Quote, Link as LinkIcon, Minus, Type, CheckSquare } from 'lucide-react'
 import clsx from 'clsx'
 import { useEffect, useCallback, useState } from 'react'
 import { VoiceInputButton } from './VoiceInputButton'
@@ -54,6 +56,10 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
                 HTMLAttributes: {
                     class: 'text-blue-500 hover:text-blue-700 underline cursor-pointer',
                 },
+            }),
+            TaskList,
+            TaskItem.configure({
+                nested: true,
             }),
         ],
         content: content,
@@ -140,6 +146,13 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
                     <div className="w-px h-4 bg-gray-200 mx-1" />
 
                     <MenuButton
+                        onClick={() => editor.chain().focus().toggleTaskList().run()}
+                        isActive={editor.isActive('taskList')}
+                        title="Checklist"
+                    >
+                        <CheckSquare size={16} />
+                    </MenuButton>
+                    <MenuButton
                         onClick={() => editor.chain().focus().toggleBulletList().run()}
                         isActive={editor.isActive('bulletList')}
                         title="Bullet List"
@@ -214,33 +227,77 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
                     pointer-events: none;
                 }
                 .ProseMirror p {
-                    margin-bottom: 1.25em; /* Adjusted spacing */
-                    line-height: 1.75;
+                    margin-bottom: 0.5em; /* Restore slight spacing for readability */
+                    line-height: 1.6;
                 }
-                .ProseMirror ul {
-                    list-style-type: disc;
-                    padding-left: 1.5em;
+                .ProseMirror ul, .ProseMirror ol {
+                    margin-top: 0;
+                    margin-bottom: 0;
                 }
-                .ProseMirror ol {
-                    list-style-type: decimal;
-                    padding-left: 1.5em;
+                .ProseMirror li {
+                    margin-bottom: 0;
+                    line-height: 1.2;
                 }
-                .ProseMirror blockquote {
-                    border-left: 3px solid #e5e7eb;
-                    padding-left: 1em;
-                    font-style: italic;
+                
+                /* Task List Styles */
+                ul[data-type="taskList"] {
+                    list-style: none;
+                    padding: 0;
+                    margin-top: 0.75em; /* Increased spacing before list */
+                    margin-bottom: 0;
                 }
-                .ProseMirror a {
-                    color: #3b82f6; 
-                    text-decoration: underline;
+                
+                ul[data-type="taskList"] li {
+                    display: flex;
+                    align-items: flex-start;
+                    margin-bottom: 0;
+                    line-height: 1.15;
+                    margin-top: -0.25em; /* Pull items even closer together */
+                }
+
+                ul[data-type="taskList"] li > label {
+                    flex: 0 0 auto;
+                    margin-right: 0.5rem;
+                    user-select: none;
+                    margin-top: 0.25em; /* adjust for flex-start alignment */
+                }
+
+                ul[data-type="taskList"] li > div {
+                    flex: 1 1 auto;
+                }
+
+                ul[data-type="taskList"] input[type="checkbox"] {
                     cursor: pointer;
+                    border-radius: 4px;
+                    border: 2px solid #cbd5e1;
+                    width: 1.1em;
+                    height: 1.1em;
+                    appearance: none;
+                    background-color: #fff;
+                    display: grid;
+                    place-content: center;
+                    margin: 0;
                 }
-                .ProseMirror a:hover {
-                    color: #1d4ed8;
+
+                ul[data-type="taskList"] input[type="checkbox"]::before {
+                    content: "";
+                    width: 0.65em;
+                    height: 0.65em;
+                    transform: scale(0);
+                    transition: 120ms transform ease-in-out;
+                    box-shadow: inset 1em 1em #fff;
+                    background-color: #fff;
+                    transform-origin: center;
+                    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
                 }
-                .ProseMirror hr {
-                    border-top: 2px solid #e5e7eb;
-                    margin: 1.5em 0;
+
+                ul[data-type="taskList"] input[type="checkbox"]:checked {
+                    background-color: #3b82f6;
+                    border-color: #3b82f6;
+                }
+
+                ul[data-type="taskList"] input[type="checkbox"]:checked::before {
+                    transform: scale(1);
                 }
             `}</style>
         </div>
