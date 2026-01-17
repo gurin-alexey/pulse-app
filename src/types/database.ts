@@ -53,6 +53,27 @@ export type Tag = {
     category?: 'place' | 'energy' | 'time' | 'people' | null
 }
 
+export type Habit = {
+    id: string
+    created_at: string
+    name: string
+    user_id: string
+    emoji: string | null
+    color: string | null
+    is_archived: boolean
+    order_index: number
+}
+
+export type HabitLog = {
+    id: string
+    habit_id: string
+    user_id: string
+    log_date: string
+    status: 'done' | 'missed' | 'skipped'
+    note: string | null
+    created_at: string
+}
+
 
 export type TaskTag = {
     task_id: string

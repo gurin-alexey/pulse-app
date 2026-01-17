@@ -5,12 +5,16 @@ import { useQueryClient, useIsFetching } from "@tanstack/react-query" // Import 
 // ... existing code ...
 
 import { createPortal } from "react-dom"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import clsx from "clsx"
 import { useProjects } from "@/hooks/useProjects"
 import { useProjectGroups, useCreateProjectGroup, useDeleteProjectGroup, useUpdateProjectGroup } from "@/hooks/useProjectGroups"
 import { useCreateProject } from "@/hooks/useCreateProject"
 import { useUpdateProject } from "@/hooks/useUpdateProject"
+import { useHabits } from "@/hooks/useHabits"
+import { useCreateHabit } from "@/hooks/useCreateHabit"
+import { useUpdateHabit } from "@/hooks/useUpdateHabit"
+import { useDeleteHabit } from "@/hooks/useDeleteHabit"
 import { supabase } from "@/lib/supabase"
 import { useDraggable, useDroppable, useDndMonitor, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
@@ -22,6 +26,7 @@ import { expandTasksForDate } from "@/utils/taskExpansion"
 import { useTags } from "@/hooks/useTags"
 import { isToday, isTomorrow, parseISO } from "date-fns"
 import { CATEGORIES } from "@/constants/categories"
+import type { Habit } from "@/types/database"
 
 type SidebarProps = {
     activePath: string
@@ -273,6 +278,14 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
             return {}
         }
     })
+    const [habitOrder, setHabitOrder] = useState<string[]>(() => {
+        try {
+            const raw = localStorage.getItem('pulse_habit_order')
+            return raw ? JSON.parse(raw) : []
+        } catch {
+            return []
+        }
+    })
     const [isProjectDragging, setIsProjectDragging] = useState(false)
 
     // Calculate Counts for recurring tasks support
@@ -305,6 +318,14 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const { mutate: updateGroup } = useUpdateProjectGroup()
     const { mutate: deleteProject } = useDeleteProject()
 
+    const { data: habits, isError: habitsError, error: hError } = useHabits()
+    if (habitsError) {
+        console.error('Habits fetch error:', hError)
+    }
+    const { mutate: createHabit, isPending: isHabitCreating } = useCreateHabit()
+    const { mutate: updateHabit } = useUpdateHabit()
+    const { mutate: deleteHabit } = useDeleteHabit()
+
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
     useEffect(() => {
         try {
@@ -313,6 +334,26 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
             // ignore
         }
     }, [projectOrder])
+
+    useEffect(() => {
+        if (!habits) return
+        setHabitOrder(prev => {
+            const existing = new Set(prev)
+            const merged = [...prev]
+            habits.forEach(habit => {
+                if (!existing.has(habit.id)) {
+                    merged.push(habit.id)
+                }
+            })
+            const filtered = merged.filter(id => habits.some(habit => habit.id === id))
+            try {
+                localStorage.setItem('pulse_habit_order', JSON.stringify(filtered))
+            } catch {
+                // ignore
+            }
+            return filtered
+        })
+    }, [habits])
 
     const getOrderKey = (groupId?: string | null) => (groupId ? `group:${groupId}` : 'root')
 
@@ -324,6 +365,17 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         const missing = list.filter(p => !order.includes(p.id)).sort((a, b) => a.name.localeCompare(b.name))
         return [...ordered, ...missing]
     }
+
+    const orderedHabits = useMemo(() => {
+        if (!habits) return []
+        if (habitOrder.length === 0) {
+            return [...habits].sort((a, b) => a.name.localeCompare(b.name))
+        }
+        const byId = new Map(habits.map(habit => [habit.id, habit]))
+        const ordered = habitOrder.map(id => byId.get(id)).filter(Boolean) as Habit[]
+        const missing = habits.filter(habit => !habitOrder.includes(habit.id)).sort((a, b) => a.name.localeCompare(b.name))
+        return [...ordered, ...missing]
+    }, [habits, habitOrder])
 
     useDndMonitor({
         onDragStart: (event) => {
@@ -364,6 +416,9 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const [isCreatingProjectIn, setIsCreatingProjectIn] = useState<string | null>(null) // 'ungrouped' or groupId
     const [newProjectName, setNewProjectName] = useState("")
     const [isProjectsExpanded, setIsProjectsExpanded] = useState(false)
+    const [isHabitsExpanded, setIsHabitsExpanded] = useState(false)
+    const [isCreatingHabit, setIsCreatingHabit] = useState(false)
+    const [newHabitName, setNewHabitName] = useState("")
     const [isTagsExpanded, setIsTagsExpanded] = useState(false)
     const [activeCategory, setActiveCategory] = useState<string | null>(null)
     const [menuPosition, setMenuPosition] = useState<{ top: number, left: number } | null>(null)
@@ -448,6 +503,60 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         e.stopPropagation()
         if (confirm("Move this project to Trash?")) {
             deleteProject(projectId)
+        }
+    }
+
+    const startCreatingHabit = () => {
+        setIsHabitsExpanded(true)
+        setIsCreatingHabit(true)
+    }
+
+    const handleCreateHabitSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!newHabitName.trim()) return
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        createHabit({ name: newHabitName.trim(), userId: user.id }, {
+            onSuccess: (habit) => {
+                setIsCreatingHabit(false)
+                setNewHabitName("")
+                setHabitOrder(prev => {
+                    const updated = [...prev, habit.id]
+                    try {
+                        localStorage.setItem('pulse_habit_order', JSON.stringify(updated))
+                    } catch {
+                        // ignore
+                    }
+                    return updated
+                })
+            }
+        })
+    }
+
+    const handleRenameHabit = (habit: Habit) => {
+        const newName = window.prompt("Rename Habit:", habit.name)
+        if (newName && newName.trim()) {
+            updateHabit({ habitId: habit.id, updates: { name: newName.trim() } })
+        }
+    }
+
+    const handleDeleteHabit = (habit: Habit) => {
+        if (confirm("Archive this habit?")) {
+            deleteHabit(habit.id, {
+                onSuccess: () => {
+                    setHabitOrder(prev => {
+                        const updated = prev.filter(id => id !== habit.id)
+                        try {
+                            localStorage.setItem('pulse_habit_order', JSON.stringify(updated))
+                        } catch {
+                            // ignore
+                        }
+                        return updated
+                    })
+                }
+            })
         }
     }
 
@@ -791,6 +900,88 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                     </div>
                 )}
 
+            </div>
+
+            <div className="mt-8 space-y-0.5">
+                <div className="px-3 flex items-center justify-between group/habits-header mb-1">
+                    <button
+                        onClick={() => setIsHabitsExpanded(!isHabitsExpanded)}
+                        className="flex items-center gap-1.5 focus:outline-none group/title"
+                    >
+                        <ChevronRight
+                            size={14}
+                            className={clsx("text-gray-400 transition-transform duration-200", isHabitsExpanded && "rotate-90")}
+                        />
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest group-hover/title:text-gray-600 transition-colors">
+                            Habits
+                        </span>
+                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover/habits-header:opacity-100 transition-opacity">
+                        <button
+                            onClick={startCreatingHabit}
+                            className="text-gray-400 hover:text-blue-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                            title="New Habit"
+                        >
+                            <Plus size={16} />
+                        </button>
+                    </div>
+                </div>
+
+                {isHabitsExpanded && (
+                    <div className="space-y-1">
+                        {isCreatingHabit && (
+                            <form onSubmit={handleCreateHabitSubmit} className="px-3 py-1 mb-1">
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={newHabitName}
+                                    onChange={(e) => setNewHabitName(e.target.value)}
+                                    onBlur={() => !newHabitName && setIsCreatingHabit(false)}
+                                    placeholder="Habit name..."
+                                    disabled={isHabitCreating}
+                                    className="w-full py-1 px-2 text-sm bg-gray-50 border border-blue-200 rounded focus:border-blue-500 focus:outline-none"
+                                />
+                            </form>
+                        )}
+
+                        {orderedHabits.map((habit) => (
+                            <div
+                                key={habit.id}
+                                className="group/habit flex items-center gap-2 px-3 py-1 text-sm text-gray-600 rounded hover:bg-gray-50 transition-colors"
+                            >
+                                {habit.emoji ? (
+                                    <span className="text-base">{habit.emoji}</span>
+                                ) : (
+                                    <span
+                                        className="w-2 h-2 rounded-full shrink-0"
+                                        style={{ backgroundColor: habit.color || "#93c5fd" }}
+                                    />
+                                )}
+                                <span className="truncate flex-1">{habit.name}</span>
+                                <button
+                                    onClick={() => handleRenameHabit(habit)}
+                                    className="opacity-0 group-hover/habit:opacity-100 text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors"
+                                    title="Rename Habit"
+                                >
+                                    <Edit2 size={14} />
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteHabit(habit)}
+                                    className="opacity-0 group-hover/habit:opacity-100 text-gray-400 hover:text-red-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                                    title="Archive Habit"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                        ))}
+
+                        {orderedHabits.length === 0 && !isCreatingHabit && (
+                            <div className="px-3 py-4 text-xs text-gray-300 italic text-center">
+                                Create a habit
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
 
