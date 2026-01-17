@@ -1,6 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;300;400;500;600&display=swap');
 @import "tailwindcss";
 
+/* Prevent horizontal scroll on entire page */
+html, body, #root {
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
 /* Font Size Customization */
 html[data-font-size="small"] {
     font-size: 15px;

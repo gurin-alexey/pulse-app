@@ -364,7 +364,7 @@ export function Layout() {
             <img src={Logo} alt="Pulse Logo" className="w-8 h-8" />
             <span className="font-extrabold text-2xl text-blue-600 italic uppercase tracking-tight">Pulse</span>
           </div>
-          <nav className="flex-1 space-y-1 mt-8">
+          <nav className="flex-1 space-y-1 mt-8 overflow-x-hidden">
             <Sidebar activePath={location.pathname} />
           </nav>
           {renderSidebarFooter()}
@@ -396,7 +396,7 @@ export function Layout() {
                   <ChevronRight size={24} className="rotate-180" />
                 </button>
               </div>
-              <nav className="flex-1 p-2 space-y-1 overflow-y-auto mt-2">
+              <nav className="flex-1 p-2 space-y-1 overflow-y-auto overflow-x-hidden mt-2">
                 <Sidebar
                   activePath={location.pathname}
                   onItemClick={() => setIsSidebarOpen(false)}

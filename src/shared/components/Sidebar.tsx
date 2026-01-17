@@ -513,7 +513,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     ]
 
     return (
-        <div className="space-y-1">
+        <div className="space-y-1 overflow-x-hidden">
 
 
             {/* Main Navigation */}

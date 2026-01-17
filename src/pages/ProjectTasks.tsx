@@ -766,7 +766,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 </div>
             </div>
 
-            <div className="flex-1 pl-4 pr-0 pt-4 md:py-4 md:pr-1 md:pl-4 overflow-y-auto pb-20">
+            <div className="flex-1 pl-4 pr-0 pt-4 md:py-4 md:pr-1 md:pl-4 overflow-y-auto overflow-x-hidden pb-20">
                 {renderMode === 'groups' ? (
                     // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
                     <div className="flex flex-col">
