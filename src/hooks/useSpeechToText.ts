@@ -13,7 +13,10 @@ type SpeechToTextResult = {
 export function useSpeechToText(options: SpeechToTextOptions = {}) {
     const [isListening, setIsListening] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [remainingTime, setRemainingTime] = useState(3)
+
     const recognitionRef = useRef<any>(null)
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
     // Callback to deliver results
     const onResultRef = useRef<((result: SpeechToTextResult) => void) | null>(null)
@@ -29,6 +32,39 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
         }
     }, [options.interimResults, options.lang])
 
+    const stopListening = useCallback(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current)
+            intervalRef.current = null
+        }
+        if (!recognitionRef.current) return
+
+        try {
+            recognitionRef.current.stop()
+        } catch (err) {
+            console.error('Failed to stop speech recognition:', err)
+        }
+        setIsListening(false)
+        setRemainingTime(3)
+    }, [])
+
+    const resetSilenceTimer = useCallback(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current)
+        }
+        setRemainingTime(3)
+
+        intervalRef.current = setInterval(() => {
+            setRemainingTime(prev => {
+                if (prev <= 1) {
+                    stopListening()
+                    return 3
+                }
+                return prev - 1
+            })
+        }, 1000)
+    }, [stopListening])
+
     const startListening = useCallback((onResult: (result: SpeechToTextResult) => void) => {
         if (!recognitionRef.current) {
             setError('Speech recognition not supported in this browser.')
@@ -43,21 +79,11 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
         try {
             recognitionRef.current.start()
             setIsListening(true)
+            resetSilenceTimer()
         } catch (err) {
             console.error('Failed to start speech recognition:', err)
         }
-    }, [isListening])
-
-    const stopListening = useCallback(() => {
-        if (!recognitionRef.current) return
-
-        try {
-            recognitionRef.current.stop()
-        } catch (err) {
-            console.error('Failed to stop speech recognition:', err)
-        }
-        setIsListening(false)
-    }, [])
+    }, [isListening, resetSilenceTimer])
 
     const toggleListening = useCallback((onResult: (result: SpeechToTextResult) => void) => {
         if (isListening) {
@@ -69,10 +95,11 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
 
     useEffect(() => {
         if (!recognitionRef.current) return
-
         const recognition = recognitionRef.current
 
         recognition.onresult = (event: any) => {
+            resetSilenceTimer()
+
             let finalTranscript = ''
             let interimTranscript = ''
 
@@ -84,13 +111,15 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
                 }
             }
 
-            // Prefer final, but send interim if available
-            // Note: simple implementation sends raw text chunks
-            const text = finalTranscript || interimTranscript
+            // Simplified: grab the last result
+            const rawText = finalTranscript || interimTranscript
+            // Or get text from the interim results if provided
+            const text = event.results[event.results.length - 1][0].transcript
+
             if (text && onResultRef.current) {
                 onResultRef.current({
                     transcript: text,
-                    isFinal: !!finalTranscript
+                    isFinal: event.results[event.results.length - 1].isFinal
                 })
             }
         }
@@ -99,16 +128,18 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
             console.error('Speech recognition error', event.error)
             setError(event.error)
             setIsListening(false)
+            if (intervalRef.current) clearInterval(intervalRef.current)
         }
 
         recognition.onend = () => {
             setIsListening(false)
+            if (intervalRef.current) clearInterval(intervalRef.current)
         }
 
         return () => {
             // Cleanup handled by useEffect return
         }
-    }, [])
+    }, [resetSilenceTimer])
 
     // Safety Force stop on unmount
     useEffect(() => {
@@ -116,6 +147,7 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
             if (recognitionRef.current) {
                 recognitionRef.current.stop()
             }
+            if (intervalRef.current) clearInterval(intervalRef.current)
         }
     }, [])
 
@@ -125,6 +157,7 @@ export function useSpeechToText(options: SpeechToTextOptions = {}) {
         startListening,
         stopListening,
         toggleListening,
+        remainingTime,
         hasSupport: !!(window.SpeechRecognition || window.webkitSpeechRecognition)
     }
 }

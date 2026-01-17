@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Settings2, CheckCircle2, Circle, Calendar, SortAsc, LayoutList } from 'lucide-react'
+import { Settings2, CheckCircle2, Circle, Calendar, SortAsc, LayoutList, Flag, Folder, Tag as TagIcon, Layers, ArrowUpDown, ListTree } from 'lucide-react'
 import clsx from 'clsx'
 
 export type SortOption = 'manual' | 'date_created' | 'due_date' | 'alphabetical'
@@ -10,110 +10,189 @@ type ViewOptionsProps = {
     setSortBy: (sort: SortOption) => void
     groupBy: GroupOption
     setGroupBy: (group: GroupOption) => void
+    onToggleSubtasks?: () => void
 }
-
-import { Flag, Folder, Tag as TagIcon } from 'lucide-react'
 
 export function ViewOptions({
     sortBy, setSortBy,
-    groupBy, setGroupBy
+    groupBy, setGroupBy,
+    onToggleSubtasks
 }: ViewOptionsProps) {
-    const [isOpen, setIsOpen] = useState(false)
-    const ref = useRef<HTMLDivElement>(null)
+    return (
+        <div className="flex items-center gap-2">
+            <GroupDropdown groupBy={groupBy} setGroupBy={setGroupBy} />
+            <div className="h-4 w-px bg-gray-200" />
+            <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
+            {onToggleSubtasks && (
+                <>
+                    <div className="h-4 w-px bg-gray-200" />
+                    <button
+                        onClick={onToggleSubtasks}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                        title="Toggle Subtasks"
+                    >
+                        <ListTree size={16} />
+                        <span className="hidden sm:inline">Subtasks</span>
+                    </button>
+                </>
+            )}
+        </div>
+    )
+}
 
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (ref.current && !ref.current.contains(event.target as Node)) {
-                setIsOpen(false)
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside)
-        return () => document.removeEventListener("mousedown", handleClickOutside)
-    }, [])
+function GroupDropdown({ groupBy, setGroupBy }: { groupBy: GroupOption, setGroupBy: (g: GroupOption) => void }) {
+    const [isOpen, setIsOpen] = useState(false)
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    const handleMouseEnter = () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        setIsOpen(true)
+    }
+
+    const handleMouseLeave = () => {
+        timeoutRef.current = setTimeout(() => {
+            setIsOpen(false)
+        }, 150) // Small delay to prevent flickering when moving to the menu
+    }
 
     return (
-        <div className="relative" ref={ref}>
+        <div
+            className="relative"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
             <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-gray-700 transition-colors"
-                title="View Options"
+                className={clsx(
+                    "flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                    isOpen ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                    groupBy !== 'none' && "text-blue-600 bg-blue-50 hover:bg-blue-100"
+                )}
             >
-                <Settings2 size={20} />
+                <Layers size={16} />
+                <span className="hidden sm:inline">Group</span>
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-100">
-
-                    {/* Grouping Section */}
-                    <div className="px-3 py-2 border-b border-gray-100">
-                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Group By</div>
-                        <div className="space-y-1">
-                            <button
-                                onClick={() => setGroupBy('none')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", groupBy === 'none' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
-                            >
-                                <LayoutList size={16} /> None
-                            </button>
-                            <button
-                                onClick={() => setGroupBy('date')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", groupBy === 'date' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
-                            >
-                                <Calendar size={16} /> Due Date
-                            </button>
-                            <button
-                                onClick={() => setGroupBy('priority')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", groupBy === 'priority' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
-                            >
-                                <Flag size={16} /> Priority
-                            </button>
-                            <button
-                                onClick={() => setGroupBy('project')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", groupBy === 'project' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
-                            >
-                                <Folder size={16} /> Project
-                            </button>
-                            <button
-                                onClick={() => setGroupBy('tag')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", groupBy === 'tag' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
-                            >
-                                <TagIcon size={16} /> Tags
-                            </button>
-                        </div>
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1 animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
+                        Group By
                     </div>
-
-                    {/* Sorting Section */}
-                    <div className="px-3 py-2">
-                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Sort By</div>
-                        <div className="space-y-1">
-                            <button
-                                onClick={() => setSortBy('manual')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", sortBy === 'manual' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
-                            >
-                                <SortAsc size={16} /> Manual
-                            </button>
-                            <button
-                                onClick={() => setSortBy('date_created')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", sortBy === 'date_created' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
-                            >
-                                <SortAsc size={16} /> Date Created
-                            </button>
-                            <button
-                                onClick={() => setSortBy('due_date')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", sortBy === 'due_date' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
-                            >
-                                <Calendar size={16} /> Due Date
-                            </button>
-                            <button
-                                onClick={() => setSortBy('alphabetical')}
-                                className={clsx("w-full text-left px-2 py-1.5 text-sm rounded flex items-center gap-2", sortBy === 'alphabetical' ? "bg-blue-50 text-blue-600" : "hover:bg-gray-50 text-gray-700")}
-                            >
-                                <SortAsc size={16} className="rotate-90" /> Alphabetical
-                            </button>
-                        </div>
-                    </div>
-
+                    <GroupItem
+                        active={groupBy === 'none'}
+                        onClick={() => setGroupBy('none')}
+                        icon={<LayoutList size={16} />}
+                        label="None"
+                    />
+                    <GroupItem
+                        active={groupBy === 'date'}
+                        onClick={() => setGroupBy('date')}
+                        icon={<Calendar size={16} />}
+                        label="Due Date"
+                    />
+                    <GroupItem
+                        active={groupBy === 'priority'}
+                        onClick={() => setGroupBy('priority')}
+                        icon={<Flag size={16} />}
+                        label="Priority"
+                    />
+                    <GroupItem
+                        active={groupBy === 'project'}
+                        onClick={() => setGroupBy('project')}
+                        icon={<Folder size={16} />}
+                        label="Project"
+                    />
+                    <GroupItem
+                        active={groupBy === 'tag'}
+                        onClick={() => setGroupBy('tag')}
+                        icon={<TagIcon size={16} />}
+                        label="Tags"
+                    />
                 </div>
             )}
         </div>
+    )
+}
+
+function SortDropdown({ sortBy, setSortBy }: { sortBy: SortOption, setSortBy: (s: SortOption) => void }) {
+    const [isOpen, setIsOpen] = useState(false)
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    const handleMouseEnter = () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        setIsOpen(true)
+    }
+
+    const handleMouseLeave = () => {
+        timeoutRef.current = setTimeout(() => {
+            setIsOpen(false)
+        }, 150)
+    }
+
+    return (
+        <div
+            className="relative"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
+            <button
+                className={clsx(
+                    "flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                    isOpen ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                    sortBy !== 'manual' && "text-blue-600 bg-blue-50 hover:bg-blue-100"
+                )}
+            >
+                <ArrowUpDown size={16} />
+                <span className="hidden sm:inline">Sort</span>
+            </button>
+
+            {isOpen && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1 animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">
+                        Sort By
+                    </div>
+                    <GroupItem
+                        active={sortBy === 'manual'}
+                        onClick={() => setSortBy('manual')}
+                        icon={<SortAsc size={16} />}
+                        label="Manual"
+                    />
+                    <GroupItem
+                        active={sortBy === 'date_created'}
+                        onClick={() => setSortBy('date_created')}
+                        icon={<SortAsc size={16} />}
+                        label="Date Created"
+                    />
+                    <GroupItem
+                        active={sortBy === 'due_date'}
+                        onClick={() => setSortBy('due_date')}
+                        icon={<Calendar size={16} />}
+                        label="Due Date"
+                    />
+                    <GroupItem
+                        active={sortBy === 'alphabetical'}
+                        onClick={() => setSortBy('alphabetical')}
+                        icon={<SortAsc size={16} className="rotate-90" />}
+                        label="Alphabetical"
+                    />
+                </div>
+            )}
+        </div>
+    )
+}
+
+function GroupItem({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
+    return (
+        <button
+            onClick={onClick}
+            className={clsx(
+                "w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 transition-colors mx-1 rounded-md",
+                active ? "bg-blue-50 text-blue-600" : "text-gray-700 hover:bg-gray-50"
+            )}
+            style={{ width: 'calc(100% - 8px)' }}
+        >
+            <span className={clsx("shrink-0", active ? "text-blue-600" : "text-gray-400")}>{icon}</span>
+            <span>{label}</span>
+            {active && <CheckCircle2 size={14} className="ml-auto" />}
+        </button>
     )
 }

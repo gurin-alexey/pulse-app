@@ -103,6 +103,7 @@ import type { TaskFilter } from "@/hooks/useTasks"
 
 import { useProjects } from "@/hooks/useProjects"
 import { getProjectIcon } from "@/utils/projectIcons"
+import { VoiceInputButton } from "@/components/ui/VoiceInputButton"
 
 // ... imports remain the same ...
 
@@ -178,6 +179,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     const [groupBy, setGroupBy] = useState<GroupOption>((mode === 'today' || mode === 'tomorrow') ? 'date' : 'none')
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
     const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false)
+    const [quickAddValue, setQuickAddValue] = useState('') // New state for inline input
     const [isAddingSection, setIsAddingSection] = useState(false)
     const [newSectionName, setNewSectionName] = useState("")
     const [sectionMenuOpen, setSectionMenuOpen] = useState<string | null>(null)
@@ -264,6 +266,37 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     }) || []
 
     const [collapsedTaskIds, setCollapsedTaskIds] = useState<Record<string, boolean>>({})
+    const [areAllCollapsed, setAreAllCollapsed] = useState(false)
+
+    const handleQuickCreate = async () => {
+        if (!quickAddValue.trim()) return
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        createTask({
+            title: quickAddValue.trim(),
+            projectId: projectId || null,
+            userId: user.id,
+            due_date: targetDate || null
+        }, {
+            onSuccess: () => setQuickAddValue('')
+        })
+    }
+
+    const handleToggleSubtasks = () => {
+        if (areAllCollapsed) {
+            setCollapsedTaskIds({})
+            setAreAllCollapsed(false)
+        } else {
+            const newCollapsed: Record<string, boolean> = {}
+            if (activeTasks) {
+                activeTasks.forEach((t: any) => newCollapsed[t.id] = true)
+            }
+            setCollapsedTaskIds(newCollapsed)
+            setAreAllCollapsed(true)
+        }
+    }
 
     // Recursive flatten logic
     // We use a helper to get flattened list for a specific container (Main List or Section)
@@ -762,20 +795,42 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                     <h2 className="font-bold text-lg text-gray-800">{pageTitle}</h2>
                 </div>
                 <div className="flex-1 max-w-2xl">
-                    <div
-                        onClick={handleQuickAdd}
-                        className="w-full py-2.5 px-4 rounded-xl bg-gray-50 border border-transparent text-gray-500 cursor-pointer hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all flex items-center gap-2 group"
-                    >
-                        <Plus size={20} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
-                        <span className="font-medium">Add a task...</span>
-                    </div>
+                    {/* Replaced by inline input below */}
                 </div>
                 <div className="shrink-0">
-                    <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />
+                    <ViewOptions
+                        sortBy={sortBy}
+                        setSortBy={setSortBy}
+                        groupBy={groupBy}
+                        setGroupBy={setGroupBy}
+                        onToggleSubtasks={handleToggleSubtasks}
+                    />
                 </div>
             </div>
 
             <div className="flex-1 pl-4 pr-0 pt-4 md:py-4 md:pr-1 md:pl-4 overflow-y-auto overflow-x-hidden pb-20">
+                {/* Quick Add Input */}
+                <div className="mb-6 relative group max-w-3xl mr-4 md:mr-0">
+                    <input
+                        value={quickAddValue}
+                        onChange={(e) => setQuickAddValue(e.target.value)}
+                        onKeyDown={async (e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault()
+                                await handleQuickCreate()
+                            }
+                        }}
+                        placeholder="Add a task..."
+                        className="w-full pl-4 pr-12 py-3 bg-white rounded-xl shadow-sm border border-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-base"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <VoiceInputButton
+                            onTranscription={(text) => setQuickAddValue(prev => (prev ? prev + ' ' : '') + text)}
+                            onRecordingComplete={handleQuickCreate}
+                        />
+                    </div>
+                </div>
+
                 {renderMode === 'groups' ? (
                     // Standard Grouped View (No Drag/Drop support needed here explicitly requested yet)
                     <div className="flex flex-col">

@@ -483,7 +483,18 @@ export function Layout() {
         <GlobalSearch />
       </div>
 
-      <Toaster position="top-center" richColors />
+      <Toaster
+        position="bottom-left"
+        richColors
+        toastOptions={{
+          style: {
+            marginBottom: '5rem', // Lift above sidebar footer/user profile
+            marginLeft: '1rem',
+            width: 'auto',
+            maxWidth: '240px' // Ensure it fits in sidebar
+          }
+        }}
+      />
 
       {/* Global Drag Overlay */}
       {createPortal(
