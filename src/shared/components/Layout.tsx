@@ -13,7 +13,6 @@ import { Sidebar, DroppableNavItem } from "@/shared/components/Sidebar"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { TaskItem } from "@/features/tasks/TaskItem"
 import { createPortal } from "react-dom"
-import { useCreateTask } from "@/hooks/useCreateTask"
 import { DndContext, DragOverlay } from '@dnd-kit/core'
 import { Toaster } from "sonner"
 import { SettingsModal } from "@/features/settings/SettingsModal"
@@ -186,35 +185,12 @@ export function Layout() {
   } = useAppDragAndDrop()
 
   // Global Mutations
-  const { mutate: createTask } = useCreateTask()
-
   const handleCreateTask = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
     const newId = crypto.randomUUID()
     setSearchParams({ task: newId, isNew: 'true' })
-
-    // Determine default date
-    let defaultDate = null
-    if (isToday) {
-      const d = new Date()
-      const offset = d.getTimezoneOffset()
-      defaultDate = new Date(d.getTime() - (offset * 60000)).toISOString().split('T')[0]
-    } else if (isTomorrow) {
-      const d = new Date()
-      d.setDate(d.getDate() + 1)
-      const offset = d.getTimezoneOffset()
-      defaultDate = new Date(d.getTime() - (offset * 60000)).toISOString().split('T')[0]
-    }
-
-    createTask({
-      id: newId,
-      title: '',
-      userId: user.id,
-      projectId: projectId || null,
-      due_date: defaultDate
-    })
   }
 
   function renderSidebarFooter() {

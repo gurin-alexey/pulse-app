@@ -3,10 +3,10 @@ import { Menu, Transition, Dialog } from '@headlessui/react'
 import TextareaAutosize from 'react-textarea-autosize'
 import { toast } from 'sonner'
 import { Loader2, CheckSquare, Square, Trash2, Calendar as CalendarIcon, ArrowUp, Flag, Repeat, MoreHorizontal, Tag as TagIcon, FolderInput, ArrowRight, SkipForward, History } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useLocation, useParams } from 'react-router-dom'
 import clsx from 'clsx'
-import { format, subDays, addDays, startOfToday, nextMonday } from 'date-fns'
-import { useQuery } from '@tanstack/react-query'
+import { format, subDays, addDays, nextMonday } from 'date-fns'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { supabase } from '@/lib/supabase'
 import { useTask } from '@/hooks/useTask'
@@ -57,6 +57,9 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     }
 
     const [searchParams, setSearchParams] = useSearchParams()
+    const location = useLocation()
+    const { projectId: routeProjectId } = useParams()
+    const queryClient = useQueryClient()
     const { data: task, isLoading } = useTask(realTaskId)
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
@@ -107,12 +110,22 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const occurrence = occurrenceDate ?? searchParams.get('occurrence') ?? embeddedDate
     const occurrenceDateStr = occurrence || null
 
-    // Sync local state when task loads
+    // Sync local state when task loads (only when task ID changes or initial load)
+    const lastSyncedIdRef = useRef<string | null>(null)
     useEffect(() => {
-        if (task) {
-            setTitle(task.title || '')
-            setDescription(task.description || '')
+        if (!task) return
+        // Skip sync right after we created the task to avoid overwriting local input
+        if (skipNextSyncRef.current) {
+            skipNextSyncRef.current = false
+            return
         }
+        // Don't overwrite local input while creating a new task
+        if (isNewRef.current || isCreatingRef.current) return
+        // Only sync if this is a different task or first load
+        if (lastSyncedIdRef.current === task.id) return
+        lastSyncedIdRef.current = task.id
+        setTitle(task.title || '')
+        setDescription(task.description || '')
     }, [task])
 
     // Keep track of values for unmount check
@@ -122,11 +135,73 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     // Track if this was opened as a new task
     const isNew = searchParams.get('isNew') === 'true'
     const isNewRef = useRef(isNew)
+    const hasCreatedRef = useRef(false)
+    const isCreatingRef = useRef(false)
+    const skipNextSyncRef = useRef(false)
 
     useEffect(() => {
         titleRef.current = title
         descriptionRef.current = description
     }, [title, description])
+
+    const getDefaultDueDate = () => {
+        if (location.pathname === '/today') {
+            const d = new Date()
+            const local = new Date(d.getTime() - (d.getTimezoneOffset() * 60000))
+            return local.toISOString().split('T')[0]
+        }
+        if (location.pathname === '/tomorrow') {
+            const d = new Date()
+            d.setDate(d.getDate() + 1)
+            const local = new Date(d.getTime() - (d.getTimezoneOffset() * 60000))
+            return local.toISOString().split('T')[0]
+        }
+        return null
+    }
+
+    const createTaskIfNeeded = async () => {
+        const hasContent = !!titleRef.current.trim() || !!descriptionRef.current.trim()
+        if (!isNewRef.current || task || !hasContent || isCreatingRef.current || hasCreatedRef.current) return
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        isCreatingRef.current = true
+        hasCreatedRef.current = true
+        const dueDate = getDefaultDueDate()
+        const projectId = routeProjectId || null
+
+        createTask(
+            {
+                id: realTaskId,
+                title: titleRef.current.trim(),
+                description: descriptionRef.current.trim() || null,
+                userId: user.id,
+                projectId,
+                due_date: dueDate
+            },
+            {
+                onSuccess: () => {
+                    isCreatingRef.current = false
+                    isNewRef.current = false
+                    skipNextSyncRef.current = true
+                    queryClient.invalidateQueries({ queryKey: ['task', realTaskId] })
+                },
+                onError: (error) => {
+                    isCreatingRef.current = false
+                    if (String(error.message).includes('duplicate key value')) {
+                        isNewRef.current = false
+                        skipNextSyncRef.current = true
+                        queryClient.invalidateQueries({ queryKey: ['task', realTaskId] })
+                        return
+                    }
+                    hasCreatedRef.current = false
+                    toast.error(`Failed to create task: ${error.message}`)
+                }
+            }
+        )
+    }
+
 
     // Cleanup empty new tasks on unmount
     useEffect(() => {
@@ -135,7 +210,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
             const closing = !currentParams.get('task')
             const isEmpty = !titleRef.current.trim() && !descriptionRef.current.trim()
 
-            if (closing && isEmpty && isNewRef.current) {
+            if (closing && isEmpty && isNewRef.current && hasCreatedRef.current) {
                 deleteTask(realTaskId)
             }
         }
@@ -166,7 +241,10 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const normalize = (s: string | null | undefined) => (s || '').trim()
 
     const handleTitleBlur = () => {
-        if (!task) return
+        if (!task) {
+            void createTaskIfNeeded()
+            return
+        }
         if (normalize(title) !== normalize(task.title)) {
             updateTask({ taskId: realTaskId, updates: { title } })
         }
@@ -212,7 +290,10 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     }
 
     const handleDescriptionBlur = () => {
-        if (!task) return
+        if (!task) {
+            void createTaskIfNeeded()
+            return
+        }
         if (normalize(description) !== normalize(task.description)) {
             if (task.recurrence_rule && occurrenceDateStr) {
                 const isFirstInstance = occurrenceDateStr === task.due_date?.split('T')[0]
