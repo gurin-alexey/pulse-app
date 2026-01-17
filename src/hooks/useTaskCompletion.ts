@@ -38,7 +38,13 @@ export function useTaskCompletion() {
             }
         } else {
             currentOccurrenceDate = task.due_date || new Date().toISOString().split('T')[0]
-            completionObj = task.start_time ? new Date(task.start_time) : (task.due_date ? new Date(task.due_date + 'T00:00:00') : new Date())
+            // Fix: Use currentOccurrenceDate as the base for completionObj to avoid issues with stale start_time dates
+            if (task.start_time) {
+                const timePart = task.start_time.split('T')[1] || '00:00:00'
+                completionObj = new Date(`${currentOccurrenceDate}T${timePart}`)
+            } else {
+                completionObj = new Date(`${currentOccurrenceDate}T00:00:00`)
+            }
         }
 
         // 2. Рассчитываем следующую дату для МАСТЕРА
