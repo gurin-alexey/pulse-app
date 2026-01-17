@@ -29,11 +29,24 @@ import { GlobalSearch } from "@/features/search/GlobalSearch"
 import { useCommandStore } from "@/store/useCommandStore"
 import { useSwipeable } from 'react-swipeable'
 
+import { useTimerStore } from "@/store/useTimerStore"
+
 export function Layout() {
   const queryClient = useQueryClient()
   const isFetching = useIsFetching()
   const isDesktop = useMediaQuery("(min-width: 768px)")
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+
+  const { tick, status } = useTimerStore()
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined
+    if (status === 'running') {
+      interval = setInterval(tick, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [status, tick])
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { selectedIds } = useSelectionStore()
   const [timezonePrompt, setTimezonePrompt] = useState<{ from: string; to: string } | null>(null)

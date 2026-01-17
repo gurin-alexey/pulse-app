@@ -35,6 +35,8 @@ import { TaskHistoryList } from './components/TaskHistoryList'
 import { VoiceInputButton } from '@/components/ui/VoiceInputButton'
 import { useTaskCompletion } from '@/hooks/useTaskCompletion'
 import { OccurrenceCompletionModal } from '@/components/ui/modals/OccurrenceCompletionModal'
+import { useTimerStore } from '@/store/useTimerStore'
+import { TimerBanner } from './TimerBanner'
 
 type TaskDetailProps = {
     taskId: string
@@ -431,6 +433,8 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
             <div className="flex-1 overflow-y-auto px-6 pt-3">
                 <div className="mb-2 space-y-2">
 
+                    {/* Timer Banner */}
+                    <TimerBanner taskId={realTaskId} />
 
                     {/* Occurrence Detach Banner */}
                     {occurrence && t.recurrence_rule && (
