@@ -185,6 +185,42 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             e.preventDefault();
             (e.currentTarget as HTMLTextAreaElement).blur()
         }
+
+        // Inline Hotkeys for Date
+        if (e.altKey && (e.key === '1' || e.key === '2' || e.key === '3')) {
+            e.preventDefault()
+            e.stopPropagation()
+
+            let date: Date | null = null
+            let msg = ''
+
+            if (e.key === '1') {
+                date = startOfToday()
+                msg = 'Сегодня'
+            } else if (e.key === '2') {
+                date = addDays(startOfToday(), 1)
+                msg = 'Завтра'
+            } else if (e.key === '3') {
+                date = nextMonday(startOfToday())
+                msg = 'Понедельник'
+            }
+
+            if (date) {
+                const dateStr = format(date, 'yyyy-MM-dd')
+                if (task.recurrence_rule) {
+                    // For recurring, just open modal or warn? 
+                    // To keep it simple inline, let's open modal
+                    setPendingDateUpdate(dateStr)
+                    const isFirst = targetDate?.split('T')[0] === task.due_date?.split('T')[0]
+                    const isChange = dateStr !== targetDate
+                    setAllowedModes(isChange ? ['single', 'following'] : (isFirst ? ['single', 'all'] : ['single', 'following', 'all']))
+                    setRecurrenceEditModalOpen(true)
+                } else {
+                    updateTask({ taskId: realTaskId, updates: { due_date: dateStr } })
+                    if (showToasts) toast.success(`📅 ${msg}`)
+                }
+            }
+        }
     }
 
     const handleRecurrenceUpdateConfirm = (mode: 'single' | 'following' | 'all') => {
