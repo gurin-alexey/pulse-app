@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise, RefreshCw, FolderInput, LogOut, Check } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise, RefreshCw, FolderInput, LogOut, Check, Smile } from "lucide-react"
 import { useQueryClient, useIsFetching } from "@tanstack/react-query" // Import react-query hooks
 
 // ... existing code ...
@@ -30,6 +30,8 @@ import { useTags } from "@/hooks/useTags"
 import { isToday, isTomorrow, parseISO, subDays } from "date-fns"
 import { CATEGORIES } from "@/constants/categories"
 import type { Habit, HabitLog } from "@/types/database"
+import { getProjectIcon } from "@/utils/projectIcons"
+import { ProjectIconPicker } from "@/features/projects/ProjectIconPicker"
 
 type SidebarProps = {
     activePath: string
@@ -38,7 +40,7 @@ type SidebarProps = {
 
 // --- DND Components ---
 
-function ProjectActionsMenu({ project, onRename, onDelete, isOver, groups, onMoveToGroup, onCreateGroup }: any) {
+function ProjectActionsMenu({ project, onRename, onDelete, onChangeIcon, isOver, groups, onMoveToGroup, onCreateGroup }: any) {
     const [isOpen, setIsOpen] = useState(false)
     const [view, setView] = useState<'main' | 'folders'>('main')
     const menuRef = useRef<HTMLDivElement>(null)
@@ -78,6 +80,13 @@ function ProjectActionsMenu({ project, onRename, onDelete, isOver, groups, onMov
                             >
                                 <Edit2 size={13} className="text-gray-400" />
                                 Rename
+                            </button>
+                            <button
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(false); onChangeIcon(e) }}
+                                className="text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 w-full transition-colors"
+                            >
+                                <Smile size={13} className="text-gray-400" />
+                                Change Icon
                             </button>
                             <button
                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setView('folders') }}
@@ -481,6 +490,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const [isTagsExpanded, setIsTagsExpanded] = useState(false)
     const [activeCategory, setActiveCategory] = useState<string | null>(null)
     const [menuPosition, setMenuPosition] = useState<{ top: number, left: number } | null>(null)
+    const [iconPickerState, setIconPickerState] = useState<{ projectId: string, top: number, left: number, currentIcon: string | null } | null>(null)
 
     const { data: tags } = useTags()
 
@@ -637,8 +647,22 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         })
     }
 
+    const handleOpenIconPicker = (e: React.MouseEvent, project: any) => {
+        const rect = e.currentTarget.getBoundingClientRect()
+        // Adjust position to be near the click
+        setIconPickerState({ projectId: project.id, top: rect.bottom, left: rect.left, currentIcon: project.icon })
+    }
+
+    const handleIconSelect = (iconName: string) => {
+        if (iconPickerState) {
+            updateProject({ projectId: iconPickerState.projectId, updates: { icon: iconName } })
+            setIconPickerState(null)
+        }
+    }
+
     const renderProjectItem = (project: any) => {
         const isActive = activePath === `/projects/${project.id}`
+        const ProjectIcon = getProjectIcon(project.icon)
         return (
             <SortableProjectItem key={project.id} project={project} activePath={activePath}>
                 <div className="relative group/project">
@@ -651,7 +675,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             "font-medium"
                         )}
                     >
-                        <Folder size={16} />
+                        <ProjectIcon size={16} />
                         <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
                             {project.name}
                         </span>
@@ -660,6 +684,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                             project={project}
                             onRename={handleRenameProject}
                             onDelete={handleDeleteProject}
+                            onChangeIcon={(e: React.MouseEvent) => handleOpenIconPicker(e, project)}
                             isOver={false}
                             groups={groups}
                             onMoveToGroup={(groupId: string | null) => updateProject({ projectId: project.id, updates: { group_id: groupId } })}
@@ -777,6 +802,16 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                     )
                 })}
             </div>
+
+            {/* Icon Picker Portal */}
+            {iconPickerState && (
+                <ProjectIconPicker
+                    currentIcon={iconPickerState.currentIcon}
+                    onSelect={handleIconSelect}
+                    onClose={() => setIconPickerState(null)}
+                    position={{ top: iconPickerState.top, left: iconPickerState.left }}
+                />
+            )}
 
             {/* Portal for Dropdown */}
             {activeCategory && menuPosition && createPortal(

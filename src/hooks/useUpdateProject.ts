@@ -36,6 +36,7 @@ export function useUpdateProject() {
             return { previousProjects }
         },
         onError: (err, newProject, context) => {
+            console.error('Update project failed:', err)
             // If the mutation fails, use the context returned from onMutate to roll back
             if (context?.previousProjects) {
                 queryClient.setQueryData<Project[]>(['projects'], context.previousProjects)

@@ -6,6 +6,7 @@ export type Project = {
     user_id: string
     group_id: string | null
     deleted_at: string | null
+    icon: string | null
 }
 
 export type ProjectGroup = {

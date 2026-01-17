@@ -78,7 +78,6 @@
     border-radius: 20px;
 }
 
-
 /* Align "Весь день" text to top left */
 .pulse-calendar .fc-timegrid-axis,
 .daily-planner-wrapper .fc-timegrid-axis {
@@ -93,31 +92,4 @@
     text-align: left !important;
     justify-content: flex-start !important;
     align-items: flex-start !important;
-}
-/* Align "Весь день" text to top left */
-.pulse-calendar .fc-timegrid-axis,
-.daily-planner-wrapper .fc-timegrid-axis {
-    text-align: left !important;
-    vertical-align: top !important;
-    padding-top: 8px !important;
-    padding-left: 8px !important;
-}
-
-.pulse-calendar .fc-timegrid-axis-frame,
-.daily-planner-wrapper .fc-timegrid-axis-frame {
-    text-align: left !important;
-    justify-content: flex-start !important;
-    align-items: flex-start !important;
-}
-/* Align time labels (hours) to left */
-.pulse-calendar .fc-timegrid-slot-label,
-.daily-planner-wrapper .fc-timegrid-slot-label {
-    text-align: left !important;
-    padding-left: 8px !important;
-}
-
-.pulse-calendar .fc-timegrid-slot-label-frame,
-.daily-planner-wrapper .fc-timegrid-slot-label-frame {
-    text-align: left !important;
-    justify-content: flex-start !important;
 }

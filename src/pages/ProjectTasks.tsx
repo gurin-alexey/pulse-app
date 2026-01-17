@@ -102,6 +102,7 @@ import type { TaskFilter } from "@/hooks/useTasks"
 // ... imports remain the same ...
 
 import { useProjects } from "@/hooks/useProjects"
+import { getProjectIcon } from "@/utils/projectIcons"
 
 // ... imports remain the same ...
 
@@ -751,7 +752,15 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
             )}
 
             <div className="px-4 py-3 border-b border-gray-100 hidden md:flex items-center gap-4 min-h-[4rem] shrink-0 sticky top-0 bg-white z-30">
-                <h2 className="font-bold text-lg text-gray-800 shrink-0">{pageTitle}</h2>
+                <div className="flex items-center gap-2 shrink-0">
+                    {mode !== 'inbox' && mode !== 'today' && mode !== 'tomorrow' && currentProject && (
+                        (() => {
+                            const Icon = getProjectIcon(currentProject.icon)
+                            return <Icon size={24} className="text-gray-400" />
+                        })()
+                    )}
+                    <h2 className="font-bold text-lg text-gray-800">{pageTitle}</h2>
+                </div>
                 <div className="flex-1 max-w-2xl">
                     <div
                         onClick={handleQuickAdd}
