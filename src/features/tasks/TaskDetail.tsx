@@ -15,7 +15,7 @@ import { useCreateTask } from '@/hooks/useCreateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
 import { useTrashActions } from '@/hooks/useTrashActions'
 import { useSettings } from '@/store/useSettings'
-import { useTags, useToggleTaskTag } from '@/hooks/useTags'
+import { useTags, useToggleTaskTag, useTaskTags } from '@/hooks/useTags'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import { addExDateToRRule, addUntilToRRule, updateDTStartInRRule, updateRRuleByDay } from '@/utils/recurrence'
@@ -97,6 +97,11 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
     const { mutate: toggleTag } = useToggleTaskTag()
     const { data: allTags } = useTags()
+    const { data: taskTags } = useTaskTags(realTaskId)
+
+    const hasPomoTag = taskTags?.some(t =>
+        (t.name.toLowerCase() === 'pomo' || t.name.toLowerCase() === 'pomodoro')
+    );
 
     // Breadcrumb Data
     const { data: parentTask } = useTask(task?.parent_id || '')
@@ -434,7 +439,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 <div className="mb-2 space-y-2">
 
                     {/* Timer Banner */}
-                    <TimerBanner taskId={realTaskId} />
+                    {hasPomoTag && <TimerBanner taskId={realTaskId} />}
 
                     {/* Occurrence Detach Banner */}
                     {occurrence && t.recurrence_rule && (

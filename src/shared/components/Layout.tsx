@@ -30,8 +30,10 @@ import { useCommandStore } from "@/store/useCommandStore"
 import { useSwipeable } from 'react-swipeable'
 
 import { useTimerStore } from "@/store/useTimerStore"
+import { useEnsureDefaultTags } from "@/hooks/useEnsureDefaultTags"
 
 export function Layout() {
+  useEnsureDefaultTags()
   const queryClient = useQueryClient()
   const isFetching = useIsFetching()
   const isDesktop = useMediaQuery("(min-width: 768px)")
