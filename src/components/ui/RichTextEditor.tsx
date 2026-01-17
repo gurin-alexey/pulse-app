@@ -167,13 +167,15 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
         <div className={clsx("w-full transition-all relative group", className)}>
 
             {/* Toggle Toolbar Button */}
-            <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-0 right-0 z-10">
                 <button
                     onClick={() => setShowToolbar(!showToolbar)}
                     className={clsx(
                         "p-1.5 rounded-md hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600",
                         showToolbar && "bg-gray-100 text-gray-600"
                     )}
+                    // Prevent taking focus away from editor when clicking
+                    onMouseDown={(e) => e.preventDefault()}
                     title="Toggle Formatting"
                 >
                     <Type size={16} />
