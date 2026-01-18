@@ -472,7 +472,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
             if (event.active.data.current?.type === 'Task') {
                 const t = event.active.data.current.task
                 setActiveDragItem(t)
-                setCurrentDragDepth(t.depth) // Start with current depth
+                setCurrentDragDepth(t.depth)
             }
         },
         onDragOver: (event) => {
@@ -502,15 +502,14 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 setDragOverSectionId(null)
             }
 
-            // Calculate Visual Depth for indentation feedback
+            // Visual Depth for indentation feedback - derived from target
             if (activeTask && over.data.current?.type === 'Task') {
-                const items = getFlattenedTasks(activeTask.section_id)
-                const activeIndex = items.findIndex((t: any) => t.id === active.id)
-
-                if (activeIndex !== -1) {
-                    const projectedDepth = Math.max(0, (items[activeIndex].depth) + Math.round(delta.x / 24))
-                    setCurrentDragDepth(projectedDepth)
+                const overTask = over.data.current.task
+                let projectedDepth = overTask.depth
+                if (activeTask.parent_id === null && overTask.parent_id !== null) {
+                    projectedDepth = 0
                 }
+                setCurrentDragDepth(projectedDepth)
             }
         },
         onDragEnd: (event) => {
@@ -616,20 +615,13 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 const [movedItem] = projectedList.splice(activeIndex, 1)
                 projectedList.splice(overIndex, 0, movedItem)
 
-                const prevItem = projectedList[overIndex - 1]
-                const nextItem = projectedList[overIndex + 1]
-                const maxDepth = prevItem ? prevItem.depth + 1 : 0
-                const projectedDepth = Math.max(0, (items[activeIndex].depth) + Math.round(delta.x / 40))
-                const finalDepth = Math.min(projectedDepth, maxDepth)
+                let finalDepth = overTask.depth
+                let newParentId = overTask.parent_id
 
-                let newParentId: string | null = null
-                if (prevItem) {
-                    if (finalDepth === prevItem.depth + 1) newParentId = prevItem.id
-                    else if (finalDepth === prevItem.depth) newParentId = prevItem.parent_id
-                    else {
-                        const ancestor = projectedList.slice(0, overIndex).reverse().find((t: any) => t.depth === finalDepth - 1)
-                        newParentId = ancestor ? ancestor.id : null
-                    }
+                // Prevent root task from becoming a subtask
+                if (activeTask.parent_id === null && newParentId !== null) {
+                    newParentId = null
+                    finalDepth = 0
                 }
 
                 let prevSiblingOrder: number | null = null

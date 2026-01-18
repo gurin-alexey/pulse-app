@@ -216,7 +216,7 @@ function GroupActionsMenu({ group, onAddProject, onRename, onDelete }: any) {
 }
 
 function SortableProjectItem({ project, activePath, children }: { project: any, activePath: string, children: React.ReactNode | ((isOver: boolean) => React.ReactNode) }) {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
         id: project.id,
         data: { project, type: 'ProjectSortable', groupId: project.group_id || null }
     })
@@ -239,7 +239,7 @@ function SortableProjectItem({ project, activePath, children }: { project: any, 
                 "hover:bg-gray-50/50"
             )}
         >
-            {typeof children === 'function' ? children(false) : children}
+            {typeof children === 'function' ? children(isOver) : children}
         </div>
     )
 }
@@ -665,33 +665,38 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
         const ProjectIcon = getProjectIcon(project.icon)
         return (
             <SortableProjectItem key={project.id} project={project} activePath={activePath}>
-                <div className="relative group/project">
-                    <Link
-                        to={`/projects/${project.id}`}
-                        onClick={onItemClick}
-                        className={clsx(
-                            "flex items-center gap-2 px-3 py-1 transition-colors text-sm",
-                            isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600",
-                            "font-medium"
-                        )}
-                    >
-                        <ProjectIcon size={16} />
-                        <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
-                            {project.name}
-                        </span>
+                {(isOver) => (
+                    <div className={clsx(
+                        "relative group/project",
+                        isOver && "bg-blue-600/10 ring-2 ring-blue-400 rounded-lg mx-1"
+                    )}>
+                        <Link
+                            to={`/projects/${project.id}`}
+                            onClick={onItemClick}
+                            className={clsx(
+                                "flex items-center gap-2 px-3 py-1 transition-colors text-sm",
+                                isOver ? "text-blue-700" : (isActive ? "text-blue-600 bg-blue-50/50" : "text-gray-600"),
+                                "font-medium"
+                            )}
+                        >
+                            <ProjectIcon size={16} />
+                            <span className="whitespace-nowrap truncate flex-1 leading-none pb-0.5">
+                                {project.name}
+                            </span>
 
-                        <ProjectActionsMenu
-                            project={project}
-                            onRename={handleRenameProject}
-                            onDelete={handleDeleteProject}
-                            onChangeIcon={(e: React.MouseEvent) => handleOpenIconPicker(e, project)}
-                            isOver={false}
-                            groups={groups}
-                            onMoveToGroup={(groupId: string | null) => updateProject({ projectId: project.id, updates: { group_id: groupId } })}
-                            onCreateGroup={handleCreateGroup}
-                        />
-                    </Link>
-                </div>
+                            <ProjectActionsMenu
+                                project={project}
+                                onRename={handleRenameProject}
+                                onDelete={handleDeleteProject}
+                                onChangeIcon={(e: React.MouseEvent) => handleOpenIconPicker(e, project)}
+                                isOver={isOver}
+                                groups={groups}
+                                onMoveToGroup={(groupId: string | null) => updateProject({ projectId: project.id, updates: { group_id: groupId } })}
+                                onCreateGroup={handleCreateGroup}
+                            />
+                        </Link>
+                    </div>
+                )}
             </SortableProjectItem>
         )
     }
@@ -703,7 +708,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
             path: "/inbox",
             icon: Inbox,
             count: allTasks?.filter(t => !t.is_completed && !t.project_id).length,
-            droppable: true
+            droppable: false
         },
         {
             label: "Today",
