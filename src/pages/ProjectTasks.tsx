@@ -5,7 +5,7 @@ import { useTasks } from "@/hooks/useTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { AlertCircle, Loader2, MoreHorizontal, Plus, Trash2, Pencil, ChevronRight, GripVertical } from "lucide-react"
 import { useCreateTask } from "@/hooks/useCreateTask"
-import { ViewOptions, type SortOption, type GroupOption } from "@/features/tasks/ViewOptions"
+import { ViewOptions, type SortOption, type GroupOption } from '@/features/tasks/ViewOptions'
 import { useTaskView } from "@/features/tasks/useTaskView"
 import { useSections, useCreateSection, useDeleteSection, useUpdateSection } from "@/hooks/useSections"
 import clsx from "clsx"
@@ -51,25 +51,30 @@ function SortableTaskItem({ task, depth, disabled, children }: { task: any, dept
         <div
             ref={setNodeRef}
             style={style}
-            {...attributes}
             className={clsx(
-                "rounded-md transition-all",
-                isDragging && "bg-blue-50/20 outline outline-2 outline-dashed outline-blue-300 -outline-offset-2"
+                "rounded-md transition-all duration-200",
+                isDragging && "opacity-0"
             )}
         >
-            <div className={isDragging ? "invisible" : ""}>
-                {children({ listeners, attributes: {} })}
-            </div>
+            {children({ listeners, attributes })}
         </div>
     )
 }
 
 // Droppable Container Wrapper
-function DroppableContainer({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) {
-    const { setNodeRef, isOver } = useDroppable({ id })
+function DroppableContainer({ id, children, className, data, isHighlighted }: { id: string, children: React.ReactNode, className?: string, data?: any, isHighlighted?: boolean }) {
+    const { setNodeRef, isOver } = useDroppable({ id, data })
+    const showHighlight = isOver || isHighlighted
 
     return (
-        <div ref={setNodeRef} className={clsx(className, isOver && "bg-blue-50/50 ring-2 ring-blue-100 rounded-lg transition-all")}>
+        <div
+            ref={setNodeRef}
+            className={clsx(
+                className,
+                "transition-all duration-300 ease-out",
+                showHighlight && "bg-gradient-to-br from-blue-50 to-blue-100/50 ring-4 ring-blue-400/40 shadow-[inset_0_2px_20px_rgba(59,130,246,0.1)] rounded-2xl p-3 scale-[1.01]"
+            )}
+        >
             {children}
         </div>
     )
@@ -175,8 +180,8 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
 
     // View State
     // ... State declarations remain ...
-    const [sortBy, setSortBy] = useState<SortOption>('manual')
-    const [groupBy, setGroupBy] = useState<GroupOption>((mode === 'today' || mode === 'tomorrow') ? 'date' : 'none')
+    const [groupBy, setGroupBy] = useState<GroupOption>('priority')
+    const sortBy: SortOption = 'manual'
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
     const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false)
     const [quickAddValue, setQuickAddValue] = useState('') // New state for inline input
@@ -187,6 +192,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     const [editingSectionName, setEditingSectionName] = useState("")
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
     const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null) // Track which section we are hovering
+    const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null) // Track which group (priority) we hover
     const [currentDragDepth, setCurrentDragDepth] = useState<number | null>(null) // Visual depth for placeholder
 
     const [activeDragItem, setActiveDragItem] = useState<any | null>(null) // Track active drag item for Overlay
@@ -284,19 +290,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
         })
     }
 
-    const handleToggleSubtasks = () => {
-        if (areAllCollapsed) {
-            setCollapsedTaskIds({})
-            setAreAllCollapsed(false)
-        } else {
-            const newCollapsed: Record<string, boolean> = {}
-            if (activeTasks) {
-                activeTasks.forEach((t: any) => newCollapsed[t.id] = true)
-            }
-            setCollapsedTaskIds(newCollapsed)
-            setAreAllCollapsed(true)
-        }
-    }
+
 
     // Recursive flatten logic
     // We use a helper to get flattened list for a specific container (Main List or Section)
@@ -510,11 +504,28 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                     projectedDepth = 0
                 }
                 setCurrentDragDepth(projectedDepth)
+
+                // Detect target group from priority for highlighting
+                if (groupBy === 'priority') {
+                    const targetPriority = overTask.priority || 'none'
+                    const targetGroupName = targetPriority.charAt(0).toUpperCase() + targetPriority.slice(1)
+                    if (targetGroupName !== (activeTask.priority?.charAt(0).toUpperCase() + activeTask.priority?.slice(1) || 'None')) {
+                        setDragOverGroupId(`group-${targetGroupName}`)
+                    } else {
+                        setDragOverGroupId(null)
+                    }
+                }
+            }
+
+            // Also detect if hovering over group container directly
+            if (over.data.current?.type === 'Group') {
+                setDragOverGroupId(over.id as string)
             }
         },
         onDragEnd: (event) => {
             setActiveDragItem(null)
             setDragOverSectionId(null) // Reset highlight
+            setDragOverGroupId(null) // Reset group highlight
             const { active, over, delta } = event
             if (!over) return
 
@@ -559,8 +570,27 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 return
             }
 
-            // 1. Handle Section Moving (Dropping on Container)
+            // 1. Handle Section/Group Moving (Dropping on Container)
             const isSectionDrop = overId === 'main-list' || localSections?.some((s: any) => s.id === overId)
+            const isGroupDrop = overData?.type === 'Group'
+
+            if (activeTask && isGroupDrop && groupBy === 'priority') {
+                const newPriority = overData.groupName.toLowerCase() === 'none' ? null : overData.groupName.toLowerCase()
+                if (activeTask.priority !== newPriority) {
+                    // Optimistic UI update
+                    setLocalTasks(prev => prev.map(t =>
+                        t.id === activeId ? { ...t, priority: newPriority } : t
+                    ))
+
+                    // Persist to server
+                    isMutatingRef.current = true
+                    updateTask({
+                        taskId: activeId,
+                        updates: { priority: newPriority }
+                    }, { onSettled: () => { isMutatingRef.current = false } })
+                }
+                return
+            }
 
             if (activeTask && isSectionDrop) {
                 const newSectionId = overId === 'main-list' ? null : overId
@@ -581,6 +611,22 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
             // 2. Handle Reordering / Reparenting (Task over Task)
             if (activeTask && over.data.current?.type === 'Task') {
                 const overTask = over.data.current.task
+
+                // Handle Priority change when dropping on another task
+                if (groupBy === 'priority' && activeTask.priority !== overTask.priority) {
+                    // Optimistic UI update
+                    setLocalTasks(prev => prev.map(t =>
+                        t.id === activeId ? { ...t, priority: overTask.priority } : t
+                    ))
+
+                    // Persist to server
+                    isMutatingRef.current = true
+                    updateTask({
+                        taskId: activeId,
+                        updates: { priority: overTask.priority }
+                    }, { onSettled: () => { isMutatingRef.current = false } })
+                    return
+                }
 
                 // Case A: Cross-Section Drop (Task -> Task in different section)
                 if (activeTask.section_id !== overTask.section_id) {
@@ -772,7 +818,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
         <div className="h-full flex flex-col">
             {/* Mobile View Options Portal */}
             {!isDesktop && portalTarget && createPortal(
-                <ViewOptions sortBy={sortBy} setSortBy={setSortBy} groupBy={groupBy} setGroupBy={setGroupBy} />,
+                <ViewOptions groupBy={groupBy} setGroupBy={setGroupBy} />,
                 portalTarget
             )}
 
@@ -791,11 +837,8 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 </div>
                 <div className="shrink-0">
                     <ViewOptions
-                        sortBy={sortBy}
-                        setSortBy={setSortBy}
                         groupBy={groupBy}
                         setGroupBy={setGroupBy}
-                        onToggleSubtasks={handleToggleSubtasks}
                     />
                 </div>
             </div>
@@ -856,7 +899,13 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                             const isGroupCollapsed = collapsedGroups[groupName] !== undefined ? collapsedGroups[groupName] : isDefaultCollapsed
 
                             return (
-                                <div key={groupName} className="mb-8">
+                                <DroppableContainer
+                                    key={groupName}
+                                    id={`group-${groupName}`}
+                                    data={{ type: 'Group', groupName }}
+                                    className="mb-8"
+                                    isHighlighted={dragOverGroupId === `group-${groupName}`}
+                                >
                                     <button
                                         onClick={() => setCollapsedGroups(prev => ({ ...prev, [groupName]: !isGroupCollapsed }))}
                                         className="flex items-center gap-2 w-full text-left mb-2 group/header focus:outline-none"
@@ -868,8 +917,14 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                                         <h3 className="text-sm font-bold text-gray-500 uppercase">{groupName} ({visibleTasks.length})</h3>
                                     </button>
 
-                                    {!isGroupCollapsed && visibleTasks.map((task, index) => renderTaskItem(task, index))}
-                                </div>
+                                    {!isGroupCollapsed && (
+                                        <SortableContext items={visibleTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                            <div className="space-y-1 relative">
+                                                {visibleTasks.map((task, index) => renderTaskItem(task, index))}
+                                            </div>
+                                        </SortableContext>
+                                    )}
+                                </DroppableContainer>
                             )
                         })}
                         {Object.keys(tasksForView).length === 0 && <div className="text-gray-400 text-center mt-10">No active tasks</div>}

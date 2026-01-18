@@ -42,9 +42,10 @@ interface TaskItemProps {
     disableStrikethrough?: boolean
     occurrencesMap?: Record<string, string>
     isSubtaskMode?: boolean
+    isDraggingOverlay?: boolean
 }
 
-export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent, viewMode, disableStrikethrough, occurrencesMap, isSubtaskMode }: TaskItemProps) {
+export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent, viewMode, disableStrikethrough, occurrencesMap, isSubtaskMode, isDraggingOverlay }: TaskItemProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
@@ -427,7 +428,8 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     const containerClasses = clsx(
         "relative flex items-center gap-2 px-2 h-9 bg-white transition-colors w-full select-none box-border border border-transparent z-10",
         isActive ? "bg-gray-100 placeholder:bg-gray-100" : "hover:bg-gray-100/60",
-        task.is_completed && "opacity-80"
+        task.is_completed && "opacity-80",
+        isDraggingOverlay && "shadow-none border-none bg-white"
     )
 
     return (

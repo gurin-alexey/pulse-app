@@ -25,6 +25,7 @@ interface DragData {
     task?: any
     project?: any
     group?: any
+    section?: any
     label?: string
 }
 
