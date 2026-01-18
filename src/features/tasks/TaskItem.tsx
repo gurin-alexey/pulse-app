@@ -1,5 +1,5 @@
 import TextareaAutosize from 'react-textarea-autosize'
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, memo } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
@@ -12,7 +12,7 @@ import { ru } from 'date-fns/locale'
 import { toast } from "sonner"
 
 
-import { useMediaQuery } from "@/hooks/useMediaQuery"
+
 import { useSettings } from "@/store/useSettings"
 import { useTrashActions } from "@/hooks/useTrashActions"
 import { ContextMenu } from "@/shared/components/ContextMenu"
@@ -46,9 +46,10 @@ interface TaskItemProps {
     occurrencesMap?: Record<string, string>
     isSubtaskMode?: boolean
     isDraggingOverlay?: boolean
+    isMobile?: boolean
 }
 
-export function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent, viewMode, disableStrikethrough, occurrencesMap, isSubtaskMode, isDraggingOverlay }: TaskItemProps) {
+export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, listeners, attributes, hasChildren, isCollapsed, onToggleCollapse, disableAnimation, onIndent, onOutdent, viewMode, disableStrikethrough, occurrencesMap, isSubtaskMode, isDraggingOverlay, isMobile = false }: TaskItemProps) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const { mutate: updateTask } = useUpdateTask()
@@ -59,8 +60,6 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
     const { settings } = useSettings()
 
     const showToasts = settings?.preferences.show_toast_hints !== false
-
-    const isMobile = useMediaQuery("(max-width: 768px)")
 
     // Task Completion logic
     const {
@@ -727,4 +726,4 @@ export function TaskItem({ task, isActive, depth = 0, listeners, attributes, has
             />
         </motion.div>
     )
-}
+})

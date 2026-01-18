@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Loader2 } from 'lucide-react'
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { supabase } from '@/lib/supabase'
 import { useSubtasks } from '@/hooks/useSubtasks'
 import { useCreateTask } from '@/hooks/useCreateTask'
@@ -9,7 +10,7 @@ import { TaskItem } from './TaskItem'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import clsx from 'clsx'
 
-function SortableSubtaskItem({ task }: { task: any }) {
+function SortableSubtaskItem({ task, isMobile }: { task: any, isMobile: boolean }) {
     const {
         attributes,
         listeners,
@@ -41,6 +42,7 @@ function SortableSubtaskItem({ task }: { task: any }) {
                     listeners={listeners}
                     attributes={attributes}
                     isSubtaskMode={true}
+                    isMobile={isMobile}
                 />
             </div>
         </div>
@@ -56,6 +58,7 @@ export function SubtaskList({ taskId, projectId, isProject }: { taskId: string; 
     const { mutate: createTask } = useCreateTask()
     const { mutate: updateTask } = useUpdateTask()
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
+    const isMobile = useMediaQuery("(max-width: 768px)")
 
     const completedCount = subtasks?.filter(t => t.is_completed).length || 0
     const totalCount = subtasks?.length || 0
@@ -113,7 +116,7 @@ export function SubtaskList({ taskId, projectId, isProject }: { taskId: string; 
                     strategy={verticalListSortingStrategy}
                 >
                     {sortedSubtasks.map(subtask => (
-                        <SortableSubtaskItem key={subtask.id} task={subtask} />
+                        <SortableSubtaskItem key={subtask.id} task={subtask} isMobile={isMobile} />
                     ))}
                 </SortableContext>
             </div>

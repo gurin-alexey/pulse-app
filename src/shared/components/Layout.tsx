@@ -37,6 +37,7 @@ export function Layout() {
   const queryClient = useQueryClient()
   const isFetching = useIsFetching()
   const isDesktop = useMediaQuery("(min-width: 768px)")
+  const isMobile = useMediaQuery("(max-width: 768px)")
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   const { tick, status } = useTimerStore()
@@ -501,7 +502,7 @@ export function Layout() {
         <DragOverlay dropAnimation={{ duration: 400, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
           {activeDragData?.type === 'Task' ? (
             <div className="shadow-[0_35px_70px_rgba(0,0,0,0.3),0_0_0_1px_rgba(0,0,0,0.05)] rounded-xl overflow-hidden bg-white cursor-grabbing z-[9999]">
-              <TaskItem task={activeDragData.task} isActive={false} isDraggingOverlay />
+              <TaskItem task={activeDragData.task} isActive={false} isDraggingOverlay isMobile={isMobile} />
             </div>
           ) : activeDragData?.type === 'Section' ? (
             <div className="opacity-100 cursor-grabbing pointer-events-none bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-64 scale-100">

@@ -3,6 +3,7 @@ import { useTasks } from "@/hooks/useTasks"
 import { useProjects } from "@/hooks/useProjects"
 import { useTags } from "@/hooks/useTags"
 import { TaskItem } from "@/features/tasks/TaskItem"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { Loader2, AlertCircle, Filter, X, CheckSquare } from "lucide-react"
 import clsx from "clsx"
 import { format, isToday, isYesterday, isThisWeek, isThisMonth } from "date-fns"
@@ -11,6 +12,7 @@ import { ru } from "date-fns/locale"
 type Period = 'today' | 'yesterday' | 'week' | 'month' | 'all'
 
 export function CompletedTasksPage() {
+    const isMobile = useMediaQuery("(max-width: 768px)")
     const [period, setPeriod] = useState<Period>('today')
     const [selectedProject, setSelectedProject] = useState<string>("")
     const [selectedTag, setSelectedTag] = useState<string>("")
@@ -184,6 +186,7 @@ export function CompletedTasksPage() {
                                             isActive={false}
                                             viewMode="all"
                                             disableStrikethrough={true}
+                                            isMobile={isMobile}
                                         />
                                     ))}
                                 </div>

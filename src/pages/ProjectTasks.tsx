@@ -199,6 +199,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     const activeTaskId = searchParams.get('task')
 
     const isDesktop = useMediaQuery("(min-width: 768px)")
+    const isMobile = useMediaQuery("(max-width: 768px)")
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
 
     useEffect(() => {
@@ -794,6 +795,8 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                         depth={task.depth} // Keep original depth for content (which is hidden during drag anyway)
                         listeners={listeners}
                         attributes={attributes}
+                        isDraggingOverlay={false}
+                        isMobile={isMobile}
                         hasChildren={hasChildren}
                         isCollapsed={!!collapsedTaskIds[task.id]}
                         onToggleCollapse={() => setCollapsedTaskIds(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
