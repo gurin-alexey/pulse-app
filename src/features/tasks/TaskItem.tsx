@@ -26,12 +26,15 @@ import { DeleteRecurrenceModal } from '@/components/ui/date-picker/DeleteRecurre
 import { useTaskCompletion } from '@/hooks/useTaskCompletion'
 import { OccurrenceCompletionModal } from '@/components/ui/modals/OccurrenceCompletionModal'
 
+import type { TaskWithTags } from "@/hooks/useTasks"
+import type { DraggableSyntheticListeners, DraggableAttributes } from "@dnd-kit/core"
+
 interface TaskItemProps {
-    task: any
+    task: TaskWithTags
     isActive: boolean
     depth?: number
-    listeners?: any
-    attributes?: any
+    listeners?: DraggableSyntheticListeners
+    attributes?: DraggableAttributes
     hasChildren?: boolean
     isCollapsed?: boolean
     onToggleCollapse?: () => void
