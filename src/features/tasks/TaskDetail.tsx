@@ -334,7 +334,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     }
 
     const handleDelete = () => {
-        if (occurrenceDateStr && task?.recurrence_rule) {
+        if (task?.recurrence_rule) {
             setShowDeleteRecurrenceModal(true)
             return
         }
@@ -342,10 +342,12 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
         deleteTask(realTaskId)
     }
 
+    const effectiveOccurrenceDate = occurrenceDateStr || (task?.recurrence_rule ? (task.due_date || (task.start_time || '').split('T')[0]) : null)
+
     const { handleDeleteInstance, handleDeleteFuture, handleDeleteAll } = useDeleteRecurrence({
         task,
         taskId: realTaskId,
-        occurrenceDate: occurrenceDateStr,
+        occurrenceDate: effectiveOccurrenceDate,
         onSuccess: () => setShowDeleteRecurrenceModal(false)
     })
 
@@ -778,7 +780,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                 onDeleteInstance={handleDeleteInstance}
                 onDeleteFuture={handleDeleteFuture}
                 onDeleteAll={handleDeleteAll}
-                isFirstInstance={task?.due_date === occurrenceDateStr}
+                isFirstInstance={effectiveOccurrenceDate === task?.due_date || effectiveOccurrenceDate === (task?.start_time || '').split('T')[0]}
             />
 
             <OccurrenceCompletionModal
