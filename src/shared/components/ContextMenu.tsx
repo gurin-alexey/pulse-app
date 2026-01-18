@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { ChevronRight } from 'lucide-react';
 
 export interface ContextMenuItem {
-    label: string;
+    label?: string;
     icon?: React.ReactNode;
     onClick?: () => void;
     variant?: 'default' | 'danger';

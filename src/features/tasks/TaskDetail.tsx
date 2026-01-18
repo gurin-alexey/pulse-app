@@ -16,6 +16,7 @@ import { useDeleteTask } from '@/hooks/useDeleteTask'
 import { useTrashActions } from '@/hooks/useTrashActions'
 import { useSettings } from '@/store/useSettings'
 import { useTags, useToggleTaskTag, useTaskTags } from '@/hooks/useTags'
+import type { TaskWithTags } from '@/hooks/useTasks'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import { addExDateToRRule, addUntilToRRule, updateDTStartInRRule, updateRRuleByDay } from '@/utils/recurrence'
@@ -78,7 +79,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     // Recurrence Edit (for Description and Date/Time)
     const [recurrenceEditModalOpen, setRecurrenceEditModalOpen] = useState(false)
     const [pendingDescription, setPendingDescription] = useState<string | null>(null)
-    const [pendingDateUpdates, setPendingDateUpdates] = useState<any>(null)
+    const [pendingDateUpdates, setPendingDateUpdates] = useState<Partial<TaskWithTags> | null>(null)
     const [recurrenceAction, setRecurrenceAction] = useState<'description' | 'date-time'>('description')
     const [allowedModes, setAllowedModes] = useState<('single' | 'following' | 'all')[] | undefined>(undefined)
     const [forcedOccurrenceDate, setForcedOccurrenceDate] = useState<string | null>(null)
@@ -262,7 +263,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     const handleRecurrenceUpdateConfirm = async (mode: 'single' | 'following' | 'all') => {
         if (!task) return
 
-        let updates: any = {}
+        let updates: Partial<TaskWithTags> = {}
 
         if (recurrenceAction === 'description') {
             if (pendingDescription === null) return
@@ -415,20 +416,30 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
     })
 
     // Safety fallback for rendering while loading/creating
-    const t = task || ({
+    // Safety fallback for rendering while loading/creating
+    const defaultTask: TaskWithTags = {
         id: realTaskId,
         title: '',
         description: '',
-        priority: 'none',
+        priority: null,
         is_completed: false,
         project_id: null,
+        user_id: '',
         parent_id: null,
         due_date: null,
         start_time: null,
         end_time: null,
+        section_id: null,
+        deleted_at: null,
+        completed_at: null,
+        sort_order: 0,
+        is_project: false,
         recurrence_rule: null,
-        is_project: false
-    } as any)
+        tags: [],
+        created_at: new Date().toISOString()
+    }
+
+    const t = task || defaultTask
 
 
     return (
@@ -567,7 +578,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                                     )}
                                     title={`Priority: ${t.priority || 'Normal'}`}
                                 >
-                                    <Flag size={18} className={clsx(t.priority && t.priority !== 'none' && "fill-current")} />
+                                    <Flag size={18} className={clsx(t.priority && "fill-current")} />
                                 </Menu.Button>
 
                                 <Transition
@@ -753,7 +764,7 @@ export function TaskDetail({ taskId, occurrenceDate }: TaskDetailProps) {
                         x={contextMenu.x}
                         y={contextMenu.y}
                         onClose={() => setContextMenu(null)}
-                        items={menuItems as any}
+                        items={menuItems}
                     />
                 )
             }
