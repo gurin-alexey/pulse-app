@@ -527,10 +527,10 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
                                     <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-lg ring-1 ring-black/5 focus:outline-none z-30 overflow-hidden">
                                         <div className="p-1">
                                             {[
-                                                { id: 'none', label: 'Normal', color: 'text-gray-500', bg: 'hover:bg-gray-50' },
-                                                { id: 'low', label: 'Low Priority', color: 'text-blue-500', bg: 'hover:bg-blue-50' },
+                                                { id: 'high', label: 'High Priority', color: 'text-red-500', bg: 'hover:bg-red-50' },
                                                 { id: 'medium', label: 'Medium Priority', color: 'text-amber-500', bg: 'hover:bg-amber-50' },
-                                                { id: 'high', label: 'High Priority', color: 'text-red-500', bg: 'hover:bg-red-50' }
+                                                { id: 'low', label: 'Low Priority', color: 'text-blue-500', bg: 'hover:bg-blue-50' },
+                                                { id: 'none', label: 'Normal', color: 'text-gray-500', bg: 'hover:bg-gray-50' }
                                             ].map((opt) => (
                                                 <Menu.Item key={opt.id}>
                                                     {({ active }) => (

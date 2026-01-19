@@ -11,7 +11,8 @@ export interface ContextMenuItem {
     variant?: 'default' | 'danger';
     className?: string;
     submenu?: ContextMenuItem[];
-    type?: 'item' | 'separator';
+    type?: 'item' | 'separator' | 'custom';
+    content?: React.ReactNode;
 }
 
 interface ContextMenuProps {
@@ -39,6 +40,10 @@ const MenuItem: React.FC<{ item: ContextMenuItem; onClose: () => void; depth: nu
 
     if (item.type === 'separator') {
         return <div className="my-1 border-t border-gray-100" />;
+    }
+
+    if (item.type === 'custom') {
+        return <>{item.content}</>;
     }
 
     return (
