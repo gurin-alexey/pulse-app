@@ -18,14 +18,14 @@ export function TagTasks() {
     const { mutate: updateTask } = useUpdateTask()
 
     // View State
-    const [sortBy, setSortBy] = useState<SortOption>('date_created')
+    // View State
     const [groupBy, setGroupBy] = useState<GroupOption>('none')
     const [showCompleted, setShowCompleted] = useState(false)
 
     const activeTaskId = searchParams.get('task')
     const currentTag = tags?.find(t => t.id === tagId)
 
-    const groupedTasks = useTaskView({ tasks, showCompleted, sortBy, groupBy, projects: allProjects })
+    const groupedTasks = useTaskView({ tasks, showCompleted, sortBy: 'date_created', groupBy, projects: allProjects })
 
     const handleTaskClick = (taskId: string) => {
         setSearchParams({ task: taskId })
@@ -127,7 +127,6 @@ export function TagTasks() {
                 </div>
 
                 <ViewOptions
-                    sortBy={sortBy} setSortBy={setSortBy}
                     groupBy={groupBy} setGroupBy={setGroupBy}
                 />
             </div>
