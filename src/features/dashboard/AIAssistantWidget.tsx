@@ -1,11 +1,24 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import { useAIChat, type AIProvider } from "@/hooks/useAIChat"
-import { Send, Settings, Sparkles, Bot, User, Key, Database, Zap, Maximize2, Minimize2 } from "lucide-react"
+import { Send, Settings, Sparkles, Bot, User, Key, Database, Zap, Maximize2, Minimize2, ChevronDown } from "lucide-react"
 import clsx from "clsx"
 import { useTasks } from "@/hooks/useTasks"
 import { useProjects } from "@/hooks/useProjects"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+
+const MODELS = {
+    openai: [
+        { id: 'gpt-4o', name: 'GPT-4o (Smartest)' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Fastest)' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo (Legacy)' }
+    ],
+    gemini: [
+        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (New & Fast)' },
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (High Reasoning)' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Efficient)' }
+    ]
+}
 
 export function AIAssistantWidget() {
     const [apiKey, setApiKey] = useState(() => localStorage.getItem('ai_api_key') || "")
@@ -13,11 +26,13 @@ export function AIAssistantWidget() {
     const [modelName, setModelName] = useState(() => localStorage.getItem('ai_model_name') || "")
     const [isExpanded, setIsExpanded] = useState(false)
 
-    // Set default model if empty when provider changes
+    // Set default model if empty or invalid when provider changes
     useEffect(() => {
-        if (!modelName) {
-            if (provider === 'openai') setModelName('gpt-3.5-turbo')
-            if (provider === 'gemini') setModelName('gemini-2.0-flash')
+        const availableModels = MODELS[provider]
+        const currentModelValid = availableModels.some(m => m.id === modelName)
+
+        if (!modelName || !currentModelValid) {
+            setModelName(availableModels[0].id)
         }
     }, [provider, modelName])
 
@@ -26,10 +41,8 @@ export function AIAssistantWidget() {
         if (!apiKey) return
         if (apiKey.startsWith('AIza')) {
             setProvider('gemini')
-            if (!modelName) setModelName('gemini-2.0-flash')
         } else if (apiKey.startsWith('sk-')) {
             setProvider('openai')
-            if (!modelName) setModelName('gpt-3.5-turbo')
         }
     }, [apiKey])
 
@@ -114,11 +127,14 @@ export function AIAssistantWidget() {
                         <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
                             {apiKey ? (
                                 <span className="flex items-center gap-1 text-emerald-600 font-medium bg-emerald-50 px-1.5 py-0.5 rounded">
-                                    <Database size={10} />
-                                    <span>Connected ({modelName})</span>
+                                    <Key size={10} />
+                                    <span>Custom Key ({MODELS[provider].find(m => m.id === modelName)?.name || modelName})</span>
                                 </span>
                             ) : (
-                                <span>Mock Mode (No Key)</span>
+                                <span className="flex items-center gap-1 text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded">
+                                    <Database size={10} />
+                                    <span>Server Mode</span>
+                                </span>
                             )}
                         </div>
                     </div>
@@ -151,13 +167,13 @@ export function AIAssistantWidget() {
 
                         <div className="flex bg-gray-200 p-1 rounded-xl">
                             <button
-                                onClick={() => { setProvider('openai'); setModelName('gpt-3.5-turbo'); }}
+                                onClick={() => setProvider('openai')}
                                 className={clsx("flex-1 py-2 text-sm font-medium rounded-lg transition-all", provider === 'openai' ? "bg-white shadow-sm text-indigo-600" : "text-gray-500 hover:text-gray-700")}
                             >
                                 OpenAI
                             </button>
                             <button
-                                onClick={() => { setProvider('gemini'); setModelName('gemini-2.0-flash'); }}
+                                onClick={() => setProvider('gemini')}
                                 className={clsx("flex-1 py-2 text-sm font-medium rounded-lg transition-all", provider === 'gemini' ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700")}
                             >
                                 Google Gemini
@@ -180,20 +196,29 @@ export function AIAssistantWidget() {
                                     <Key size={14} className="absolute left-3 top-2.5 text-gray-400" />
                                 </div>
                                 <p className="text-[10px] text-gray-400 mt-1.5 ml-1">
-                                    If empty, requests use the secure server proxy.
+                                    Key stays in your browser. Leave empty to use free server quota.
                                 </p>
                             </div>
 
-                            {/* Model Name Input */}
-                            <div className="relative">
-                                <div className="absolute left-3 top-3.5 text-gray-400 font-mono text-xs font-bold">MODEL</div>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. gpt-4o or gemini-2.0-flash"
-                                    value={modelName}
-                                    onChange={(e) => setModelName(e.target.value)}
-                                    className="w-full pl-16 pr-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all font-mono shadow-sm"
-                                />
+                            {/* Model Selection */}
+                            <div>
+                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+                                    Model
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        value={modelName}
+                                        onChange={(e) => setModelName(e.target.value)}
+                                        className="w-full pl-3 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all appearance-none cursor-pointer text-gray-700"
+                                    >
+                                        {MODELS[provider].map(model => (
+                                            <option key={model.id} value={model.id}>
+                                                {model.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown size={16} className="absolute right-3 top-3 text-gray-400 pointer-events-none" />
+                                </div>
                             </div>
 
                             <button

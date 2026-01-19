@@ -5,6 +5,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister'
 import './index.css'
 import App from './App.tsx'
+import { ErrorBoundary } from './shared/components/ErrorBoundary'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,7 +26,9 @@ createRoot(document.getElementById('root')!).render(
       client={queryClient}
       persistOptions={{ persister }}
     >
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </PersistQueryClientProvider>
   </StrictMode>,
 )
