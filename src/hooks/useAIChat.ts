@@ -1,15 +1,27 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useChatStore, type ChatMessage } from '@/store/useChatStore' // Use types from store
 
-export type ChatMessage = {
-    role: 'user' | 'assistant' | 'system'
-    content: string
-}
+export type { ChatMessage } // Re-export for compatibility if files use it from here
 
 export type AIProvider = 'openai' | 'gemini'
 
-export function useAIChat(apiKey: string | null, provider: AIProvider, model: string, systemContext?: string) {
-    const [messages, setMessages] = useState<ChatMessage[]>([])
+export type Tool = {
+    name: string
+    description: string
+    parameters: any
+    execute: (args: any) => Promise<any>
+}
+
+export function useAIChat(
+    apiKey: string | null,
+    provider: AIProvider,
+    model: string,
+    systemContext?: string,
+    tools: Tool[] = []
+) {
+    // Use Global Store
+    const { messages, setMessages, addMessage, clearMessages } = useChatStore()
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -18,90 +30,144 @@ export function useAIChat(apiKey: string | null, provider: AIProvider, model: st
         setError(null)
 
         const userMsg: ChatMessage = { role: 'user', content }
-        setMessages(prev => [...prev, userMsg])
+        // setMessages(prev => [...prev, userMsg]) -> replaced by addMessage
+        addMessage(userMsg)
 
         // Prepare context message
-        let systemPrompt = "Ты — помощник по продуктивности. Твои ответы кратки и мотивируют действовать."
+        let systemPrompt = "Ты — умный помощник по управлению задачами (Pulse App). Твоя главная цель — помогать пользователю управлять его делами."
+        systemPrompt += "\n\nВАЖНО: Если пользователь просит создать, добавить или запланировать задачу — ты ОБЯЗАН использовать инструмент `create_task`. Не отвечай просто текстом, что ты 'записал' или 'понял'. Сначала вызови функцию, дождись подтверждения, а потом ответь."
         if (systemContext) {
-            systemPrompt += `\n\nКОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:\n${systemContext}\n\nИспользуй этот контекст, чтобы отвечать на вопросы о задачах и проектах пользователя.`
+            systemPrompt += `\n\nТЕКУЩИЙ КОНТЕКСТ:\n${systemContext}\n\nОпирайся на этот список при ответах.`
         }
+        const todayStr = new Date().toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+        systemPrompt += `\nСегодня: ${todayStr}.`
 
         try {
-            let aiContent = ""
-            const cleanMessages = messages.concat(userMsg).filter(m => m.role !== 'system')
+            // MAX TURNS to prevent infinite loops (e.g. AI keeps calling tools)
+            let turns = 0
+            const MAX_TURNS = 5
 
-            if (!apiKey) {
-                // --- Server Mode (Supabase Edge Function) ---
-                console.log("Using Server Mode (Supabase Edge Function)...")
+            while (turns < MAX_TURNS) {
+                turns++
+                let aiResponseMsg: ChatMessage | null = null
+                let toolCallsToExecute: any[] = []
 
-                const { data, error } = await supabase.functions.invoke('chat-stream', {
-                    body: {
-                        messages: cleanMessages,
-                        provider,
-                        model,
-                        systemPrompt
-                    }
-                })
+                // Get fresh messages for context construction
+                const currentHistory = useChatStore.getState().messages
 
-                if (error) {
-                    throw new Error(error.message || "Ошибка вызова Supabase Function")
-                }
+                if (!apiKey) {
+                    // --- SERVER MODE ---
+                    console.log("Using Server Mode...")
+                    const { data, error } = await supabase.functions.invoke('chat-stream', {
+                        body: {
+                            messages: currentHistory.filter(m => m.role !== 'function' && m.role !== 'tool'), // Simplify for server mode
+                            provider,
+                            model,
+                            systemPrompt
+                        }
+                    })
+                    if (error) throw new Error(error.message || "Server Error")
+                    if (data?.error) throw new Error(data.error)
 
-                if (data?.error) {
-                    throw new Error(data.error)
-                }
+                    aiResponseMsg = { role: 'assistant', content: data.content || "No response" }
+                    addMessage(aiResponseMsg)
+                    break
 
-                aiContent = data.content || "No response from server"
+                } else if (provider === 'gemini') {
+                    // --- GEMINI API ---
+                    const geminiTools = tools.length > 0 ? [{
+                        function_declarations: tools.map(t => ({
+                            name: t.name,
+                            description: t.description,
+                            parameters: t.parameters
+                        }))
+                    }] : undefined
 
-            } else {
-                // --- Client Mode (Direct API Call) ---
-                if (provider === 'gemini') {
-                    // --- Google Gemini API ---
-                    // Using gemini-2.0-flash based on user's available models list
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                    const contents = currentHistory.map(m => {
+                        if (m.role === 'user') return { role: 'user', parts: [{ text: m.content || '' }] }
+                        if (m.role === 'assistant') {
+                            if (m.tool_calls) {
+                                // For gemini history, we might need to represent tool calls differently or skip if complex
+                                // Simplified: if it has content, use it.
+                                return { role: 'model', parts: [{ text: m.content || '' }] }
+                            }
+                            return { role: 'model', parts: [{ text: m.content || '' }] }
+                        }
+                        if (m.role === 'tool') {
+                            return {
+                                role: 'function',
+                                parts: [{
+                                    functionResponse: {
+                                        name: m.name,
+                                        response: { content: m.content }
+                                    }
+                                }]
+                            }
+                        }
+                        // Default fallback
+                        return { role: 'user', parts: [{ text: m.content || '' }] }
+                    })
+
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            contents: cleanMessages.map(m => ({
-                                role: m.role === 'user' ? 'user' : 'model',
-                                parts: [{ text: m.content }]
-                            })),
-                            systemInstruction: {
-                                parts: [{ text: systemPrompt }]
-                            },
-                            generationConfig: {
-                                maxOutputTokens: 1000,
-                            }
+                            contents,
+                            tools: geminiTools,
+                            systemInstruction: { parts: [{ text: systemPrompt }] },
+                            generationConfig: { maxOutputTokens: 1000 }
                         })
                     })
 
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}))
-                        let errorMessage = errorData?.error?.message || response.statusText || "Unknown error"
+                    if (!res.ok) throw new Error(`Gemini Error ${res.status}: ${res.statusText}`)
+                    const data = await res.json()
 
-                        // Auto-debug: If 404, check what models ARE available
-                        if (response.status === 404) {
-                            try {
-                                const modelsResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
-                                if (modelsResponse.ok) {
-                                    const modelsData = await modelsResponse.json()
-                                    const availableModels = modelsData.models?.map((m: any) => m.name.replace('models/', '')).join(', ')
-                                    errorMessage += `\n\nДОСТУПНЫЕ МОДЕЛИ:\n${availableModels}`
-                                }
-                            } catch (e) {
-                                errorMessage += " (Не удалось получить список моделей)"
-                            }
+                    const candidate = data.candidates?.[0]?.content
+                    const parts = candidate?.parts || []
+
+                    const functionCallPart = parts.find((p: any) => p.functionCall)
+
+                    if (functionCallPart) {
+                        const fc = functionCallPart.functionCall
+                        toolCallsToExecute.push({
+                            id: 'gemini_call',
+                            name: fc.name,
+                            args: fc.args
+                        })
+
+                        // Add assistant message with function call to history (locally represented)
+                        // For Gemini next turn, we need to send this too.
+                        aiResponseMsg = {
+                            role: 'assistant',
+                            content: "", // Gemini function call messages often have empty text
+                            // We don't have a standard field for 'gemini_function_call' in our type yet, 
+                            // but we can store it in content as a placeholder or handle it in the mapping above
+                            // For now, let's treat it as an assistant message that triggered a tool.
+                            // Ideally we should store the function call details.
+                            // Let's use the 'tool_calls' field we added for OpenAI compatibility, adapting it.
+                            tool_calls: [{
+                                type: 'function',
+                                function: { name: fc.name, arguments: JSON.stringify(fc.args) },
+                                id: 'gemini_call'
+                            }]
                         }
-
-                        throw new Error(`Gemini Error ${response.status}: ${errorMessage}`)
+                    } else {
+                        const text = parts.map((p: any) => p.text).join('')
+                        aiResponseMsg = { role: 'assistant', content: text }
                     }
 
-                    const data = await response.json()
-                    aiContent = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response"
-
                 } else {
-                    // --- OpenAI API (Default) ---
-                    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    // --- OPENAI API ---
+                    const openAiTools = tools.length > 0 ? tools.map(t => ({
+                        type: 'function',
+                        function: {
+                            name: t.name,
+                            description: t.description,
+                            parameters: t.parameters
+                        }
+                    })) : undefined
+
+                    const res = await fetch('https://api.openai.com/v1/chat/completions', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -111,49 +177,100 @@ export function useAIChat(apiKey: string | null, provider: AIProvider, model: st
                             model: model || 'gpt-3.5-turbo',
                             messages: [
                                 { role: "system", content: systemPrompt },
-                                ...cleanMessages
+                                ...currentHistory.map(m => {
+                                    if (m.role === 'tool') {
+                                        return { tool_call_id: m.tool_call_id, role: 'tool', name: m.name, content: m.content }
+                                    }
+                                    if (m.tool_calls) {
+                                        return { role: 'assistant', content: m.content, tool_calls: m.tool_calls }
+                                    }
+                                    return { role: m.role, content: m.content }
+                                })
                             ],
+                            tools: openAiTools,
+                            tool_choice: openAiTools ? "auto" : undefined,
                             max_tokens: 1000
                         })
                     })
 
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}))
-                        const errorMessage = errorData?.error?.message || response.statusText || "Unknown error"
-                        throw new Error(`OpenAI Error ${response.status}: ${errorMessage}`)
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}))
+                        throw new Error(`OpenAI Error: ${errData.error?.message || res.statusText}`)
+                    }
+                    const data = await res.json()
+                    const choice = data.choices[0]
+                    const message = choice.message
+
+                    aiResponseMsg = {
+                        role: 'assistant',
+                        content: message.content, // Can be null if tool call
+                        tool_calls: message.tool_calls
                     }
 
-                    const data = await response.json()
-                    aiContent = data.choices[0]?.message?.content || "No response"
+                    if (message.tool_calls) {
+                        toolCallsToExecute = message.tool_calls.map((tc: any) => ({
+                            id: tc.id,
+                            name: tc.function.name,
+                            args: JSON.parse(tc.function.arguments)
+                        }))
+                    }
                 }
-            }
 
-            setMessages(prev => [...prev, { role: 'assistant', content: aiContent }])
+                // --- Handle Response State ---
+                if (aiResponseMsg) {
+                    addMessage(aiResponseMsg!)
+
+                    if (toolCallsToExecute.length === 0) {
+                        break; // Exit loop
+                    }
+                }
+
+                // --- Execute Tools ---
+                for (const call of toolCallsToExecute) {
+                    const tool = tools.find(t => t.name === call.name)
+                    let resultString = ""
+                    if (tool) {
+                        try {
+                            console.log(`Executing tool ${call.name} with args`, call.args)
+                            const result = await tool.execute(call.args)
+                            resultString = JSON.stringify(result)
+                        } catch (e: any) {
+                            resultString = `Error: ${e.message}`
+                        }
+                    } else {
+                        resultString = "Error: Tool not found"
+                    }
+
+                    // Add Tool Result to History
+                    if (provider === 'gemini') {
+                        // Gemini tool part
+                        // For Gemini, we constructed the functionResponse in the request builder above
+                    }
+
+                    const toolMsg: ChatMessage = {
+                        role: 'tool',
+                        tool_call_id: call.id,
+                        name: call.name,
+                        content: resultString
+                    }
+                    addMessage(toolMsg)
+                }
+
+                // Loop continues...
+            }
 
         } catch (err: any) {
             console.error("AI Chat Error:", err);
-
             let errorMessage = err.message || "Неизвестная ошибка";
-
-            // Handle network errors specifically
-            if (errorMessage.includes("Failed to fetch")) {
-                errorMessage = "Ошибка сети (VPN?). Проверьте интернет или включите VPN.";
-            } else if (errorMessage.includes("401")) {
-                errorMessage = "Неверный API ключ (401).";
-            } else if (errorMessage.includes("429")) {
-                errorMessage = "Лимит запросов исчерпан (429).";
-            } else if (errorMessage.includes("FunctionsFetchError")) {
-                errorMessage = "Ошибка соединения с сервером (Edge Function).";
-            }
-
+            if (errorMessage.includes("Failed to fetch")) errorMessage = "Ошибка сети (VPN?).";
             setError(errorMessage)
-            setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${errorMessage}` }])
+            addMessage({ role: 'assistant', content: `⚠️ ${errorMessage}` })
         } finally {
             setIsLoading(false)
         }
     }
 
-    const clearHistory = () => setMessages([])
+    const clearHistory = () => clearMessages()
 
     return { messages, isLoading, error, sendMessage, clearHistory }
 }

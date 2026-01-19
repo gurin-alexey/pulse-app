@@ -3,6 +3,7 @@ import { useAIChat, type AIProvider } from "@/hooks/useAIChat"
 import { Send, Settings, Sparkles, Bot, User, Key, Database, Zap, Maximize2, Minimize2, ChevronDown } from "lucide-react"
 import clsx from "clsx"
 import { useTasks } from "@/hooks/useTasks"
+import { useCreateTask } from "@/hooks/useCreateTask"
 import { useProjects } from "@/hooks/useProjects"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -53,7 +54,10 @@ export function AIAssistantWidget() {
     const { data: tasks } = useTasks({ type: 'all' })
     const { data: projects } = useProjects()
 
-    // 2. Prepare Context String
+    // Tools Actions
+    const createTask = useCreateTask()
+
+    // 2. Prepare Context + Tools
     const systemContext = useMemo(() => {
         if (!tasks && !projects) return ""
 
@@ -80,8 +84,49 @@ export function AIAssistantWidget() {
         return context
     }, [tasks, projects])
 
-    // 3. Initialize AI with Context
-    const { messages, isLoading, sendMessage } = useAIChat(apiKey || null, provider, modelName, systemContext)
+    const tools = useMemo(() => [
+        {
+            name: "create_task",
+            description: "Создать одну новую задачу. Используй это, когда пользователь просит добавить, создать или запланировать задачу.",
+            parameters: {
+                type: "object",
+                properties: {
+                    title: { type: "string", description: "Название задачи" },
+                    due_date: { type: "string", description: "Дата выполнения в формате YYYY-MM-DD (например 2024-05-20)" },
+                    priority: { type: "string", enum: ["low", "medium", "high", "urgent"], description: "Приоритет задачи" },
+                    description: { type: "string", description: "Дополнительное описание задачи" }
+                },
+                required: ["title"]
+            },
+            execute: async (args: any) => {
+                try {
+                    // Get current user ID logic is handled inside useCreateTask? No, user_id is required.
+                    // We need user ID. Assuming context or auth is handled.
+                    // Wait, useCreateTask requires userId parameter.
+                    // We need to get the user ID here.
+                    const user = await import('@/lib/supabase').then(m => m.supabase.auth.getUser())
+                    const userId = user.data.user?.id
+
+                    if (!userId) throw new Error("User not found")
+
+                    await createTask.mutateAsync({
+                        userId,
+                        title: args.title,
+                        due_date: args.due_date,
+                        priority: args.priority,
+                        description: args.description,
+                        projectId: null // Default to Inbox
+                    })
+                    return { success: true, message: `Задача "${args.title}" успешно создана!` }
+                } catch (e: any) {
+                    return { success: false, error: e.message }
+                }
+            }
+        }
+    ], [createTask])
+
+    // 3. Initialize AI with Context and Tools
+    const { messages, isLoading, sendMessage } = useAIChat(apiKey || null, provider, modelName, systemContext, tools)
 
     // Auto-scroll
     const scrollRef = useRef<HTMLDivElement>(null)
