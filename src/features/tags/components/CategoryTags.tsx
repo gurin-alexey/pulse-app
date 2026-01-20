@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Plus, Check } from 'lucide-react'
+import { Plus, Check, Hash } from 'lucide-react'
 import { useTags } from '@/features/tags/hooks/useTags'
 import { useTagMutations } from '@/features/tags/hooks/useTagMutations'
 import clsx from 'clsx'
@@ -18,7 +18,7 @@ export function CategoryTags({ taskId, tags: initialTags, readOnly }: CategoryTa
     const taskTags = initialTags || [] // Use passed tags
     const { createTag, toggleTaskTag } = useTagMutations()
 
-    const [activeCategory, setActiveCategory] = useState<CategoryType | null>(null)
+    const [activeCategory, setActiveCategory] = useState<CategoryType | 'other' | null>(null)
     const [filter, setFilter] = useState('')
     const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -113,7 +113,15 @@ export function CategoryTags({ taskId, tags: initialTags, readOnly }: CategoryTa
                                     {/* Create New Option */}
                                     {filter && !allTags?.some(t => t.category === cat.id && t.name.toLowerCase() === filter.toLowerCase()) && (
                                         <button
-                                            onClick={handleCreateTag}
+                                            onClick={() => {
+                                                if (!filter.trim()) return
+                                                createTag.mutate({ name: filter, category: cat.id }, {
+                                                    onSuccess: (newTag) => {
+                                                        toggleTaskTag.mutate({ taskId, tagId: newTag.id, isAttached: false })
+                                                        setFilter('')
+                                                    }
+                                                })
+                                            }}
                                             disabled={createTag.isPending}
                                             className="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded-lg flex items-center mt-1"
                                         >
@@ -134,6 +142,104 @@ export function CategoryTags({ taskId, tags: initialTags, readOnly }: CategoryTa
                     </div>
                 )
             })}
+
+            {/* OTHER / UNCATEGORIZED TAGS */}
+            {(() => {
+                const otherTags = taskTags?.filter(t => !t.category || !CATEGORIES.some(c => c.id === t.category)) || []
+                const hasOtherTags = otherTags.length > 0
+                const isActive = activeCategory === 'other'
+
+                return (
+                    <div className="relative">
+                        <button
+                            onClick={() => {
+                                if (isActive) {
+                                    setActiveCategory(null)
+                                } else {
+                                    setActiveCategory('other')
+                                    setFilter('')
+                                }
+                            }}
+                            className={clsx(
+                                "flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all",
+                                hasOtherTags ? "bg-gray-100" : "hover:bg-gray-50 text-gray-400 hover:text-gray-600",
+                            )}
+                            title="Другие"
+                        >
+                            <Hash size={16} className={clsx(hasOtherTags ? "text-gray-600" : "text-gray-400")} />
+                            {hasOtherTags && (
+                                <span className={clsx("text-xs font-medium max-w-[60px] truncate text-gray-600")}>
+                                    {otherTags.map(t => t.name).join(', ')}
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Dropdown for Other */}
+                        {isActive && (
+                            <div className="absolute bottom-full left-0 mb-2 w-56 bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                <div className="p-2 border-b border-gray-50">
+                                    <input
+                                        type="text"
+                                        autoFocus
+                                        placeholder="Добавить тег..."
+                                        value={filter}
+                                        onChange={e => setFilter(e.target.value)}
+                                        className="w-full text-xs px-2 py-1.5 bg-gray-50 rounded border-none outline-none focus:ring-1 focus:ring-blue-100 transition-all placeholder:text-gray-400"
+                                    />
+                                </div>
+
+                                <div className="max-h-48 overflow-y-auto p-1 space-y-0.5">
+                                    {/* Existing uncategorized tags */}
+                                    {allTags?.filter(t => (!t.category || !CATEGORIES.some(c => c.id === t.category)) && t.name.toLowerCase().includes(filter.toLowerCase())).map(tag => {
+                                        const isAttached = taskTags?.some(t => t.id === tag.id) || false
+                                        return (
+                                            <button
+                                                key={tag.id}
+                                                onClick={() => toggleTaskTag.mutate({ taskId, tagId: tag.id, isAttached })}
+                                                className="w-full text-left px-2 py-1.5 text-xs rounded-lg hover:bg-gray-50 flex items-center justify-between group transition-colors"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
+                                                    <span className="text-gray-700">{tag.name}</span>
+                                                </div>
+                                                {isAttached && <Check size={12} className="text-blue-600" />}
+                                            </button>
+                                        )
+                                    })}
+
+                                    {/* Create New Option */}
+                                    {filter && !allTags?.some(t => (!t.category || !CATEGORIES.some(c => c.id === t.category)) && t.name.toLowerCase() === filter.toLowerCase()) && (
+                                        <button
+                                            onClick={() => {
+                                                if (!filter.trim()) return
+                                                // Create uncategorized tag
+                                                createTag.mutate({ name: filter, category: undefined }, {
+                                                    onSuccess: (newTag) => {
+                                                        toggleTaskTag.mutate({ taskId, tagId: newTag.id, isAttached: false })
+                                                        setFilter('')
+                                                    }
+                                                })
+                                            }}
+                                            disabled={createTag.isPending}
+                                            className="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded-lg flex items-center mt-1"
+                                        >
+                                            <Plus size={12} className="mr-1" />
+                                            Создать "{filter}"
+                                        </button>
+                                    )}
+
+                                    {/* Empty State */}
+                                    {!filter && allTags?.filter(t => !t.category || !CATEGORIES.some(c => c.id === t.category)).length === 0 && (
+                                        <div className="px-2 py-3 text-center text-xs text-gray-400 italic">
+                                            Нет тегов
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )
+            })()}
         </div>
     )
 }

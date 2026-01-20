@@ -188,6 +188,8 @@ export const useTagMutations = () => {
             // We invalidate tasks to refresh the list view if tags are shown there
             queryClient.invalidateQueries({ queryKey: ['all-tasks'] })
             queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            // Invalidate the specific task detail query to update the UI in TaskDetail
+            queryClient.invalidateQueries({ queryKey: ['task', taskId] })
         }
     })
 
