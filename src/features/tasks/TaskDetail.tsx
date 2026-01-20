@@ -15,7 +15,7 @@ import { useCreateTask } from '@/hooks/useCreateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
 import { useTrashActions } from '@/hooks/useTrashActions'
 import { useSettings } from '@/store/useSettings'
-import { useTags, useTagMutations, useTaskTags, CategoryTags } from '@/features/tags'
+import { useTags, useTagMutations, CategoryTags } from '@/features/tags'
 import type { TaskWithTags } from '@/hooks/useTasks'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
@@ -102,9 +102,8 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
     const { toggleTaskTag: toggleTag } = useTagMutations()
     const { data: allTags } = useTags()
-    const { data: taskTags } = useTaskTags(realTaskId)
 
-    const hasPomoTag = taskTags?.some(t =>
+    const hasPomoTag = task?.tags?.some(t =>
         (t.name.toLowerCase() === 'pomo' || t.name.toLowerCase() === 'pomodoro')
     );
 
@@ -647,7 +646,7 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
                     />
 
                     {/* Categorized Tags (Place, Energy, Time, People) */}
-                    <CategoryTags taskId={realTaskId} />
+                    <CategoryTags taskId={realTaskId} tags={task?.tags} />
 
                     {/* Project Type Toggle (GTD logic) */}
                     <div className="flex items-center gap-2 border-l border-gray-100 pl-4 py-1">

@@ -1,18 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Check } from 'lucide-react'
-import { useTags, useTaskTags } from '../hooks/useTags'
-import { useTagMutations } from '../hooks/useTagMutations'
+import { useTags } from '@/features/tags/hooks/useTags'
+import { useTagMutations } from '@/features/tags/hooks/useTagMutations'
 import clsx from 'clsx'
-import { CATEGORIES, type CategoryType } from '../constants'
+import { CATEGORIES, type CategoryType } from '@/features/tags/constants'
+import type { Tag } from '@/types/database'
 
 type CategoryTagsProps = {
     taskId: string
+    tags?: Tag[] // Added optional tags prop
     readOnly?: boolean
 }
 
-export function CategoryTags({ taskId, readOnly }: CategoryTagsProps) {
+export function CategoryTags({ taskId, tags: initialTags, readOnly }: CategoryTagsProps) {
     const { data: allTags } = useTags()
-    const { data: taskTags } = useTaskTags(taskId)
+    // const { data: taskTags } = useTaskTags(taskId) // Removed N+1 fetch
+    const taskTags = initialTags || [] // Use passed tags
     const { createTag, toggleTaskTag } = useTagMutations()
 
     const [activeCategory, setActiveCategory] = useState<CategoryType | null>(null)

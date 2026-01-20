@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import type { Task } from '@/types/database'
+import type { TaskWithTags } from './useTasks'
 
 export function useTask(taskId: string | null) {
     return useQuery({
@@ -10,12 +10,19 @@ export function useTask(taskId: string | null) {
 
             const { data, error } = await supabase
                 .from('tasks')
-                .select('*')
+                .select('*, task_tags(tags(*))')
                 .eq('id', taskId)
                 .single()
 
             if (error) throw error
-            return data as Task
+
+            const task = data as any
+            const taskWithTags: TaskWithTags = {
+                ...task,
+                tags: task.task_tags?.map((tt: any) => tt.tags) || []
+            }
+
+            return taskWithTags
         },
         enabled: !!taskId
     })

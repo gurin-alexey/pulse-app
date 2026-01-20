@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
 import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight, Repeat, SkipForward, Maximize2 } from "lucide-react"
-import { useTags, useTagMutations } from '@/features/tags'
+import { useTagMutations } from '@/features/tags'
 import { useSettings } from '@/store/useSettings'
 import clsx from "clsx"
 import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion"
@@ -57,7 +57,6 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
     const { mutate: deleteTask } = useDeleteTask()
     const { restoreTask } = useTrashActions()
     const { toggleTaskTag: toggleTag } = useTagMutations()
-    const { data: allTags } = useTags()
     const { settings } = useSettings()
 
     const showToasts = settings?.preferences.show_toast_hints !== false

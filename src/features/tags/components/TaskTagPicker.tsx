@@ -1,18 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, X, Tag as TagIcon, Check } from 'lucide-react'
-import { useTags, useTaskTags } from '../hooks/useTags'
-import { useTagMutations } from '../hooks/useTagMutations'
+import { useTags } from '@/features/tags/hooks/useTags'
+import { useTagMutations } from '@/features/tags/hooks/useTagMutations'
 import clsx from 'clsx'
 import { Loader2 } from 'lucide-react'
+import type { Tag } from '@/types/database'
 
 type TaskTagPickerProps = {
     taskId: string
+    tags?: Tag[] // Added optional tags prop
     readOnly?: boolean
 }
 
-export function TaskTagPicker({ taskId, readOnly }: TaskTagPickerProps) {
+export function TaskTagPicker({ taskId, tags: initialTags, readOnly }: TaskTagPickerProps) {
     const { data: allTags } = useTags()
-    const { data: taskTags, isLoading } = useTaskTags(taskId)
+    // const { data: taskTags, isLoading } = useTaskTags(taskId) // Removed N+1 fetch
+    const taskTags = initialTags || [] // Use passed tags
+    const isLoading = false // No longer loading individually
     const { createTag, toggleTaskTag } = useTagMutations()
 
     const [isOpen, setIsOpen] = useState(false)
