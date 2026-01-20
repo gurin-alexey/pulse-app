@@ -231,13 +231,30 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects, t
             otherKeys.forEach(k => orderedGroups[k] = organizeByHierarchy(groups[k]))
 
             return orderedGroups
-        } else if (groupBy === 'tag') {
+        } else if (groupBy.startsWith('tag')) {
+            const categoryFilter = groupBy === 'tag' ? null : groupBy.replace('tag-', '')
+
             filtered.forEach(task => {
-                if (!task.tags || task.tags.length === 0) {
-                    if (!groups['No Tags']) groups['No Tags'] = []
-                    groups['No Tags'].push(task)
+                let taskTags = task.tags || []
+
+                // Filter tags based on selected category
+                if (categoryFilter) {
+                    if (categoryFilter === 'other') {
+                        // Tags that have NO category or category not in known list
+                        const knownCategories = ['place', 'energy', 'time', 'people']
+                        taskTags = taskTags.filter(t => !t.category || !knownCategories.includes(t.category))
+                    } else {
+                        taskTags = taskTags.filter(t => t.category === categoryFilter)
+                    }
+                }
+
+                if (taskTags.length === 0) {
+                    // Task has no tags (or no tags in this category)
+                    const noTagLabel = categoryFilter ? 'No Matching Tag' : 'No Tags'
+                    if (!groups[noTagLabel]) groups[noTagLabel] = []
+                    groups[noTagLabel].push(task)
                 } else {
-                    task.tags.forEach(tag => {
+                    taskTags.forEach(tag => {
                         if (!groups[tag.name]) groups[tag.name] = []
                         groups[tag.name].push(task)
                     })
@@ -245,9 +262,16 @@ export function useTaskView({ tasks, showCompleted, sortBy, groupBy, projects, t
             })
 
             const orderedGroups: Record<string, TaskWithTags[]> = {}
-            const keys = Object.keys(groups).filter(k => k !== 'No Tags').sort()
-            keys.forEach(k => orderedGroups[k] = organizeByHierarchy(groups[k]))
+            const keys = Object.keys(groups).sort()
+
+            // Prioritize real tags, put "No ..." last
+            keys.filter(k => k !== 'No Tags' && k !== 'No Matching Tag').forEach(k => {
+                orderedGroups[k] = organizeByHierarchy(groups[k])
+            })
+
+            if (groups['No Matching Tag']) orderedGroups['No Matching Tag'] = organizeByHierarchy(groups['No Matching Tag'])
             if (groups['No Tags']) orderedGroups['No Tags'] = organizeByHierarchy(groups['No Tags'])
+
             return orderedGroups
         } else if (groupBy === 'complexity') {
             const visibleIds = new Set(filtered.map(t => t.id))
