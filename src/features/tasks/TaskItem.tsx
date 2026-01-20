@@ -4,7 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
 import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight, Repeat, SkipForward, Maximize2 } from "lucide-react"
-import { useTags, useToggleTaskTag } from '@/features/tags'
+import { useTags, useTagMutations } from '@/features/tags'
+import { useSettings } from '@/store/useSettings'
 import clsx from "clsx"
 import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion"
 import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } from "date-fns"
@@ -13,7 +14,7 @@ import { toast } from "sonner"
 
 
 
-import { useSettings } from "@/store/useSettings"
+
 import { useTrashActions } from "@/hooks/useTrashActions"
 import { ContextMenu } from "@/shared/components/ContextMenu"
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
@@ -55,7 +56,7 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: deleteTask } = useDeleteTask()
     const { restoreTask } = useTrashActions()
-    const { mutate: toggleTag } = useToggleTaskTag()
+    const { toggleTaskTag: toggleTag } = useTagMutations()
     const { data: allTags } = useTags()
     const { settings } = useSettings()
 

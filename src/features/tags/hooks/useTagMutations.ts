@@ -7,7 +7,7 @@ export const useTagMutations = () => {
     const queryClient = useQueryClient()
 
     const createTag = useMutation({
-        mutationFn: async ({ name, category, color: forcedColor }: { name: string, category?: string, color?: string }) => {
+        mutationFn: async ({ name, category, color: forcedColor, parent_id }: { name: string, category?: string, color?: string, parent_id?: string }) => {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error("User not authenticated")
 
@@ -21,7 +21,8 @@ export const useTagMutations = () => {
                     name,
                     user_id: user.id,
                     color,
-                    category
+                    category,
+                    parent_id
                 })
                 .select()
                 .single()
@@ -40,6 +41,7 @@ export const useTagMutations = () => {
                     name: newTag.name,
                     color: newTag.color || '#ccc',
                     category: newTag.category as any,
+                    parent_id: newTag.parent_id || null,
                     user_id: 'temp',
                     created_at: new Date().toISOString()
                 }

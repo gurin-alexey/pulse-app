@@ -15,7 +15,7 @@ import { useCreateTask } from '@/hooks/useCreateTask'
 import { useDeleteTask } from '@/hooks/useDeleteTask'
 import { useTrashActions } from '@/hooks/useTrashActions'
 import { useSettings } from '@/store/useSettings'
-import { useTags, useToggleTaskTag, useTaskTags, CategoryTags } from '@/features/tags'
+import { useTags, useTagMutations, useTaskTags, CategoryTags } from '@/features/tags'
 import type { TaskWithTags } from '@/hooks/useTasks'
 import { useTaskDateHotkeys } from '@/hooks/useTaskDateHotkeys'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
@@ -100,7 +100,7 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null)
-    const { mutate: toggleTag } = useToggleTaskTag()
+    const { toggleTaskTag: toggleTag } = useTagMutations()
     const { data: allTags } = useTags()
     const { data: taskTags } = useTaskTags(realTaskId)
 
