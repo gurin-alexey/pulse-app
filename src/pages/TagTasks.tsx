@@ -1,8 +1,7 @@
 import { useState } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
-import { useTagTasks } from "@/hooks/useTagTasks"
+import { useTagTasks, useTags } from "@/features/tags"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { useTags } from "@/hooks/useTags"
 import { useProjects } from "@/hooks/useProjects"
 import { AlertCircle, Loader2 } from "lucide-react" // Removed TagIcon if unused, or keep if used somewhere else (it was unused in previous code)
 import { ViewOptions, type SortOption, type GroupOption } from "@/features/tasks/ViewOptions"

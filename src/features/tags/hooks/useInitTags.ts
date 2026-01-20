@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { useTags, useCreateTag } from '@/hooks/useTags'
+import { useTags, useCreateTag } from './useTags'
 
-export function useEnsureDefaultTags() {
+export function useInitTags() {
     const { data: tags, isLoading } = useTags()
     const { mutate: createTag } = useCreateTag()
     const attemptedRef = useRef(false)

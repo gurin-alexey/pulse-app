@@ -63,7 +63,12 @@ export function RichTextEditor({ content, onChange, onBlur, placeholder = "Add a
 
     const editor = useEditor({
         extensions: [
-            StarterKit,
+            StarterKit.configure({
+                // We are using a custom Link extension below with specific settings
+                // so we disable the one bundled in StarterKit to avoid duplicates.
+                // @ts-ignore
+                link: false,
+            }),
             Placeholder.configure({
                 placeholder,
             }),

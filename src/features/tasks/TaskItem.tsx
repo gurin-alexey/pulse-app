@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
 import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight, Repeat, SkipForward, Maximize2 } from "lucide-react"
-import { useTags, useToggleTaskTag } from '@/hooks/useTags'
+import { useTags, useToggleTaskTag } from '@/features/tags'
 import clsx from "clsx"
 import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion"
 import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } from "date-fns"

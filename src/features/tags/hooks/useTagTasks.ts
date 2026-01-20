@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Task } from '@/types/database'
-import type { TaskWithTags } from './useTasks'
+import type { TaskWithTags } from '@/hooks/useTasks'
 
 export function useTagTasks(tagId: string | undefined) {
     return useQuery({

@@ -1,15 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, X, Tag as TagIcon, Check } from 'lucide-react'
-import { useTags, useTaskTags, useCreateTag, useToggleTaskTag } from '@/hooks/useTags'
+import { useTags, useTaskTags, useCreateTag, useToggleTaskTag } from '../hooks/useTags'
 import clsx from 'clsx'
 import { Loader2 } from 'lucide-react'
 
-type TagManagerProps = {
+type TaskTagPickerProps = {
     taskId: string
     readOnly?: boolean
 }
 
-export function TagManager({ taskId, readOnly }: TagManagerProps) {
+export function TaskTagPicker({ taskId, readOnly }: TaskTagPickerProps) {
     const { data: allTags } = useTags()
     const { data: taskTags, isLoading } = useTaskTags(taskId)
     const { mutate: createTag, isPending: isCreating } = useCreateTag()

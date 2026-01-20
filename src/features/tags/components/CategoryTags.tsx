@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Check } from 'lucide-react'
-import { useTags, useTaskTags, useCreateTag, useToggleTaskTag } from '@/hooks/useTags'
+import { useTags, useTaskTags, useCreateTag, useToggleTaskTag } from '../hooks/useTags'
 import clsx from 'clsx'
-import { CATEGORIES, type CategoryType } from '@/constants/categories'
+import { CATEGORIES, type CategoryType } from '../constants'
 
 type CategoryTagsProps = {
     taskId: string

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react"
 import { useTasks } from "@/hooks/useTasks"
 import { useProjects } from "@/hooks/useProjects"
-import { useTags } from "@/hooks/useTags"
+import { useTags } from "@/features/tags"
 import { TaskItem } from "@/features/tasks/TaskItem"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { Loader2, AlertCircle, Filter, X, CheckSquare } from "lucide-react"
