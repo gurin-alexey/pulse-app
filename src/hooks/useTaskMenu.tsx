@@ -9,10 +9,11 @@ import { useCreateTask } from '@/hooks/useCreateTask'
 import { useSettings } from '@/store/useSettings'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import type { TaskWithTags } from '@/hooks/useTasks'
+import type { Task } from '@/types/database'
 import { PRIORITIES } from '@/constants/priorities'
 
 interface UseTaskMenuProps {
-    task: TaskWithTags
+    task?: Task | null
     taskId: string // The real UUID
     // For virtual instances
     occurrenceDate?: string | null
@@ -39,6 +40,8 @@ export function useTaskMenu({
     const { setOccurrenceStatus } = useTaskOccurrence()
 
     const showToasts = settings?.preferences.show_toast_hints !== false
+
+    if (!task) return []
 
     // Parsing virtual info if not passed explicitly, though purely relies on props
     const isVirtual = task?.id?.includes('_recur_')
