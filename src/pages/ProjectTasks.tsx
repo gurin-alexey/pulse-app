@@ -3,10 +3,11 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
 import { useTasks } from "@/hooks/useTasks"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
-import { AlertCircle, Loader2, MoreHorizontal, Plus, Trash2, Pencil, ChevronRight, GripVertical } from "lucide-react"
+import { AlertCircle, Loader2, MoreHorizontal, Plus, Trash2, Pencil, ChevronRight, GripVertical, Filter } from "lucide-react"
 import { useCreateTask } from "@/hooks/useCreateTask"
 import { ViewOptions, type SortOption, type GroupOption } from '@/features/tasks/ViewOptions'
 import { useTaskView } from "@/features/tasks/useTaskView"
+import { TodayFilterBar } from "@/shared/components/TodayFilterBar"
 import { useSections, useCreateSection, useDeleteSection, useUpdateSection } from "@/hooks/useSections"
 import clsx from "clsx"
 import { createPortal } from "react-dom"
@@ -28,6 +29,7 @@ import { TaskItem } from "@/features/tasks/TaskItem"
 import { supabase } from "@/lib/supabase"
 import { expandTasksForDate } from "@/utils/taskExpansion"
 import { useAllTasks } from "@/hooks/useAllTasks"
+import { useTodayFilter } from "@/hooks/useTodayFilter"
 
 // Draggable Task Item Wrapper
 // Sortable Task Item Wrapper
@@ -139,6 +141,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     // Data Hooks
     const { data: tasks, isLoading: tasksLoading, isError: tasksError } = useTasks(filter)
     const { data: sections, isLoading: sectionsLoading } = useSections(projectId)
+    const { filter: todayFilter } = useTodayFilter()
 
     // Derived State
     const currentProject = allProjects?.find(p => p.id === projectId)
@@ -210,6 +213,22 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     const isMobile = useMediaQuery("(max-width: 768px)")
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
 
+    // Today Filter State
+    const [todayFilterOpen, setTodayFilterOpen] = useState(false)
+    const [filterOverflowVisible, setFilterOverflowVisible] = useState(false)
+
+    const handleTodayFilterClick = (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setTodayFilterOpen(!todayFilterOpen)
+    }
+
+    useEffect(() => {
+        if (!todayFilterOpen) {
+            setFilterOverflowVisible(false)
+        }
+    }, [todayFilterOpen])
+
     useEffect(() => {
         setPortalTarget(document.getElementById('mobile-header-right'))
     }, [])
@@ -267,9 +286,27 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 processedTasks = [...activeOnly, ...completedFromSource]
             }
 
+            // Apply Today Filters
+            if (mode === 'today') {
+                if (todayFilter.excludedTagIds.length > 0) {
+                    const excludedSet = new Set(todayFilter.excludedTagIds)
+                    processedTasks = processedTasks.filter((t: any) => {
+                        if (!t.tags || !Array.isArray(t.tags)) return true
+                        return !t.tags.some((tag: any) => excludedSet.has(tag.id))
+                    })
+                }
+
+                if (todayFilter.excludedProjectIds && todayFilter.excludedProjectIds.length > 0) {
+                    const excludedProjects = new Set(todayFilter.excludedProjectIds)
+                    processedTasks = processedTasks.filter((t: any) => {
+                        return !t.project_id || !excludedProjects.has(t.project_id)
+                    })
+                }
+            }
+
             setLocalTasks(processedTasks.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)))
         }
-    }, [tasks, sharedOccurrencesMap, mode, targetDate])
+    }, [tasks, sharedOccurrencesMap, mode, targetDate, todayFilter])
 
     // Derived tasks to use for rendering
     const activeTasks = localTasks.filter((t: any) => !t.is_completed)
@@ -833,6 +870,8 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 portalTarget
             )}
 
+
+
             <div className="px-4 py-3 border-b border-gray-100 hidden md:flex items-center gap-4 min-h-[4rem] shrink-0 sticky top-0 bg-white z-30">
                 <div className="flex items-center gap-2 shrink-0">
                     {mode !== 'inbox' && mode !== 'today' && mode !== 'tomorrow' && currentProject && (
@@ -846,13 +885,47 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                 <div className="flex-1 max-w-2xl">
                     {/* Replaced by inline input below */}
                 </div>
-                <div className="shrink-0">
+                <div className="shrink-0 flex items-center gap-2">
+                    {mode === 'today' && (
+                        <button
+                            onClick={handleTodayFilterClick}
+                            className={clsx(
+                                "flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-gray-100 shadow-sm h-10 transition-colors",
+                                todayFilterOpen || todayFilter.excludedTagIds.length > 0 ? "text-blue-600 bg-blue-50 border-blue-100" : "text-gray-600 hover:bg-gray-50"
+                            )}
+                            title="Filter by Tags"
+                        >
+                            <Filter size={16} />
+                            {todayFilter.excludedTagIds.length > 0 && (
+                                <span className="flex h-2 w-2 rounded-full bg-blue-600" />
+                            )}
+                        </button>
+                    )}
                     <ViewOptions
                         groupBy={groupBy}
                         setGroupBy={setGroupBy}
                     />
                 </div>
             </div>
+
+            <AnimatePresence>
+                {todayFilterOpen && mode === 'today' && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        style={{ overflow: filterOverflowVisible ? 'visible' : 'hidden' }}
+                        onAnimationComplete={(definition) => {
+                            if (todayFilterOpen) {
+                                setFilterOverflowVisible(true)
+                            }
+                        }}
+                        className="bg-white z-20 relative"
+                    >
+                        <TodayFilterBar />
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <div className="flex-1 pl-4 pr-0 pt-4 md:py-4 md:pr-1 md:pl-4 overflow-y-auto overflow-x-hidden pb-20">
                 {/* Quick Add Input */}

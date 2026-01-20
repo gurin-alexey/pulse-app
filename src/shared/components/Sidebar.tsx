@@ -492,6 +492,10 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
     const [menuPosition, setMenuPosition] = useState<{ top: number, left: number } | null>(null)
     const [iconPickerState, setIconPickerState] = useState<{ projectId: string, top: number, left: number, currentIcon: string | null } | null>(null)
 
+
+
+
+
     const { data: tags } = useTags()
 
     const navigate = useNavigate()
@@ -1163,6 +1167,7 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                     </div>
                 )}
             </div>
+
 
 
         </div>
