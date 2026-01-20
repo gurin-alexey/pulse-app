@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom"
-import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise, RefreshCw, FolderInput, LogOut, Check, Smile } from "lucide-react"
+import { Folder, ChevronRight, FolderPlus, Trash2, Edit2, Plus, Calendar, LayoutDashboard, CheckSquare, Inbox, Sun, Tag as TagIcon, MoreHorizontal, Sunrise, RefreshCw, FolderInput, LogOut, Check, Smile, Hash } from "lucide-react"
 import { useQueryClient, useIsFetching } from "@tanstack/react-query" // Import react-query hooks
 
 // ... existing code ...
@@ -806,6 +806,29 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                         </div>
                     )
                 })}
+
+                {/* Other/Uncategorized */}
+                <div className="relative">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            if (activeCategory === 'other') {
+                                setActiveCategory(null)
+                            } else {
+                                const rect = e.currentTarget.getBoundingClientRect()
+                                setMenuPosition({ top: rect.bottom, left: rect.left })
+                                setActiveCategory('other')
+                            }
+                        }}
+                        className={clsx(
+                            "p-2 rounded-lg transition-colors",
+                            activeCategory === 'other' ? "bg-gray-100 text-gray-900" : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                        )}
+                        title="Other Tags"
+                    >
+                        <Hash size={18} />
+                    </button>
+                </div>
             </div>
 
             {/* Hierarchical Tags List */}
@@ -837,32 +860,39 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            {CATEGORIES.find(c => c.id === activeCategory)?.label}
+                            {activeCategory === 'other' ? 'Other' : CATEGORIES.find(c => c.id === activeCategory)?.label}
                         </div>
                         <div className="max-h-64 overflow-y-auto py-1">
-                            {tags?.filter(t => t.category === activeCategory).length! > 0 ? (
-                                tags?.filter(t => t.category === activeCategory).map(tag => (
-                                    <Link
-                                        key={tag.id}
-                                        to={`/tags/${tag.id}`}
-                                        onClick={() => {
-                                            setActiveCategory(null)
-                                            if (onItemClick) onItemClick()
-                                        }}
-                                        className={clsx(
-                                            "flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors",
-                                            activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-700"
-                                        )}
-                                    >
-                                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
-                                        <span className="truncate">{tag.name}</span>
-                                    </Link>
-                                ))
-                            ) : (
-                                <div className="px-3 py-2 text-xs text-gray-400 italic text-center">
-                                    No tags
-                                </div>
-                            )}
+                            {(() => {
+                                const filteredTags = activeCategory === 'other'
+                                    ? tags?.filter(t => !t.category || !CATEGORIES.some(c => c.id === t.category))
+                                    : tags?.filter(t => t.category === activeCategory)
+
+                                if (filteredTags && filteredTags.length > 0) {
+                                    return filteredTags.map(tag => (
+                                        <Link
+                                            key={tag.id}
+                                            to={`/tags/${tag.id}`}
+                                            onClick={() => {
+                                                setActiveCategory(null)
+                                                if (onItemClick) onItemClick()
+                                            }}
+                                            className={clsx(
+                                                "flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 transition-colors",
+                                                activePath === `/tags/${tag.id}` ? "text-blue-600 bg-blue-50/50" : "text-gray-700"
+                                            )}
+                                        >
+                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                                            <span className="truncate">{tag.name}</span>
+                                        </Link>
+                                    ))
+                                }
+                                return (
+                                    <div className="px-3 py-2 text-xs text-gray-400 italic text-center">
+                                        No tags
+                                    </div>
+                                )
+                            })()}
                         </div>
                     </div>
                 </div>,
