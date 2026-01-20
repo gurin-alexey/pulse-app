@@ -23,6 +23,7 @@ import { addExDateToRRule, addUntilToRRule, updateDTStartInRRule, updateRRuleByD
 import { useTaskMenu } from '@/hooks/useTaskMenu'
 import { useDeleteRecurrence } from '@/hooks/useDeleteRecurrence'
 import { DeleteRecurrenceModal } from '@/components/ui/date-picker/DeleteRecurrenceModal'
+import { PRIORITIES, getPriorityConfig } from '@/constants/priorities'
 
 import { useTaskRecurrenceLogic } from './hooks/useTaskRecurrenceLogic'
 
@@ -346,7 +347,8 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
         onSkipOccurrence: () => {
             setContextMenu(null)
             setSearchParams({}) // Close detail view
-        }
+        },
+        onClose: () => setContextMenu(null)
     })
 
     // Safety fallback for rendering while loading/creating
@@ -505,12 +507,9 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
                                 <Menu.Button
                                     className={clsx(
                                         "p-2 rounded-md transition-colors hover:bg-gray-100",
-                                        t.priority === 'high' ? "text-red-500" :
-                                            t.priority === 'medium' ? "text-amber-500" :
-                                                t.priority === 'low' ? "text-blue-500" :
-                                                    "text-gray-400 hover:text-gray-600"
+                                        getPriorityConfig(t.priority).colors.text
                                     )}
-                                    title={`Priority: ${t.priority || 'Normal'}`}
+                                    title={`Priority: ${getPriorityConfig(t.priority).label}`}
                                 >
                                     <Flag size={18} className={clsx(t.priority && "fill-current")} />
                                 </Menu.Button>
@@ -526,23 +525,18 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
                                 >
                                     <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-lg ring-1 ring-black/5 focus:outline-none z-30 overflow-hidden">
                                         <div className="p-1">
-                                            {[
-                                                { id: 'high', label: 'High Priority', color: 'text-red-500', bg: 'hover:bg-red-50' },
-                                                { id: 'medium', label: 'Medium Priority', color: 'text-amber-500', bg: 'hover:bg-amber-50' },
-                                                { id: 'low', label: 'Low Priority', color: 'text-blue-500', bg: 'hover:bg-blue-50' },
-                                                { id: 'none', label: 'Normal', color: 'text-gray-500', bg: 'hover:bg-gray-50' }
-                                            ].map((opt) => (
+                                            {PRIORITIES.map((opt) => (
                                                 <Menu.Item key={opt.id}>
                                                     {({ active }) => (
                                                         <button
-                                                            onClick={() => updateTask({ taskId: realTaskId, updates: { priority: (opt.id === 'none' ? null : opt.id) as TaskWithTags['priority'] } })}
+                                                            onClick={() => updateTask({ taskId: realTaskId, updates: { priority: opt.value as TaskWithTags['priority'] } })}
                                                             className={clsx(
                                                                 "flex w-full items-center gap-3 px-3 py-2 text-sm font-medium transition-colors",
-                                                                active ? opt.bg : "bg-white",
-                                                                opt.color
+                                                                active ? opt.colors.hover : "bg-white",
+                                                                opt.colors.text
                                                             )}
                                                         >
-                                                            <Flag size={14} className={clsx(t.priority === opt.id && "fill-current")} />
+                                                            <Flag size={14} className={clsx(t.priority === opt.value && "fill-current")} />
                                                             {opt.label}
                                                         </button>
                                                     )}

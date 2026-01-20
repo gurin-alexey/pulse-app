@@ -4,6 +4,7 @@ import { useProjects } from "@/hooks/useProjects"
 import { Loader2, List, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 import clsx from "clsx"
+import { getPriorityConfig } from "@/constants/priorities"
 
 export function CustomListWidget() {
     const [selectedListId, setSelectedListId] = useState(() => localStorage.getItem('dashboard_custom_list_id') || 'inbox')
@@ -81,9 +82,7 @@ export function CustomListWidget() {
                     >
                         <div className={clsx(
                             "w-2 h-2 rounded-full mr-3 shrink-0",
-                            task.priority === 'high' ? "bg-red-400" :
-                                task.priority === 'medium' ? "bg-orange-400" :
-                                    "bg-blue-400"
+                            getPriorityConfig(task.priority).colors.dot
                         )} />
                         <span className="text-sm text-gray-700 truncate flex-1">{task.title}</span>
                         <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors opacity-0 group-hover:opacity-100" />

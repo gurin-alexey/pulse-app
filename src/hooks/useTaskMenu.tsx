@@ -8,9 +8,11 @@ import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useCreateTask } from '@/hooks/useCreateTask'
 import { useSettings } from '@/store/useSettings'
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
+import type { TaskWithTags } from '@/hooks/useTasks'
+import { PRIORITIES } from '@/constants/priorities'
 
 interface UseTaskMenuProps {
-    task: any
+    task: TaskWithTags
     taskId: string // The real UUID
     // For virtual instances
     occurrenceDate?: string | null
@@ -18,7 +20,9 @@ interface UseTaskMenuProps {
     onDateChangeRequest?: (dateStr: string) => void
     onDelete?: () => void
     onSkipOccurrence?: () => void
+    onClose?: () => void
 }
+
 
 export function useTaskMenu({
     task,
@@ -26,7 +30,8 @@ export function useTaskMenu({
     occurrenceDate,
     onDateChangeRequest,
     onDelete,
-    onSkipOccurrence
+    onSkipOccurrence,
+    onClose
 }: UseTaskMenuProps) {
     const { mutate: updateTask } = useUpdateTask()
     const { mutate: createTask } = useCreateTask()
@@ -60,53 +65,23 @@ export function useTaskMenu({
             type: 'custom' as const,
             content: (
                 <div className="px-2 py-1.5 flex items-center justify-between gap-1">
-                    {[
-                        { id: 'high', label: 'High', color: 'text-red-500', hover: 'hover:bg-red-50' },
-                        { id: 'medium', label: 'Medium', color: 'text-amber-500', hover: 'hover:bg-amber-50' },
-                        { id: 'low', label: 'Low', color: 'text-blue-500', hover: 'hover:bg-blue-50' },
-                        { id: 'none', label: 'Normal', color: 'text-gray-400', hover: 'hover:bg-gray-50' }
-                    ].map((p) => (
+                    {PRIORITIES.map((p) => (
                         <button
                             key={p.id}
                             onClick={(e) => {
                                 e.stopPropagation()
-                                updateTask({ taskId, updates: { priority: (p.id === 'none' ? null : p.id) as any } })
+                                updateTask({ taskId, updates: { priority: p.value as any } })
                                 if (showToasts) toast.success(`Priority set to ${p.label}`)
-                                // Determine if we should close the menu? Context menus usually close on action.
-                                // But since this is a custom row, I need to ensure it closes.
-                                // However, I don't have direct access to 'onClose' here unless I pass it or handle it.
-                                // But ContextMenu.tsx handles close on item click. 
-                                // Since this is a custom content button, the ContextMenu wrapping click handler won't fire automatically for inner buttons if I stop propagation.
-                                // If I don't stop propagation, it might work?
-                                // Let's check ContextMenu.tsx again:
-                                // Custom item just renders content. It doesn't wrap in a button/onclick handler like standard items.
-                                // So I need to manually close it? 
-                                // useTaskMenu returns items, it doesn't receive onClose control directly to pass to items?
-                                // Actually, ContextMenu.tsx passes `onClose` to MenuItem, but `MenuItem` for custom type just renders content.
-                                // So my custom content cannot easily close the menu unless I pass a way to do so.
-                                // But I can dispatch a click or something?
-                                // Or better: The definition of useTaskMenu doesn't seem to include a way to close the menu.
-                                // Ah, standard items have `onClick` which `ContextMenu` calls then closes.
-                                // For custom items, I might need to dispatch a global click or escape?
-                                // Or I can trigger a re-render that closes it?
-                                // Wait, `onClose` is passed to `MenuItem`. But `MenuItem` uses it for standard items.
-                                // I cannot access `onClose` inside the definition of `menuItems` in `useTaskMenu` because `useTaskMenu` is a hook that returns data.
-                                // It doesn't know about the UI state of the menu (open/closed) except via `onSkipOccurrence` callback which seems to be a hack.
-
-                                // User request: "Add icons...". 
-                                // If I can't close the menu, it's a bit annoying.
-                                // Maybe I can fire a click on document? `document.body.click()`?
-                                // That would trigger `handleClickOutside` in ContextMenu... which closes it!
-                                document.body.click()
+                                if (onClose) onClose()
                             }}
                             className={clsx(
                                 "p-1.5 rounded-md transition-colors flex-1 flex justify-center",
-                                p.hover,
-                                task.priority === (p.id === 'none' ? null : p.id) ? "bg-gray-100 ring-1 ring-gray-200" : ""
+                                p.colors.hover,
+                                task?.priority === p.value ? "bg-gray-100 ring-1 ring-gray-200" : ""
                             )}
                             title={p.label}
                         >
-                            <Flag size={16} className={clsx(p.color, task.priority === (p.id === 'none' ? null : p.id) && "fill-current")} />
+                            <Flag size={16} className={clsx(p.colors.text, task?.priority === p.value && p.colors.fill)} />
                         </button>
                     ))}
                 </div>

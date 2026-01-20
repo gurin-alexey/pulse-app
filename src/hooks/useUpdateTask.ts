@@ -208,7 +208,7 @@ export function useUpdateTask() {
 
             // 3. Separate updates
             // Positional/Individual fields should ONLY apply to the primary task
-            const individualFields = ['parent_id', 'sort_order', 'title', 'is_completed', 'due_date']
+            const individualFields = ['parent_id', 'sort_order', 'title', 'is_completed', 'due_date', 'priority']
             const positionalUpdates: any = {}
             const contextualUpdates: any = {}
 
@@ -252,6 +252,12 @@ export function useUpdateTask() {
                         const today = new Date().toISOString().split('T')[0]
                         return task.due_date === today
                     }
+
+                    // Priority filtering (if applicable to the filter type)
+                    if (typeof filter === 'object' && filter !== null && 'priority' in filter && (filter as any).priority && task.priority !== (filter as any).priority) {
+                        return false
+                    }
+
                     return true
                 }
 

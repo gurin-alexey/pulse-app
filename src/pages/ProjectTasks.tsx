@@ -11,7 +11,7 @@ import { useSections, useCreateSection, useDeleteSection, useUpdateSection } fro
 import clsx from "clsx"
 import { createPortal } from "react-dom"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence, motion, LayoutGroup } from "framer-motion"
 import {
     useDraggable,
     useDroppable,
@@ -48,16 +48,24 @@ function SortableTaskItem({ task, depth, disabled, children }: { task: any, dept
     }
 
     return (
-        <div
+        <motion.div
+            layoutId={task.id}
             ref={setNodeRef}
             style={style}
+            transition={{
+                layout: {
+                    type: "spring",
+                    stiffness: 800,
+                    damping: 35
+                }
+            }}
             className={clsx(
-                "rounded-md transition-all duration-200",
+                "rounded-md",
                 isDragging && "opacity-0"
             )}
         >
             {children({ listeners, attributes })}
-        </div>
+        </motion.div>
     )
 }
 
@@ -874,62 +882,64 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                     <div className="flex flex-col">
                         {/* Allow creating tasks in Inbox/Today even without projectId */}
 
-                        {Object.entries(tasksForView).map(([groupName, groupTasks]) => {
-                            // Filter out children of collapsed parents
-                            const visibleTasks = []
-                            let hiddenUntilDepth = null
+                        <LayoutGroup>
+                            {Object.entries(tasksForView).map(([groupName, groupTasks]) => {
+                                // Filter out children of collapsed parents
+                                const visibleTasks = []
+                                let hiddenUntilDepth = null
 
-                            for (const t of groupTasks) {
-                                const task = t as any
-                                if (hiddenUntilDepth !== null) {
-                                    if (task.depth > hiddenUntilDepth) continue
-                                    else hiddenUntilDepth = null
+                                for (const t of groupTasks) {
+                                    const task = t as any
+                                    if (hiddenUntilDepth !== null) {
+                                        if (task.depth > hiddenUntilDepth) continue
+                                        else hiddenUntilDepth = null
+                                    }
+
+                                    visibleTasks.push(task)
+
+                                    if (collapsedTaskIds[task.id]) {
+                                        hiddenUntilDepth = task.depth
+                                    }
                                 }
 
-                                visibleTasks.push(task)
+                                // Determine if this group is collapsed
+                                // Logic: If user has explicitly toggled it, use that state.
+                                // If not toggled yet (undefined), check if it matches "Future" or "Ideas" keywords to default to collapsed (true).
+                                // Otherwise default to expanded (false).
 
-                                if (collapsedTaskIds[task.id]) {
-                                    hiddenUntilDepth = task.depth
-                                }
-                            }
+                                const isDefaultCollapsed = ['future', 'ideas', 'будущее', 'идеи', 'future', 'idea'].some(k => groupName.toLowerCase().includes(k))
+                                const isGroupCollapsed = collapsedGroups[groupName] !== undefined ? collapsedGroups[groupName] : isDefaultCollapsed
 
-                            // Determine if this group is collapsed
-                            // Logic: If user has explicitly toggled it, use that state.
-                            // If not toggled yet (undefined), check if it matches "Future" or "Ideas" keywords to default to collapsed (true).
-                            // Otherwise default to expanded (false).
-
-                            const isDefaultCollapsed = ['future', 'ideas', 'будущее', 'идеи', 'future', 'idea'].some(k => groupName.toLowerCase().includes(k))
-                            const isGroupCollapsed = collapsedGroups[groupName] !== undefined ? collapsedGroups[groupName] : isDefaultCollapsed
-
-                            return (
-                                <DroppableContainer
-                                    key={groupName}
-                                    id={`group-${groupName}`}
-                                    data={{ type: 'Group', groupName }}
-                                    className="mb-8"
-                                    isHighlighted={dragOverGroupId === `group-${groupName}`}
-                                >
-                                    <button
-                                        onClick={() => setCollapsedGroups(prev => ({ ...prev, [groupName]: !isGroupCollapsed }))}
-                                        className="flex items-center gap-2 w-full text-left mb-2 group/header focus:outline-none"
+                                return (
+                                    <DroppableContainer
+                                        key={groupName}
+                                        id={`group-${groupName}`}
+                                        data={{ type: 'Group', groupName }}
+                                        className="mb-8"
+                                        isHighlighted={dragOverGroupId === `group-${groupName}`}
                                     >
-                                        <ChevronRight
-                                            size={16}
-                                            className={clsx("text-gray-400 transition-transform duration-200", !isGroupCollapsed && "rotate-90")}
-                                        />
-                                        <h3 className="text-sm font-bold text-gray-500 uppercase">{groupName} ({visibleTasks.length})</h3>
-                                    </button>
+                                        <button
+                                            onClick={() => setCollapsedGroups(prev => ({ ...prev, [groupName]: !isGroupCollapsed }))}
+                                            className="flex items-center gap-2 w-full text-left mb-2 group/header focus:outline-none"
+                                        >
+                                            <ChevronRight
+                                                size={16}
+                                                className={clsx("text-gray-400 transition-transform duration-200", !isGroupCollapsed && "rotate-90")}
+                                            />
+                                            <h3 className="text-sm font-bold text-gray-500 uppercase">{groupName} ({visibleTasks.length})</h3>
+                                        </button>
 
-                                    {!isGroupCollapsed && (
-                                        <SortableContext items={visibleTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                                            <div className="space-y-1 relative">
-                                                {visibleTasks.map((task, index) => renderTaskItem(task, index))}
-                                            </div>
-                                        </SortableContext>
-                                    )}
-                                </DroppableContainer>
-                            )
-                        })}
+                                        {!isGroupCollapsed && (
+                                            <SortableContext items={visibleTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                                <div className="space-y-1 relative">
+                                                    {visibleTasks.map((task, index) => renderTaskItem(task, index))}
+                                                </div>
+                                            </SortableContext>
+                                        )}
+                                    </DroppableContainer>
+                                )
+                            })}
+                        </LayoutGroup>
                         {Object.keys(tasksForView).length === 0 && <div className="text-gray-400 text-center mt-10">No active tasks</div>}
 
                         {/* COMPLETED TASKS SECTION FOR GROUPS VIEW (Today/Tomorrow) */}
