@@ -274,7 +274,22 @@ export function SidebarTags() {
     // ... existing hook calls
     const { data: tags } = useTags()
     const { createTag } = useTagMutations()
-    const [isExpanded, setIsExpanded] = useState(false)
+    const [isExpanded, setIsExpanded] = useState(() => {
+        try {
+            const saved = localStorage.getItem('pulse.sidebarTagsExpanded')
+            return saved === 'true'
+        } catch {
+            return false
+        }
+    })
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('pulse.sidebarTagsExpanded', String(isExpanded))
+        } catch {
+            // ignore
+        }
+    }, [isExpanded])
 
     // Transform flat list to tree
     const tree = useMemo(() => tags ? buildTree(tags) : [], [tags])
