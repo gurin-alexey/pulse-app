@@ -498,9 +498,10 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
                                 </div>
                             </DatePickerPopover>
 
-                            <div className="flex-1 flex items-center px-4">
-                                <CategoryTags taskId={realTaskId} tags={task?.tags} direction="down" />
-                            </div>
+                            <div className="flex-1" />
+                            <div className="w-px h-5 bg-gray-200" />
+                            <CategoryTags taskId={realTaskId} tags={task?.tags} direction="down" />
+                            <div className="w-px h-5 bg-gray-200" />
 
                             {/* Priority Selection Menu */}
                             <Menu as="div" className="relative">
