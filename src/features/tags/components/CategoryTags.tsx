@@ -10,9 +10,10 @@ type CategoryTagsProps = {
     taskId: string
     tags?: Tag[] // Added optional tags prop
     readOnly?: boolean
+    direction?: 'up' | 'down'
 }
 
-export function CategoryTags({ taskId, tags: initialTags, readOnly }: CategoryTagsProps) {
+export function CategoryTags({ taskId, tags: initialTags, readOnly, direction = 'down' }: CategoryTagsProps) {
     const { data: allTags } = useTags()
     // const { data: taskTags } = useTaskTags(taskId) // Removed N+1 fetch
     const taskTags = initialTags || [] // Use passed tags
@@ -79,7 +80,10 @@ export function CategoryTags({ taskId, tags: initialTags, readOnly }: CategoryTa
 
                         {/* Dropdown */}
                         {activeCategory === cat.id && (
-                            <div className="absolute bottom-full left-0 mb-2 w-56 bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                            <div className={clsx(
+                                "absolute left-0 w-56 bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100",
+                                direction === 'up' ? "bottom-full mb-2" : "top-full mt-2"
+                            )}>
                                 <div className="p-2 border-b border-gray-50">
                                     <input
                                         type="text"
@@ -176,7 +180,10 @@ export function CategoryTags({ taskId, tags: initialTags, readOnly }: CategoryTa
 
                         {/* Dropdown for Other */}
                         {isActive && (
-                            <div className="absolute bottom-full left-0 mb-2 w-56 bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                            <div className={clsx(
+                                "absolute left-0 w-56 bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100",
+                                direction === 'up' ? "bottom-full mb-2" : "top-full mt-2"
+                            )}>
                                 <div className="p-2 border-b border-gray-50">
                                     <input
                                         type="text"

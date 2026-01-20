@@ -498,7 +498,9 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
                                 </div>
                             </DatePickerPopover>
 
-                            <div className="flex-1" />
+                            <div className="flex-1 flex items-center px-4">
+                                <CategoryTags taskId={realTaskId} tags={task?.tags} direction="down" />
+                            </div>
 
                             {/* Priority Selection Menu */}
                             <Menu as="div" className="relative">
@@ -645,8 +647,7 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
                         }}
                     />
 
-                    {/* Categorized Tags (Place, Energy, Time, People) */}
-                    <CategoryTags taskId={realTaskId} tags={task?.tags} />
+
 
                     {/* Project Type Toggle (GTD logic) */}
                     <div className="flex items-center gap-2 border-l border-gray-100 pl-4 py-1">
