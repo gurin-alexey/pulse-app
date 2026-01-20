@@ -150,7 +150,7 @@ export async function fetchTasks(filter: TaskFilter) {
     // Transform to flat structure
     const mappedTasks = finalData.map(task => ({
         ...task,
-        tags: task.task_tags.map((tt: any) => tt.tags),
+        tags: task.task_tags.map((tt: any) => tt.tags).filter((t: any) => t !== null && t !== undefined),
         subtasks_count: task.subtasks?.[0]?.count
     })) as TaskWithTags[]
 

@@ -126,6 +126,9 @@ export const useTagMutations = () => {
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['tags'] })
+            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['all-tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['task-tags'] })
         }
     })
 

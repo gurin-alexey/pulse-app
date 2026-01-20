@@ -194,11 +194,13 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     const [groupBy, setGroupBy] = useState<GroupOption>('priority')
     const [sortBy, setSortBy] = useState<SortOption>('manual')
 
-    // Reset view options when switching to Inbox
+    // Reset view options when switching modes
     useEffect(() => {
         if (mode === 'inbox') {
             setGroupBy('none')
             setSortBy('date_created') // Default to Newest First in Inbox
+        } else if (mode === 'today' || mode === 'tomorrow') {
+            setSortBy('manual') // Enforce manual sort for Today/Tomorrow to enable DND
         }
     }, [mode])
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
