@@ -6,23 +6,48 @@ import {
     Folder,
     Tag,
     Activity,
-    Hash
+    Hash,
+    ArrowUp,
+    ArrowDown
 } from 'lucide-react'
 import clsx from 'clsx'
 import { Menu, Transition } from '@headlessui/react'
 import { CATEGORIES } from '@/features/tags/constants'
 
-export type SortOption = 'manual' | 'date_created' | 'due_date' | 'alphabetical'
+export type SortOption = 'manual' | 'date_created' | 'due_date' | 'alphabetical' | 'date_created_asc'
 export type GroupOption = 'none' | 'date' | 'priority' | 'project' | 'tag' | 'complexity' | 'tag-place' | 'tag-energy' | 'tag-time' | 'tag-people' | 'tag-other'
 
 type ViewOptionsProps = {
     groupBy: GroupOption
     setGroupBy: (group: GroupOption) => void
+    sortBy?: SortOption
+    setSortBy?: (sort: SortOption) => void
+    viewMode?: string
 }
 
 export function ViewOptions({
-    groupBy, setGroupBy
+    groupBy, setGroupBy, sortBy, setSortBy, viewMode
 }: ViewOptionsProps) {
+
+    if (viewMode === 'inbox') {
+        return (
+            <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 p-1 shadow-sm h-10">
+                <GroupIconBtn
+                    active={sortBy === 'date_created_asc'}
+                    onClick={() => setSortBy?.('date_created_asc')}
+                    icon={<ArrowUp size={18} />}
+                    title="Oldest to Newest"
+                />
+                <GroupIconBtn
+                    active={sortBy === 'date_created'}
+                    onClick={() => setSortBy?.('date_created')}
+                    icon={<ArrowDown size={18} />}
+                    title="Newest to Oldest"
+                />
+            </div>
+        )
+    }
+
     return (
         <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 p-1 shadow-sm h-10">
             {/* Grouping - Icon Only */}

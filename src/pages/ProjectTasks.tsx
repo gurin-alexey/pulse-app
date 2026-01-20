@@ -192,7 +192,15 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     // View State
     // ... State declarations remain ...
     const [groupBy, setGroupBy] = useState<GroupOption>('priority')
-    const sortBy: SortOption = 'manual'
+    const [sortBy, setSortBy] = useState<SortOption>('manual')
+
+    // Reset view options when switching to Inbox
+    useEffect(() => {
+        if (mode === 'inbox') {
+            setGroupBy('none')
+            setSortBy('date_created') // Default to Newest First in Inbox
+        }
+    }, [mode])
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
     const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false)
     const [quickAddValue, setQuickAddValue] = useState('') // New state for inline input
@@ -354,6 +362,8 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                         return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
                     } else if (sortBy === 'date_created') {
                         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime() // Newest first
+                    } else if (sortBy === 'date_created_asc') {
+                        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime() // Oldest first
                     } else if (sortBy === 'due_date') {
                         if (!a.due_date) return 1; if (!b.due_date) return -1
                         return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
@@ -396,6 +406,8 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                     return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
                 } else if (sortBy === 'date_created') {
                     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+                } else if (sortBy === 'date_created_asc') {
+                    return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
                 } else if (sortBy === 'due_date') {
                     if (!a.due_date) return 1; if (!b.due_date) return -1
                     return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
@@ -904,6 +916,9 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
                     <ViewOptions
                         groupBy={groupBy}
                         setGroupBy={setGroupBy}
+                        sortBy={sortBy}
+                        setSortBy={setSortBy}
+                        viewMode={mode || 'project'}
                     />
                 </div>
             </div>
