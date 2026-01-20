@@ -52,6 +52,7 @@ export type Tag = {
     color: string
     user_id: string
     category?: 'place' | 'energy' | 'time' | 'people' | null
+    parent_id?: string | null
 }
 
 export type Habit = {

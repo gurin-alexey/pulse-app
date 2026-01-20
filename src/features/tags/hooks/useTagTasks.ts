@@ -1,32 +1,55 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import type { Task } from '@/types/database'
-import type { TaskWithTags } from '@/hooks/useTasks'
+import type { Task, Tag } from '@/types/database'
+
+type TaskWithTags = Task & {
+    tags: Tag[]
+}
 
 export function useTagTasks(tagId: string | undefined) {
     return useQuery({
-        queryKey: ['tasks', 'tag', tagId],
+        queryKey: ['tag-tasks', tagId],
         queryFn: async () => {
             if (!tagId) return []
 
-            const { data, error } = await supabase
+            // Fetch task IDs associated with this tag
+            const { data: taskTagsData, error: taskTagsError } = await supabase
+                .from('task_tags')
+                .select('task_id')
+                .eq('tag_id', tagId)
+
+            if (taskTagsError) throw taskTagsError
+            if (!taskTagsData || taskTagsData.length === 0) return []
+
+            const taskIds = taskTagsData.map(tt => tt.task_id)
+
+            // Fetch tasks details
+            const { data: tasksData, error: tasksError } = await supabase
                 .from('tasks')
-                // Inner join to filter by tag, and fetch tag details
-                .select('*, task_tags!inner(tag_id, tags(*))')
-                .eq('task_tags.tag_id', tagId)
-                .is('parent_id', null)
+                .select('*')
+                .in('id', taskIds)
+                .is('deleted_at', null)
                 .order('created_at', { ascending: false })
 
-            if (error) throw error
+            if (tasksError) throw tasksError
 
-            // Transform to TaskWithTags structure
-            // Note: This only returns the tag that we filtered by. 
-            // To get ALL tags for these tasks, we'd need a different query approach, 
-            // but this is sufficient for the basic list.
-            return (data as any[]).map(task => ({
-                ...task,
-                tags: task.task_tags.map((tt: any) => tt.tags)
-            })) as TaskWithTags[]
+            // Fetch tags for these tasks to display them
+            const { data: allTaskTags, error: allTagsError } = await supabase
+                .from('task_tags')
+                .select('task_id, tags(*)')
+                .in('task_id', taskIds)
+
+            if (allTagsError) throw allTagsError
+
+            // Map tags to tasks
+            const tasksWithTags = tasksData.map(task => {
+                const tags = allTaskTags
+                    .filter(t => t.task_id === task.id)
+                    .map(t => t.tags) as unknown as Tag[]
+                return { ...task, tags }
+            })
+
+            return tasksWithTags as TaskWithTags[]
         },
         enabled: !!tagId
     })

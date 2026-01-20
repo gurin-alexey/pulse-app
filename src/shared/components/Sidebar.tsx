@@ -28,7 +28,7 @@ import { useTasks } from "@/hooks/useTasks"
 import { expandTasksForDate } from "@/utils/taskExpansion"
 import { useTags } from "@/features/tags"
 import { isToday, isTomorrow, parseISO, subDays } from "date-fns"
-import { CATEGORIES } from "@/features/tags"
+import { CATEGORIES, SidebarTags } from "@/features/tags"
 import type { Habit, HabitLog } from "@/types/database"
 import { getProjectIcon } from "@/utils/projectIcons"
 import { ProjectIconPicker } from "@/features/projects/ProjectIconPicker"
@@ -807,6 +807,10 @@ export function Sidebar({ activePath, onItemClick }: SidebarProps) {
                     )
                 })}
             </div>
+
+            {/* Hierarchical Tags List */}
+            <SidebarTags />
+
 
             {/* Icon Picker Portal */}
             {iconPickerState && (

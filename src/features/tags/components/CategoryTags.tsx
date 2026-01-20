@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Check } from 'lucide-react'
-import { useTags, useTaskTags, useCreateTag, useToggleTaskTag } from '../hooks/useTags'
+import { useTags, useTaskTags } from '../hooks/useTags'
+import { useTagMutations } from '../hooks/useTagMutations'
 import clsx from 'clsx'
 import { CATEGORIES, type CategoryType } from '../constants'
 
@@ -12,8 +13,7 @@ type CategoryTagsProps = {
 export function CategoryTags({ taskId, readOnly }: CategoryTagsProps) {
     const { data: allTags } = useTags()
     const { data: taskTags } = useTaskTags(taskId)
-    const { mutate: createTag, isPending: isCreating } = useCreateTag()
-    const { mutate: toggleTag } = useToggleTaskTag()
+    const { createTag, toggleTaskTag } = useTagMutations()
 
     const [activeCategory, setActiveCategory] = useState<CategoryType | null>(null)
     const [filter, setFilter] = useState('')
@@ -33,9 +33,9 @@ export function CategoryTags({ taskId, readOnly }: CategoryTagsProps) {
 
     const handleCreateTag = () => {
         if (!filter.trim() || !activeCategory) return
-        createTag({ name: filter, category: activeCategory }, {
+        createTag.mutate({ name: filter, category: activeCategory }, {
             onSuccess: (newTag) => {
-                toggleTag({ taskId, tagId: newTag.id, isAttached: false })
+                toggleTaskTag.mutate({ taskId, tagId: newTag.id, isAttached: false })
                 setFilter('')
             }
         })
@@ -95,7 +95,7 @@ export function CategoryTags({ taskId, readOnly }: CategoryTagsProps) {
                                         return (
                                             <button
                                                 key={tag.id}
-                                                onClick={() => toggleTag({ taskId, tagId: tag.id, isAttached })}
+                                                onClick={() => toggleTaskTag.mutate({ taskId, tagId: tag.id, isAttached })}
                                                 className="w-full text-left px-2 py-1.5 text-xs rounded-lg hover:bg-gray-50 flex items-center justify-between group transition-colors"
                                             >
                                                 <div className="flex items-center gap-2">
@@ -111,7 +111,7 @@ export function CategoryTags({ taskId, readOnly }: CategoryTagsProps) {
                                     {filter && !allTags?.some(t => t.category === cat.id && t.name.toLowerCase() === filter.toLowerCase()) && (
                                         <button
                                             onClick={handleCreateTag}
-                                            disabled={isCreating}
+                                            disabled={createTag.isPending}
                                             className="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded-lg flex items-center mt-1"
                                         >
                                             <Plus size={12} className="mr-1" />

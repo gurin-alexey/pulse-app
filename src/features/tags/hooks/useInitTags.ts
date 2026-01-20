@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { useTags, useCreateTag } from './useTags'
+import { useTags } from './useTags'
+import { useTagMutations } from './useTagMutations'
 
 export function useInitTags() {
     const { data: tags, isLoading } = useTags()
-    const { mutate: createTag } = useCreateTag()
+    const { createTag } = useTagMutations()
     const attemptedRef = useRef(false)
 
     useEffect(() => {
@@ -15,7 +16,7 @@ export function useInitTags() {
             const seedAttempted = localStorage.getItem('pulse.pomoSeedAttempted')
             if (!seedAttempted) {
                 console.log("Seeding default Pomo tag...")
-                createTag({ name: 'Pomo', category: 'time', color: '#ef4444' })
+                createTag.mutate({ name: 'Pomo', category: 'time', color: '#ef4444' })
                 localStorage.setItem('pulse.pomoSeedAttempted', 'true')
             }
         }

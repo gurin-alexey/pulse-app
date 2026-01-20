@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, X, Tag as TagIcon, Check } from 'lucide-react'
-import { useTags, useTaskTags, useCreateTag, useToggleTaskTag } from '../hooks/useTags'
+import { useTags, useTaskTags } from '../hooks/useTags'
+import { useTagMutations } from '../hooks/useTagMutations'
 import clsx from 'clsx'
 import { Loader2 } from 'lucide-react'
 
@@ -12,8 +13,7 @@ type TaskTagPickerProps = {
 export function TaskTagPicker({ taskId, readOnly }: TaskTagPickerProps) {
     const { data: allTags } = useTags()
     const { data: taskTags, isLoading } = useTaskTags(taskId)
-    const { mutate: createTag, isPending: isCreating } = useCreateTag()
-    const { mutate: toggleTag } = useToggleTaskTag()
+    const { createTag, toggleTaskTag } = useTagMutations()
 
     const [isOpen, setIsOpen] = useState(false)
     const [showInput, setShowInput] = useState(false)
@@ -44,9 +44,9 @@ export function TaskTagPicker({ taskId, readOnly }: TaskTagPickerProps) {
 
     const handleCreateTag = () => {
         if (!filter.trim()) return
-        createTag({ name: filter }, {
+        createTag.mutate({ name: filter }, {
             onSuccess: (newTag) => {
-                toggleTag({ taskId, tagId: newTag.id, isAttached: false })
+                toggleTaskTag.mutate({ taskId, tagId: newTag.id, isAttached: false })
                 setFilter('')
             }
         })
@@ -65,7 +65,7 @@ export function TaskTagPicker({ taskId, readOnly }: TaskTagPickerProps) {
                     {tag.name}
                     {!readOnly && (
                         <button
-                            onClick={() => toggleTag({ taskId, tagId: tag.id, isAttached: true })}
+                            onClick={() => toggleTaskTag.mutate({ taskId, tagId: tag.id, isAttached: true })}
                             className="ml-1 hover:text-red-500 focus:outline-none"
                         >
                             <X size={12} />
@@ -111,7 +111,7 @@ export function TaskTagPicker({ taskId, readOnly }: TaskTagPickerProps) {
                                     return (
                                         <button
                                             key={tag.id}
-                                            onClick={() => toggleTag({ taskId, tagId: tag.id, isAttached })}
+                                            onClick={() => toggleTaskTag.mutate({ taskId, tagId: tag.id, isAttached })}
                                             className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-gray-50 flex items-center justify-between group"
                                         >
                                             <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ export function TaskTagPicker({ taskId, readOnly }: TaskTagPickerProps) {
                                 {showInput && filter && !exactMatch && (
                                     <button
                                         onClick={handleCreateTag}
-                                        disabled={isCreating}
+                                        disabled={createTag.isPending}
                                         className="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 rounded flex items-center"
                                     >
                                         <Plus size={12} className="mr-1" />
