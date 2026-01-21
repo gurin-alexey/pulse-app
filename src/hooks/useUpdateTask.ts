@@ -375,7 +375,7 @@ export function useUpdateTask() {
                 queryClient.setQueryData(['all-tasks-v2'], context.previousAllTasks)
             }
             // Rollback all modified lists
-            context?.modifiedLists.forEach(({ queryKey, data }) => {
+            context?.modifiedLists?.forEach(({ queryKey, data }) => {
                 queryClient.setQueryData(queryKey, data)
             })
         },
