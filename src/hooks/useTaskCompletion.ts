@@ -80,8 +80,9 @@ export function useTaskCompletion() {
         const endOfCurrentDay = new Date(currentOccurrenceDate + 'T23:59:59')
         const nextDate = getNextOccurrenceDate(task, endOfCurrentDay)
 
-        // 3. СНАЧАЛА создаём НОВЫЙ мастер (чтобы серия не исчезала)
+        // 3. ATOMIC OPTIMISTIC UPDATE: Готовим данные и обновляем кэш ОДИН раз
         let newMaster: Task | null = null
+
         if (nextDate) {
             const nextDateStr = nextDate.toISOString().split('T')[0]
             let nextStartTime: string | null = null
@@ -101,11 +102,11 @@ export function useTaskCompletion() {
 
             const newRule = updateDTStartInRRule(task.recurrence_rule || '', nextDate)
 
-            // Генерируем ID чтобы кэш useCreateTask и реальный запрос совпали
-            // И чтобы мы могли использовать его в optimistic update
+            // Генерируем ID
             const tempId = crypto.randomUUID()
+            const nowIso = new Date().toISOString()
 
-            // === OPTIMISTIC UPDATE: Добавляем новую задачу в кэш СРАЗУ (для Календаря и Списка) ===
+            // Данные новой задачи (Optimistic)
             const optimisticNewMaster: TaskWithTags = {
                 ...task,
                 id: tempId,
@@ -115,20 +116,56 @@ export function useTaskCompletion() {
                 recurrence_rule: newRule,
                 is_completed: false,
                 completed_at: null,
-                created_at: new Date().toISOString(),
-                // updated_at не существует в типе Task
+                created_at: nowIso,
                 deleted_at: null,
                 is_project: false,
                 subtasks_count: 0,
                 tags: (task as any).tags || []
             }
 
-            // 1. Добавляем оптимистично
-            safeUpdateCache('tasks', (old) => [optimisticNewMaster, ...old])
-            safeUpdateCache('all-tasks-v2', (old) => [optimisticNewMaster, ...old])
+            // Данные обновления старой задачи (Optimistic)
+            const oldTaskUpdates = {
+                due_date: currentOccurrenceDate,
+                start_time: (isVirtual && actualDate && task.start_time)
+                    ? `${actualDate}T${task.start_time.split('T')[1]}`
+                    : task.start_time,
+                end_time: (isVirtual && actualDate && task.end_time)
+                    ? `${actualDate}T${task.end_time.split('T')[1]}`
+                    : task.end_time,
+                recurrence_rule: null,
+                is_completed: true,
+                completed_at: nowIso
+            }
+
+            // Функция атомарного обновления списка
+            const atomicUpdater = (oldList: any[]) => {
+                let updatedList = [...oldList]
+
+                // 1. Обновляем старую задачу (она исчезнет из календаря/списка на сегодня или станет галочкой)
+                updatedList = updatedList.map(t => {
+                    if (t.id === realId) {
+                        return { ...t, ...oldTaskUpdates, tags: (t.tags || []) }
+                    }
+                    return t
+                })
+
+                // 2. Добавляем новую задачу (она появится на завтра)
+                // Проверяем на дубликаты на всякий случай
+                if (!updatedList.some(t => t.id === tempId)) {
+                    updatedList = [optimisticNewMaster, ...updatedList]
+                }
+
+                return updatedList
+            }
+
+            // ПРИМЕНЯЕМ АТОМАРНОЕ ОБНОВЛЕНИЕ
+            safeUpdateCache('tasks', atomicUpdater)
+            safeUpdateCache('all-tasks-v2', atomicUpdater)
 
             try {
-                // skipInvalidation: true — не сбрасываем кэш, полагаемся на optimistic update и наш ручной фикс
+                // 4. Реальные запросы к серверу (без optimistic update хуков)
+
+                // Сначала создаём новую (чтобы гарантировать сохранение серии)
                 newMaster = await createTask({
                     id: tempId,
                     title: task.title,
@@ -143,62 +180,61 @@ export function useTaskCompletion() {
                     recurrence_rule: newRule,
                     is_completed: false,
                     skipInvalidation: true,
-                    skipOptimisticUpdate: true
+                    skipOptimisticUpdate: true // <--- Важно!
                 })
+
+                // Потом завершаем старую
+                const updatedOldMaster = await updateTask({
+                    taskId: realId,
+                    updates: oldTaskUpdates,
+                    skipInvalidation: true,
+                    skipOptimisticUpdate: true // <--- Важно!
+                })
+
+                // 5. MANUAL CACHE SYNC (обновляем реальные данные с сервера)
+                const syncCache = (list: any[]) => {
+                    return list.map(t => {
+                        // Обновляем старую задачу (синхронизируем)
+                        if (t.id === realId) {
+                            return { ...t, ...updatedOldMaster, tags: (t.tags || []) }
+                        }
+                        // Обновляем новую задачу (синхронизируем)
+                        if (newMaster && t.id === newMaster.id) {
+                            return { ...newMaster, tags: (t.tags || []) }
+                        }
+                        return t
+                    })
+                }
+
+                safeUpdateCache('tasks', syncCache)
+                safeUpdateCache('all-tasks-v2', syncCache)
+
             } catch (err) {
-                console.error('[useTaskCompletion] Failed to create new master:', err)
-                toast.error("Ошибка создания следующего повторения")
+                console.error('[useTaskCompletion] Failed during atomic completion:', err)
+                toast.error("Ошибка при завершении повторяющейся задачи")
 
-                // Rollback optimistic update
-                safeUpdateCache('tasks', (old) => old.filter(t => t.id !== tempId))
-                safeUpdateCache('all-tasks-v2', (old) => old.filter(t => t.id !== tempId))
+                // Rollback: просто сбрасываем кэш, так как ручной откат сложный
+                queryClient.invalidateQueries({ queryKey: ['tasks'] })
+                queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
             }
         }
-
-        // 4. ПОТОМ завершаем ТЕКУЩИЙ мастер (после создания нового)
-        try {
-            const updatedOldMaster = await updateTask({
-                taskId: realId,
-                updates: {
-                    due_date: currentOccurrenceDate,
-                    start_time: (isVirtual && actualDate && task.start_time)
-                        ? `${actualDate}T${task.start_time.split('T')[1]}`
-                        : task.start_time,
-                    end_time: (isVirtual && actualDate && task.end_time)
-                        ? `${actualDate}T${task.end_time.split('T')[1]}`
-                        : task.end_time,
-                    recurrence_rule: null,
-                    is_completed: true,
-                    completed_at: new Date().toISOString()
-                },
-                skipInvalidation: true
-            })
-
-            // 5. MANUAL CACHE UPDATE (Sync w/ Server)
-            // Обновляем данные реальными значениями с сервера (например, created_at, updated_at)
-
-            const syncCache = (list: any[]) => {
-                return list.map(t => {
-                    // Обновляем старую задачу (она теперь completed)
-                    if (t.id === realId) {
-                        return { ...t, ...updatedOldMaster, tags: (t.tags || []) }
-                    }
-                    // Обновляем новую задачу (синхронизируем поля с сервера, ID уже совпадает)
-                    if (newMaster && t.id === newMaster.id) {
-                        return { ...newMaster, tags: (t.tags || []) }
-                    }
-                    return t
+        // Если nextDate нет (последний повтор?), просто завершаем
+        else {
+            // Fallback for non-recurring or last instance logic (simplified)
+            try {
+                await updateTask({
+                    taskId: realId,
+                    updates: {
+                        is_completed: true,
+                        completed_at: new Date().toISOString(),
+                        recurrence_rule: null
+                    },
+                    // Здесь можно оставить стандартное поведение или too atomic
                 })
-            }
-
-            safeUpdateCache('tasks', syncCache)
-            safeUpdateCache('all-tasks-v2', syncCache)
-
-        } catch (err) {
-            console.error('[useTaskCompletion] Failed to update old master:', err)
+            } catch (e) { console.error(e) }
         }
 
-    }, [createTask, updateTask, safeUpdateCache])
+    }, [createTask, updateTask, safeUpdateCache, queryClient])
 
     const toggleStatus = useCallback(async (task: Task, date?: string, occurrencesMap?: Record<string, string>) => {
         const actualDate = date

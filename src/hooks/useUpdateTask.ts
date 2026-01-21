@@ -7,6 +7,7 @@ type UpdateTaskParams = {
     taskId: string
     updates: Partial<Task>
     skipInvalidation?: boolean  // Пропустить invalidateQueries после операции
+    skipOptimisticUpdate?: boolean // Пропустить optimistic update (если делается вручную)
 }
 
 export function useUpdateTask() {
@@ -130,6 +131,8 @@ export function useUpdateTask() {
             return primaryTask as Task
         },
         onMutate: async (vars) => {
+            if (vars.skipOptimisticUpdate) return { previousQueries: [] }
+
             let { taskId, updates } = vars
 
             // Cancel outgoing refetches (we need to cancel generally since we might switch IDs)
