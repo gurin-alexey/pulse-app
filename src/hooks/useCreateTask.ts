@@ -18,6 +18,8 @@ type CreateTaskParams = {
     recurrence_rule?: string | null
     is_completed?: boolean
     completed_at?: string | null
+    skipInvalidation?: boolean  // Пропустить invalidateQueries после операции
+    skipOptimisticUpdate?: boolean // Пропустить optimistic update (если делается вручную)
 }
 
 const isToday = (dateStr: string | null) => {
@@ -61,6 +63,8 @@ export function useCreateTask() {
             return data as Task
         },
         onMutate: async (newTodo) => {
+            if (newTodo.skipOptimisticUpdate) return { previousQueries: [] }
+
             // Cancel outgoing refetches
             await queryClient.cancelQueries({ queryKey: ['tasks'] })
 
@@ -119,6 +123,9 @@ export function useCreateTask() {
             }
         },
         onSuccess: (_, variables) => {
+            // Пропускаем invalidation если запрошено (для batch операций)
+            if (variables.skipInvalidation) return
+
             // Invalidate to ensure consistency and fetching real ID/DB state
             queryClient.invalidateQueries({ queryKey: ['tasks'] })
             queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })

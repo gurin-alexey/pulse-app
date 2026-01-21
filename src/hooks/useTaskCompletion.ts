@@ -1,17 +1,18 @@
 import { useState, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTaskOccurrence } from './useTaskOccurrence'
 import { useUpdateTask } from './useUpdateTask'
 import { useCreateTask } from './useCreateTask'
 import { toast } from 'sonner'
 import { getNextOccurrenceDate, updateDTStartInRRule, getPastIncompleteInstances } from '@/utils/recurrence'
 import type { Task } from '@/types/database'
-import { useSearchParams } from 'react-router-dom'
+import type { TaskWithTags } from './useTasks'
 
 export function useTaskCompletion() {
-    const { removeOccurrence, setOccurrenceStatus, batchSetOccurrenceStatus } = useTaskOccurrence()
+    const queryClient = useQueryClient()
+    const { removeOccurrence, batchSetOccurrenceStatus } = useTaskOccurrence()
     const { mutateAsync: updateTask } = useUpdateTask()
     const { mutateAsync: createTask } = useCreateTask()
-    const [searchParams, setSearchParams] = useSearchParams()
 
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [pendingContext, setPendingContext] = useState<{
@@ -20,76 +21,71 @@ export function useTaskCompletion() {
     } | null>(null)
     const [pastInstances, setPastInstances] = useState<string[]>([])
 
+    // Helper for safe cache updates (supports both Array and Object with tasks prop)
+    const safeUpdateCache = useCallback((queryKeyString: string, updater: (tasks: any[]) => any[]) => {
+        const queries = queryClient.getQueriesData({ queryKey: [queryKeyString] })
+        queries.forEach(([key, oldData]) => {
+            if (!oldData) return
+
+            if (Array.isArray(oldData)) {
+                queryClient.setQueryData(key, updater(oldData))
+            } else if ((oldData as any).tasks && Array.isArray((oldData as any).tasks)) {
+                queryClient.setQueryData(key, { ...oldData, tasks: updater((oldData as any).tasks) })
+            }
+        })
+    }, [queryClient])
+
     const executeCompletion = useCallback(async (task: Task, date: string | undefined) => {
         const actualDate = date
         const isVirtual = !!date
         const realId = task.id.split('_recur_')[0] || task.id
 
-        // Новая логика: Advance via Mutation (Master moves forward, Clone stays back as completed)
+        // Логика "Complete & Fork": 
+        // 1. Текущий мастер завершается (recurrence_rule = null)
+        // 2. Создаётся НОВЫЙ мастер со следующего повторения
+
         // 1. Находим дату завершаемого экземпляра
         let currentOccurrenceDate: string
         let completionObj: Date
         if (isVirtual && actualDate) {
-            currentOccurrenceDate = actualDate
-            completionObj = new Date(actualDate + 'T00:00:00')
+            currentOccurrenceDate = actualDate.split('T')[0] // Только дата
+            completionObj = new Date(currentOccurrenceDate + 'T00:00:00')
             if (task.start_time) {
-                const timePart = task.start_time.split('T')[1] || '00:00:00'
-                completionObj = new Date(`${actualDate}T${timePart}`)
+                const timePart = task.start_time.split('T')[1]?.split('+')[0]?.split('Z')[0] || '00:00:00'
+                completionObj = new Date(`${currentOccurrenceDate}T${timePart}`)
             }
         } else {
-            currentOccurrenceDate = task.due_date || new Date().toISOString().split('T')[0]
-            // Fix: Use currentOccurrenceDate as the base for completionObj to avoid issues with stale start_time dates
+            // Извлекаем только часть даты (первые 10 символов) из due_date
+            const rawDueDate = task.due_date || new Date().toISOString()
+            currentOccurrenceDate = rawDueDate.includes('T')
+                ? rawDueDate.split('T')[0]
+                : rawDueDate.slice(0, 10)
+
             if (task.start_time) {
-                const timePart = task.start_time.split('T')[1] || '00:00:00'
+                const timePart = task.start_time.split('T')[1]?.split('+')[0]?.split('Z')[0] || '00:00:00'
                 completionObj = new Date(`${currentOccurrenceDate}T${timePart}`)
             } else {
                 completionObj = new Date(`${currentOccurrenceDate}T00:00:00`)
             }
         }
 
-        // 2. Рассчитываем следующую дату для МАСТЕРА
-        const nextDate = getNextOccurrenceDate(task, completionObj)
-
-        // 3. Создаем ВЫПОЛНЕННЫЙ КЛОН текущего вхождения
-        const newClone = await createTask({
-            title: task.title,
-            description: task.description,
-            priority: task.priority,
-            projectId: task.project_id,
-            userId: task.user_id,
-            parentId: task.parent_id,
-            due_date: currentOccurrenceDate,
-            start_time: (isVirtual && actualDate && task.start_time) ? `${actualDate}T${task.start_time.split('T')[1]}` : task.start_time,
-            end_time: (isVirtual && actualDate && task.end_time) ? `${actualDate}T${task.end_time.split('T')[1]}` : task.end_time,
-            recurrence_rule: null, // Клон не повторяется
-            is_completed: true,
-            completed_at: new Date().toISOString()
-        } as any)
-
-        // 4. Помечаем вхождение мастера как завершенное (скрываем его)
-        await setOccurrenceStatus({
-            taskId: realId,
-            date: currentOccurrenceDate,
-            status: 'completed'
-        })
-
-        toast.success("Задача выполнена")
-
-        // 5. Если текущая открытая задача в URL совпадает с этой - переключаем на клон
-        const currentTaskInUrl = searchParams.get('task')
-        const virtualId = `${realId}_recur_${actualDate}`
-        if (currentTaskInUrl === realId || currentTaskInUrl === virtualId) {
-            const newParams = new URLSearchParams(searchParams)
-            newParams.set('task', newClone.id)
-            newParams.delete('occurrence')
-            setSearchParams(newParams, { replace: true })
+        // Проверка валидности даты
+        if (isNaN(completionObj.getTime())) {
+            toast.error("Ошибка: невалидная дата")
+            return
         }
 
+        // 2. Рассчитываем следующую дату для НОВОЙ серии
+        // Используем конец текущего дня чтобы получить СЛЕДУЮЩЕЕ вхождение
+        const endOfCurrentDay = new Date(currentOccurrenceDate + 'T23:59:59')
+        const nextDate = getNextOccurrenceDate(task, endOfCurrentDay)
+
+        // 3. СНАЧАЛА создаём НОВЫЙ мастер (чтобы серия не исчезала)
+        let newMaster: Task | null = null
         if (nextDate) {
-            // 6. Продвигаем ОРИГИНАЛЬНОГО МАСТЕРА на будущее (сохраняя ID)
             const nextDateStr = nextDate.toISOString().split('T')[0]
-            let nextStartTime = null
-            let nextEndTime = null
+            let nextStartTime: string | null = null
+            let nextEndTime: string | null = null
 
             if (task.start_time) {
                 const timePart = task.start_time.split('T')[1]
@@ -105,29 +101,104 @@ export function useTaskCompletion() {
 
             const newRule = updateDTStartInRRule(task.recurrence_rule || '', nextDate)
 
-            await updateTask({
-                taskId: realId,
-                updates: {
+            // Генерируем ID чтобы кэш useCreateTask и реальный запрос совпали
+            // И чтобы мы могли использовать его в optimistic update
+            const tempId = crypto.randomUUID()
+
+            // === OPTIMISTIC UPDATE: Добавляем новую задачу в кэш СРАЗУ (для Календаря и Списка) ===
+            const optimisticNewMaster: TaskWithTags = {
+                ...task,
+                id: tempId,
+                due_date: nextDateStr,
+                start_time: nextStartTime,
+                end_time: nextEndTime,
+                recurrence_rule: newRule,
+                is_completed: false,
+                completed_at: null,
+                created_at: new Date().toISOString(),
+                // updated_at не существует в типе Task
+                deleted_at: null,
+                is_project: false,
+                subtasks_count: 0,
+                tags: (task as any).tags || []
+            }
+
+            // 1. Добавляем оптимистично
+            safeUpdateCache('tasks', (old) => [optimisticNewMaster, ...old])
+            safeUpdateCache('all-tasks-v2', (old) => [optimisticNewMaster, ...old])
+
+            try {
+                // skipInvalidation: true — не сбрасываем кэш, полагаемся на optimistic update и наш ручной фикс
+                newMaster = await createTask({
+                    id: tempId,
+                    title: task.title,
+                    description: task.description,
+                    priority: task.priority,
+                    projectId: task.project_id,
+                    userId: task.user_id,
+                    parentId: task.parent_id,
                     due_date: nextDateStr,
                     start_time: nextStartTime,
                     end_time: nextEndTime,
                     recurrence_rule: newRule,
-                    is_completed: false, // Мастер остается активным
-                    completed_at: null
-                }
-            })
-        } else {
-            // Если повторов больше нет, просто завершаем мастера
-            await updateTask({
+                    is_completed: false,
+                    skipInvalidation: true,
+                    skipOptimisticUpdate: true
+                })
+            } catch (err) {
+                console.error('[useTaskCompletion] Failed to create new master:', err)
+                toast.error("Ошибка создания следующего повторения")
+
+                // Rollback optimistic update
+                safeUpdateCache('tasks', (old) => old.filter(t => t.id !== tempId))
+                safeUpdateCache('all-tasks-v2', (old) => old.filter(t => t.id !== tempId))
+            }
+        }
+
+        // 4. ПОТОМ завершаем ТЕКУЩИЙ мастер (после создания нового)
+        try {
+            const updatedOldMaster = await updateTask({
                 taskId: realId,
                 updates: {
+                    due_date: currentOccurrenceDate,
+                    start_time: (isVirtual && actualDate && task.start_time)
+                        ? `${actualDate}T${task.start_time.split('T')[1]}`
+                        : task.start_time,
+                    end_time: (isVirtual && actualDate && task.end_time)
+                        ? `${actualDate}T${task.end_time.split('T')[1]}`
+                        : task.end_time,
+                    recurrence_rule: null,
                     is_completed: true,
-                    completed_at: new Date().toISOString(),
-                    recurrence_rule: null
-                }
+                    completed_at: new Date().toISOString()
+                },
+                skipInvalidation: true
             })
+
+            // 5. MANUAL CACHE UPDATE (Sync w/ Server)
+            // Обновляем данные реальными значениями с сервера (например, created_at, updated_at)
+
+            const syncCache = (list: any[]) => {
+                return list.map(t => {
+                    // Обновляем старую задачу (она теперь completed)
+                    if (t.id === realId) {
+                        return { ...t, ...updatedOldMaster, tags: (t.tags || []) }
+                    }
+                    // Обновляем новую задачу (синхронизируем поля с сервера, ID уже совпадает)
+                    if (newMaster && t.id === newMaster.id) {
+                        return { ...newMaster, tags: (t.tags || []) }
+                    }
+                    return t
+                })
+            }
+
+            safeUpdateCache('tasks', syncCache)
+            safeUpdateCache('all-tasks-v2', syncCache)
+
+        } catch (err) {
+            console.error('[useTaskCompletion] Failed to update old master:', err)
         }
-    }, [createTask, setOccurrenceStatus, searchParams, setSearchParams, updateTask])
+
+    }, [createTask, updateTask, safeUpdateCache])
 
     const toggleStatus = useCallback(async (task: Task, date?: string, occurrencesMap?: Record<string, string>) => {
         const actualDate = date
@@ -163,7 +234,8 @@ export function useTaskCompletion() {
 
                 // Проверка пропущенных повторов
                 // We pass the current instance's date as the reference date so we only look for instances strictly BEFORE this one.
-                const curDateStr = actualDate || task.due_date || new Date().toISOString().split('T')[0]
+                const rawDateStr = actualDate || task.due_date || new Date().toISOString()
+                const curDateStr = rawDateStr.includes('T') ? rawDateStr.split('T')[0] : rawDateStr.slice(0, 10)
                 const referenceObj = new Date(curDateStr + 'T00:00:00')
 
                 const past = getPastIncompleteInstances(task, map || {}, referenceObj)

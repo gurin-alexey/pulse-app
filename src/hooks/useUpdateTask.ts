@@ -6,6 +6,7 @@ import type { Task } from '@/types/database'
 type UpdateTaskParams = {
     taskId: string
     updates: Partial<Task>
+    skipInvalidation?: boolean  // Пропустить invalidateQueries после операции
 }
 
 export function useUpdateTask() {
@@ -376,11 +377,14 @@ export function useUpdateTask() {
             })
         },
         onSettled: (_data, _error, _vars, context) => {
+            // Пропускаем invalidation если запрошено (для batch операций)
+            if (_vars.skipInvalidation) return
+
             const idToInvalidate = context?.effectiveTaskId || _vars.taskId
 
             queryClient.invalidateQueries({ queryKey: ['task', idToInvalidate] })
-            queryClient.invalidateQueries({ queryKey: ['tasks'] }) // Invalidate all lists to be safe
-            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] }) // Invalidate calendar view
+            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['all-tasks-v2'] })
             queryClient.invalidateQueries({ queryKey: ['subtasks'] })
             queryClient.invalidateQueries({ queryKey: ['task-history', idToInvalidate] })
         },
