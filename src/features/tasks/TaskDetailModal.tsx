@@ -11,10 +11,14 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
     const isMobile = useMediaQuery("(max-width: 768px)")
     const [isOpen, setIsOpen] = React.useState(true)
 
+    // Track if drawer was fully expanded to enable direct close on swipe down
+    const wasFullyExpandedRef = React.useRef(false)
+
     const handleOpenChange = (open: boolean) => {
         setIsOpen(open)
         if (!open) {
-            // Reset snap points for next time
+            // Reset state for next open
+            wasFullyExpandedRef.current = false
             setSnapPoints([0.55, 1])
             setSnap(0.55)
 
@@ -35,8 +39,13 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
 
     // Effect to remove 0.55 when fully expanded
     React.useEffect(() => {
-        if (snap === 1) {
-            setSnapPoints([1])
+        if (snap === 1 && !wasFullyExpandedRef.current) {
+            wasFullyExpandedRef.current = true
+            // Small delay to ensure the snap animation completes before changing points
+            const timer = setTimeout(() => {
+                setSnapPoints([1])
+            }, 100)
+            return () => clearTimeout(timer)
         }
     }, [snap])
 
@@ -93,6 +102,8 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
             activeSnapPoint={snap}
             setActiveSnapPoint={setSnap}
             fadeFromIndex={0}
+            closeThreshold={0.2}
+            scrollLockTimeout={100}
         >
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" />
@@ -106,10 +117,19 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
                         }
                     }}
                 >
-                    {/* Drag Handle */}
-                    <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-300 mt-4 mb-2" />
+                    {/* Drag Handle - larger area for easier grabbing */}
+                    <div
+                        className="w-full flex justify-center py-3 cursor-grab active:cursor-grabbing"
+                        style={{ touchAction: 'none' }}
+                    >
+                        <div className="w-12 h-1.5 rounded-full bg-gray-300" />
+                    </div>
 
-                    <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
+                    {/* Content area */}
+                    <div
+                        className="flex-1 overflow-y-auto"
+                        style={{ overscrollBehavior: 'contain' }}
+                    >
                         <TaskDetail key={taskId} taskId={taskId} />
                     </div>
                 </Drawer.Content>
