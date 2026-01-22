@@ -99,6 +99,17 @@ const MenuItem: React.FC<{ item: ContextMenuItem; onClose: () => void; depth: nu
 export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, items }) => {
     const menuRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState({ x, y });
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Do not render on mobile
+    if (isMobile) return null;
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
