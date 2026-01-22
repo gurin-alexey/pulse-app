@@ -11,43 +11,15 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
     const isMobile = useMediaQuery("(max-width: 768px)")
     const [isOpen, setIsOpen] = React.useState(true)
 
-    // Track if drawer was fully expanded to enable direct close on swipe down
-    const wasFullyExpandedRef = React.useRef(false)
-
     const handleOpenChange = (open: boolean) => {
         setIsOpen(open)
         if (!open) {
-            // Reset state for next open
-            wasFullyExpandedRef.current = false
-            setSnapPoints([0.55, 1])
-            setSnap(0.55)
-
             // Wait for animation to finish before unmounting (calling onClose)
             setTimeout(() => {
                 onClose()
             }, 300)
         }
     }
-
-    // Controlled snap state
-    const [snap, setSnap] = React.useState<number | string | null>(0.55)
-
-    // Dynamic snap points:
-    // Initial: [0.55, 1]
-    // Once expanded to 1, we remove 0.55 so swiping down closes immediately.
-    const [snapPoints, setSnapPoints] = React.useState<(number | string)[]>([0.55, 1])
-
-    // Effect to remove 0.55 when fully expanded
-    React.useEffect(() => {
-        if (snap === 1 && !wasFullyExpandedRef.current) {
-            wasFullyExpandedRef.current = true
-            // Small delay to ensure the snap animation completes before changing points
-            const timer = setTimeout(() => {
-                setSnapPoints([1])
-            }, 100)
-            return () => clearTimeout(timer)
-        }
-    }, [snap])
 
     const [searchParams] = useSearchParams()
     const isNew = searchParams.get('isNew') === 'true'
@@ -93,33 +65,21 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
         )
     }
 
-    // Mobile: Vaul Drawer
+    // Mobile: Simple full-screen drawer without snap points
     return (
         <Drawer.Root
             open={isOpen}
             onOpenChange={handleOpenChange}
-            snapPoints={snapPoints}
-            activeSnapPoint={snap}
-            setActiveSnapPoint={setSnap}
-            fadeFromIndex={0}
-            closeThreshold={0.2}
-            scrollLockTimeout={100}
+            closeThreshold={0.1}
         >
             <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50" />
+                <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[70]" />
                 <Drawer.Content
-                    className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 h-[96dvh] z-50 focus:outline-none"
-                    onFocusCapture={(e) => {
-                        // When input is focused (keyboard opens), expand to full screen
-                        // Check if it's an input or textarea
-                        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-                            setSnap(1)
-                        }
-                    }}
+                    className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 h-[100dvh] z-[70] focus:outline-none"
                 >
-                    {/* Drag Handle - larger area for easier grabbing */}
+                    {/* Drag Handle */}
                     <div
-                        className="w-full flex justify-center py-3 cursor-grab active:cursor-grabbing"
+                        className="w-full flex justify-center py-4 cursor-grab active:cursor-grabbing"
                         style={{ touchAction: 'none' }}
                     >
                         <div className="w-12 h-1.5 rounded-full bg-gray-300" />
@@ -137,3 +97,4 @@ export function TaskDetailModal({ taskId, onClose }: { taskId: string, onClose: 
         </Drawer.Root>
     )
 }
+

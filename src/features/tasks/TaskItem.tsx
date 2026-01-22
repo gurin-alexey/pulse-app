@@ -3,14 +3,15 @@ import { useState, useEffect, useRef, memo } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useDeleteTask } from "@/hooks/useDeleteTask"
-import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight, Repeat, SkipForward, Maximize2 } from "lucide-react"
-import { useTagMutations } from '@/features/tags'
+import { CheckSquare, Square, GripVertical, Calendar, ChevronRight, Tag as TagIcon, Trash2, MoreHorizontal, FolderInput, List, ArrowRight, Repeat, SkipForward, Maximize2, Unlink, Check, Plus } from "lucide-react"
+import { useTagMutations, useTags } from '@/features/tags'
 import { useSettings } from '@/store/useSettings'
 import clsx from "clsx"
 import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion"
 import { addDays, nextMonday, format, startOfToday, differenceInCalendarDays } from "date-fns"
 import { ru } from 'date-fns/locale'
 import { toast } from "sonner"
+import { Drawer } from "vaul"
 
 
 
@@ -91,6 +92,10 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
         onSuccess: () => setShowDeleteRecurrenceModal(false)
     })
 
+    // Tags
+    const { data: allTags } = useTags()
+    const [showTagPicker, setShowTagPicker] = useState(false)
+
     // Local state for inline editing
     const [title, setTitle] = useState(task.title)
     const [isEditing, setIsEditing] = useState(false)
@@ -114,8 +119,8 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
             await controls.start({ x: -180, transition: { type: "spring", stiffness: 300, damping: 30 } })
             setIsOpen(true)
         } else if (offset > 50 || (offset > 10 && velocity > 200)) {
-            // Swiped Right -> Reveal Project/List Options
-            await controls.start({ x: 120, transition: { type: "spring", stiffness: 300, damping: 30 } })
+            // Swiped Right -> Reveal Project/Detach, Tags, Delete
+            await controls.start({ x: 180, transition: { type: "spring", stiffness: 300, damping: 30 } })
             setIsOpen(true)
         } else {
             // Reset
@@ -341,12 +346,33 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
         window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
     }
 
-    // Placeholder for "Add to List" - for now behaves like Project or we can add specific logic later
-    const addToList = (e: any) => {
+    // Detach subtask from parent (make it independent)
+    const detachFromParent = (e: any) => {
         e.stopPropagation()
         resetSwipe()
-        // Re-use same search for now as lists/projects are often similar or same entity in some structures
-        window.dispatchEvent(new CustomEvent('open-move-task-search', { detail: task.id }))
+        if (task.parent_id) {
+            updateTask({ taskId: realTaskId, updates: { parent_id: null } })
+            if (showToasts) toast.success('Задача откреплена')
+        }
+    }
+
+    // Open tag picker modal
+    const openTagPicker = (e: any) => {
+        e.stopPropagation()
+        resetSwipe()
+        setShowTagPicker(true)
+    }
+
+    // Delete task via swipe
+    const swipeDelete = (e: any) => {
+        e.stopPropagation()
+        resetSwipe()
+        if (task.recurrence_rule) {
+            setShowDeleteRecurrenceModal(true)
+        } else {
+            deleteTask(realTaskId)
+            if (showToasts) toast.success('Задача удалена')
+        }
     }
 
     const setDate = (e: any, type: 'today' | 'tomorrow' | 'monday') => {
@@ -428,9 +454,9 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
     })
 
     const containerClasses = clsx(
-        "relative flex items-center gap-2 px-2 transition-colors w-full select-none box-border border border-transparent z-10",
+        "relative flex items-center gap-2 px-2 transition-colors w-full select-none box-border border border-transparent z-10 bg-white",
         isMobile ? "min-h-[48px] py-2" : "h-9", // Mobile: taller touch target | Desktop: compact
-        isActive ? "bg-gray-100 placeholder:bg-gray-100" : "hover:bg-gray-100/60",
+        isActive ? "bg-gray-100" : "hover:bg-gray-50",
         task.is_completed && "opacity-80",
         isDraggingOverlay && "shadow-none border-none bg-white"
     )
@@ -449,30 +475,49 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
 
                 {/* --- BACKGROUND ACTIONS --- */}
 
-                {/* LEFT Actions (Visible when swiping RIGHT) -> Move To... */}
-                <motion.div
-                    style={{ opacity: leftActionOpacity }}
-                    className="absolute inset-y-0 left-0 w-[120px] flex"
+                {/* LEFT Actions (Visible when swiping RIGHT) -> Project/Detach, Tags, Delete */}
+                <div
+                    className="absolute inset-y-0 left-0 w-[180px] flex"
                 >
+                    {/* Project / Detach button */}
+                    {task.parent_id ? (
+                        <button
+                            onClick={detachFromParent}
+                            className="flex-1 bg-blue-500 flex flex-col items-center justify-center text-white gap-0.5 active:bg-blue-600"
+                        >
+                            <Unlink size={14} />
+                            <span className="text-[9px] font-bold">Открепить</span>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={addToProject}
+                            className="flex-1 bg-blue-500 flex flex-col items-center justify-center text-white gap-0.5 active:bg-blue-600"
+                        >
+                            <FolderInput size={14} />
+                            <span className="text-[9px] font-bold">Проект</span>
+                        </button>
+                    )}
+                    {/* Tags button */}
                     <button
-                        onClick={addToProject}
-                        className="flex-1 bg-blue-500 flex flex-col items-center justify-center text-white gap-0.5 active:bg-blue-600"
-                    >
-                        <FolderInput size={14} />
-                        <span className="text-[9px] font-bold">Проект</span>
-                    </button>
-                    <button
-                        onClick={addToList}
+                        onClick={openTagPicker}
                         className="flex-1 bg-indigo-500 flex flex-col items-center justify-center text-white gap-0.5 border-l border-white/20 active:bg-indigo-600"
                     >
-                        <List size={14} />
-                        <span className="text-[9px] font-bold">Список</span>
+                        <TagIcon size={14} />
+                        <span className="text-[9px] font-bold">Теги</span>
                     </button>
-                </motion.div>
+                    {/* Delete button */}
+                    <button
+                        onClick={swipeDelete}
+                        className="flex-1 bg-red-500 flex flex-col items-center justify-center text-white gap-0.5 border-l border-white/20 active:bg-red-600"
+                    >
+                        <Trash2 size={14} />
+                        <span className="text-[9px] font-bold">Удалить</span>
+                    </button>
+                </div>
+
 
                 {/* RIGHT Actions (Visible when swiping LEFT) -> Date... */}
-                <motion.div
-                    style={{ opacity: rightActionOpacity }}
+                <div
                     className="absolute inset-y-0 right-0 w-[180px] flex"
                 >
                     <button
@@ -496,13 +541,13 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
                         <Calendar size={14} />
                         <span className="text-[9px] font-bold">ПН</span>
                     </button>
-                </motion.div>
+                </div>
 
                 {/* --- FOREGROUND CONTENT (SWIPEABLE) --- */}
                 <motion.div
                     drag={isMobile ? "x" : false} // Only swipe on mobile
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.05} // Stiffer drag to prevent wobbling
+                    dragElastic={0.8} // High elasticity = immediate response
+                    dragMomentum={false} // Prevent momentum-based sliding
                     onDragStart={() => setIsOpen(true)}
                     onDragEnd={handleDragEnd}
                     animate={controls}
@@ -724,6 +769,208 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
                 onConfirm={handleConfirmPast}
                 pastInstances={pastInstances}
             />
+
+            {/* Tag Picker Modal */}
+            <Drawer.Root
+                open={showTagPicker}
+                onOpenChange={setShowTagPicker}
+            >
+                <Drawer.Portal>
+                    <Drawer.Overlay className="fixed inset-0 bg-black/40 z-[80]" />
+                    <Drawer.Content className="bg-white flex flex-col rounded-t-[10px] fixed bottom-0 left-0 right-0 h-[85vh] z-[80] focus:outline-none">
+                        {/* Handle */}
+                        <div className="w-full flex justify-center py-3">
+                            <div className="w-12 h-1.5 rounded-full bg-gray-300" />
+                        </div>
+
+                        {/* Title */}
+                        <div className="px-4 pb-3 border-b border-gray-100">
+                            <h3 className="text-lg font-semibold text-gray-800">Теги</h3>
+                            <p className="text-xs text-gray-500 mt-0.5 truncate">{task.title}</p>
+                        </div>
+
+                        {/* Tags List grouped by category */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                            {/* Place tags */}
+                            {(() => {
+                                const placeTags = allTags?.filter(t => t.category === 'place') || []
+                                if (placeTags.length === 0) return null
+                                return (
+                                    <div>
+                                        <h4 className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                            <span>📍</span> Место
+                                        </h4>
+                                        <div className="space-y-1.5">
+                                            {placeTags.map(tag => {
+                                                const isAttached = task.tags?.some(t => t.id === tag.id)
+                                                return (
+                                                    <button
+                                                        key={tag.id}
+                                                        onClick={() => toggleTag.mutate({ taskId: realTaskId, tagId: tag.id, isAttached: !!isAttached })}
+                                                        className={clsx(
+                                                            "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all",
+                                                            isAttached ? "bg-red-50 border border-red-200" : "bg-gray-50 border border-gray-100"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                                                            <span className={clsx("font-medium", isAttached ? "text-red-700" : "text-gray-700")}>{tag.name}</span>
+                                                        </div>
+                                                        {isAttached && <Check size={18} className="text-red-600" />}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })()}
+
+                            {/* Energy tags */}
+                            {(() => {
+                                const energyTags = allTags?.filter(t => t.category === 'energy') || []
+                                if (energyTags.length === 0) return null
+                                return (
+                                    <div>
+                                        <h4 className="text-xs font-semibold text-yellow-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                            <span>⚡</span> Энергия
+                                        </h4>
+                                        <div className="space-y-1.5">
+                                            {energyTags.map(tag => {
+                                                const isAttached = task.tags?.some(t => t.id === tag.id)
+                                                return (
+                                                    <button
+                                                        key={tag.id}
+                                                        onClick={() => toggleTag.mutate({ taskId: realTaskId, tagId: tag.id, isAttached: !!isAttached })}
+                                                        className={clsx(
+                                                            "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all",
+                                                            isAttached ? "bg-yellow-50 border border-yellow-200" : "bg-gray-50 border border-gray-100"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                                                            <span className={clsx("font-medium", isAttached ? "text-yellow-700" : "text-gray-700")}>{tag.name}</span>
+                                                        </div>
+                                                        {isAttached && <Check size={18} className="text-yellow-600" />}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })()}
+
+                            {/* Time tags */}
+                            {(() => {
+                                const timeTags = allTags?.filter(t => t.category === 'time') || []
+                                if (timeTags.length === 0) return null
+                                return (
+                                    <div>
+                                        <h4 className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                            <span>🕐</span> Время
+                                        </h4>
+                                        <div className="space-y-1.5">
+                                            {timeTags.map(tag => {
+                                                const isAttached = task.tags?.some(t => t.id === tag.id)
+                                                return (
+                                                    <button
+                                                        key={tag.id}
+                                                        onClick={() => toggleTag.mutate({ taskId: realTaskId, tagId: tag.id, isAttached: !!isAttached })}
+                                                        className={clsx(
+                                                            "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all",
+                                                            isAttached ? "bg-blue-50 border border-blue-200" : "bg-gray-50 border border-gray-100"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                                                            <span className={clsx("font-medium", isAttached ? "text-blue-700" : "text-gray-700")}>{tag.name}</span>
+                                                        </div>
+                                                        {isAttached && <Check size={18} className="text-blue-600" />}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })()}
+
+                            {/* People tags */}
+                            {(() => {
+                                const peopleTags = allTags?.filter(t => t.category === 'people') || []
+                                if (peopleTags.length === 0) return null
+                                return (
+                                    <div>
+                                        <h4 className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                            <span>👥</span> Люди
+                                        </h4>
+                                        <div className="space-y-1.5">
+                                            {peopleTags.map(tag => {
+                                                const isAttached = task.tags?.some(t => t.id === tag.id)
+                                                return (
+                                                    <button
+                                                        key={tag.id}
+                                                        onClick={() => toggleTag.mutate({ taskId: realTaskId, tagId: tag.id, isAttached: !!isAttached })}
+                                                        className={clsx(
+                                                            "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all",
+                                                            isAttached ? "bg-purple-50 border border-purple-200" : "bg-gray-50 border border-gray-100"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                                                            <span className={clsx("font-medium", isAttached ? "text-purple-700" : "text-gray-700")}>{tag.name}</span>
+                                                        </div>
+                                                        {isAttached && <Check size={18} className="text-purple-600" />}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })()}
+
+                            {/* Other/Uncategorized tags */}
+                            {(() => {
+                                const otherTags = allTags?.filter(t => !t.category || !['place', 'energy', 'time', 'people'].includes(t.category)) || []
+                                if (otherTags.length === 0) return null
+                                return (
+                                    <div>
+                                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                            <span>#</span> Другие
+                                        </h4>
+                                        <div className="space-y-1.5">
+                                            {otherTags.map(tag => {
+                                                const isAttached = task.tags?.some(t => t.id === tag.id)
+                                                return (
+                                                    <button
+                                                        key={tag.id}
+                                                        onClick={() => toggleTag.mutate({ taskId: realTaskId, tagId: tag.id, isAttached: !!isAttached })}
+                                                        className={clsx(
+                                                            "w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all",
+                                                            isAttached ? "bg-gray-100 border border-gray-300" : "bg-gray-50 border border-gray-100"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                                                            <span className={clsx("font-medium", isAttached ? "text-gray-800" : "text-gray-700")}>{tag.name}</span>
+                                                        </div>
+                                                        {isAttached && <Check size={18} className="text-gray-600" />}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })()}
+
+                            {(!allTags || allTags.length === 0) && (
+                                <div className="text-center py-8 text-gray-400">
+                                    <TagIcon size={32} className="mx-auto mb-2 opacity-50" />
+                                    <p>Нет тегов</p>
+                                </div>
+                            )}
+                        </div>
+                    </Drawer.Content>
+                </Drawer.Portal>
+            </Drawer.Root>
         </motion.div>
     )
 })
