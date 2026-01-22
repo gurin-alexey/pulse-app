@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 
 import { useParams, useSearchParams } from "react-router-dom"
 import { useTasks } from "@/hooks/useTasks"
@@ -836,33 +836,46 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
         })
     }
 
+    // Stable Callbacks for TaskItem
+    const handleToggleCollapse = React.useCallback((taskId: string) => {
+        setCollapsedTaskIds(prev => ({ ...prev, [taskId]: !prev[taskId] }))
+    }, [])
+
+    const handleIndentWrapper = React.useCallback((taskId: string) => {
+        const t = activeTasks.find(t => t.id === taskId)
+        if (t) handleSwipeIndent(t)
+    }, [activeTasks])
+
+    const handleOutdentWrapper = React.useCallback((taskId: string) => {
+        const t = activeTasks.find(t => t.id === taskId)
+        if (t) handleSwipeOutdent(t)
+    }, [activeTasks])
+
     // Helper to render a single task item
     const renderTaskItem = (task: any, index?: number) => {
-        const hasChildren = activeTasks.some(t => t.parent_id === task.id)
-        const isDraggingThis = activeDragItem?.id === task.id
-        const effectiveDepth = isDraggingThis && currentDragDepth !== null ? currentDragDepth : task.depth
+        const isCollapsed = collapsedTaskIds[task.id] || false
 
-        // Use a composite key if index is provided (for duplicates in Groups view), otherwise standard ID
-        const uniqueKey = index !== undefined ? `${task.id}-${index}` : task.id
+        // Check if visible
+        // If parent is collapsed, this function shouldn't even be called by the recursion, 
+        // but for safety or direct list rendering:
 
         return (
-            <SortableTaskItem key={uniqueKey} task={task} depth={effectiveDepth} disabled={sortBy !== 'manual'}>
+            <SortableTaskItem key={task.id} task={task} depth={task.depth} disabled={isMutatingRef.current}>
                 {({ listeners, attributes }) => (
                     <TaskItem
                         task={task}
                         isActive={activeTaskId === task.id}
-                        depth={task.depth} // Keep original depth for content (which is hidden during drag anyway)
+                        depth={task.depth}
                         listeners={listeners}
                         attributes={attributes}
-                        isDraggingOverlay={false}
-                        isMobile={isMobile}
-                        hasChildren={hasChildren}
-                        isCollapsed={!!collapsedTaskIds[task.id]}
-                        onToggleCollapse={() => setCollapsedTaskIds(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
-                        onIndent={() => handleSwipeIndent(task)}
-                        onOutdent={() => handleSwipeOutdent(task)}
+                        hasChildren={activeTasks.some(t => t.parent_id === task.id)}
+                        isCollapsed={isCollapsed}
+                        onToggleCollapse={handleToggleCollapse}
+                        onIndent={handleIndentWrapper}
+                        onOutdent={handleOutdentWrapper}
                         viewMode={mode || 'project'}
                         occurrencesMap={formattedOccurrencesMap}
+                        isMobile={isMobile}
                     />
                 )}
             </SortableTaskItem>

@@ -38,10 +38,10 @@ interface TaskItemProps {
     attributes?: DraggableAttributes
     hasChildren?: boolean
     isCollapsed?: boolean
-    onToggleCollapse?: () => void
+    onToggleCollapse?: (taskId: string) => void // Changed signature
     disableAnimation?: boolean
-    onIndent?: () => void
-    onOutdent?: () => void
+    onIndent?: (taskId: string) => void // Changed signature
+    onOutdent?: (taskId: string) => void // Changed signature
     viewMode?: 'today' | 'tomorrow' | 'inbox' | 'project' | 'all'
     disableStrikethrough?: boolean
     occurrencesMap?: Record<string, string>
@@ -428,7 +428,8 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
     })
 
     const containerClasses = clsx(
-        "relative flex items-center gap-2 px-2 h-9 bg-white transition-colors w-full select-none box-border border border-transparent z-10",
+        "relative flex items-center gap-2 px-2 transition-colors w-full select-none box-border border border-transparent z-10",
+        isMobile ? "min-h-[48px] py-2" : "h-9", // Mobile: taller touch target | Desktop: compact
         isActive ? "bg-gray-100 placeholder:bg-gray-100" : "hover:bg-gray-100/60",
         task.is_completed && "opacity-80",
         isDraggingOverlay && "shadow-none border-none bg-white"
@@ -654,7 +655,6 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
                             })()}
                         </div>
 
-                        {/* Chevron */}
                         <div
                             className={clsx(
                                 "w-6 h-6 flex items-center justify-center cursor-pointer transition-transform hover:bg-gray-200 rounded shrink-0",
@@ -664,11 +664,11 @@ export const TaskItem = memo(function TaskItem({ task, isActive, depth = 0, list
                             onClick={(e) => {
                                 if (hasChildren && onToggleCollapse) {
                                     e.stopPropagation()
-                                    onToggleCollapse()
+                                    onToggleCollapse(task.id)
                                 }
                             }}
                         >
-                            <ChevronRight size={16} className="text-gray-400" />
+                            <ChevronRight size={16} className={clsx("text-gray-400", isMobile && "w-5 h-5")} />
                         </div>
 
                         {/* Open Button for Subtasks */}

@@ -1,8 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { TaskWithTags } from './useTasks'
 
 export function useTask(taskId: string | null) {
+    const queryClient = useQueryClient()
+
     return useQuery({
         queryKey: ['task', taskId],
         queryFn: async () => {
@@ -24,6 +26,21 @@ export function useTask(taskId: string | null) {
 
             return taskWithTags
         },
-        enabled: !!taskId
+        enabled: !!taskId,
+        initialData: () => {
+            if (!taskId) return undefined
+
+            // Try to find the task in existing list queries
+            const queries = queryClient.getQueriesData<TaskWithTags[]>({ queryKey: ['tasks'] })
+
+            for (const [_, tasks] of queries) {
+                const foundTask = tasks?.find(t => t.id === taskId)
+                if (foundTask) {
+                    return foundTask
+                }
+            }
+
+            return undefined
+        }
     })
 }
