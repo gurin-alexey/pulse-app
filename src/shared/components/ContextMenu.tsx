@@ -108,9 +108,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, items }
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // Do not render on mobile
-    if (isMobile) return null;
-
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -151,6 +148,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, items }
             setPosition({ x: newX, y: newY });
         }
     }, [x, y]);
+
+    // Do not render on mobile (moved to end to respect hook rules)
+    if (isMobile) return null;
 
     return createPortal(
         <AnimatePresence>
