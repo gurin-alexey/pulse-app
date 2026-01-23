@@ -3,6 +3,8 @@ import { useUpdateTask } from "@/hooks/useUpdateTask"
 import { useSettings } from "@/store/useSettings"
 import { useCreateTask } from "@/hooks/useCreateTask"
 import { useTaskOccurrence } from "@/hooks/useTaskOccurrence"
+import { useCalendarContextMenu } from "@/hooks/useCalendarContextMenu"
+import { useDeleteRecurrence } from "@/hooks/useDeleteRecurrence"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
@@ -12,12 +14,14 @@ import listPlugin from "@fullcalendar/list"
 import ruLocale from '@fullcalendar/core/locales/ru'
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom"
 import { Loader2, Settings, ChevronLeft, ChevronRight, Calendar as CalendarIcon, ArrowLeft, ArrowRight, Check } from "lucide-react"
-import type { DateSelectArg } from "@fullcalendar/core"
+import type { DateSelectArg, EventMountArg } from "@fullcalendar/core"
 import { supabase } from "@/lib/supabase"
-import { useState, useEffect, useRef, Fragment, useMemo } from "react"
+import { useState, useEffect, useRef, Fragment, useMemo, useCallback } from "react"
 import { buildCalendarEvents, renderCalendarEventContent } from "@/features/calendar/calendarEvents"
 import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
+import { DeleteRecurrenceModal } from "@/components/ui/date-picker/DeleteRecurrenceModal"
+import { ContextMenu } from "@/shared/components/ContextMenu"
 import { Menu, Transition } from "@headlessui/react"
 import { createPortal } from "react-dom"
 import { format } from "date-fns"
@@ -81,6 +85,19 @@ export function CalendarPage() {
         allowedModes?: ('single' | 'following' | 'all')[];
     }>({ isOpen: false, info: null })
 
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        task: any;
+    } | null>(null)
+
+    // Delete Recurrence Modal State (for context menu)
+    const [deleteRecurrenceModal, setDeleteRecurrenceModal] = useState<{
+        isOpen: boolean;
+        task: any;
+    }>({ isOpen: false, task: null })
+
     const [showCompleted, setShowCompleted] = useState(false)
 
     useEffect(() => {
@@ -117,44 +134,25 @@ export function CalendarPage() {
         const calendarApi = selectInfo.view.calendar
         calendarApi.unselect()
 
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        const newId = crypto.randomUUID()
+        const params: Record<string, string> = { task: newId, isNew: 'true' }
 
-        const isAllDay = selectInfo.allDay
-        let updates: any = {
-            title: 'New Task',
-            projectId: null,
-            userId: user.id
-        }
-
-        if (isAllDay) {
+        if (selectInfo.allDay) {
             const d = selectInfo.start
             const year = d.getFullYear()
             const month = String(d.getMonth() + 1).padStart(2, '0')
             const day = String(d.getDate()).padStart(2, '0')
-            updates.due_date = `${year}-${month}-${day}`
+            params.calendarDate = `${year}-${month}-${day}`
         } else {
-            updates.start_time = selectInfo.startStr
-            updates.end_time = selectInfo.endStr
-            updates.due_date = selectInfo.startStr.split('T')[0]
+            params.calendarStart = selectInfo.startStr
+            params.calendarEnd = selectInfo.endStr
         }
 
-        const newId = crypto.randomUUID()
-        setSearchParams({ task: newId, isNew: 'true' })
-
-        createTask({ id: newId, ...updates, title: '' })
-    }
-
-    if (isLoading && !tasks) {
-        return (
-            <div className="h-full flex items-center justify-center text-gray-400">
-                <Loader2 className="animate-spin mr-2" />
-                Loading calendar...
-            </div>
-        )
+        setSearchParams(params)
     }
 
     const events = useMemo(() => {
+        if (!tasks) return []
         const rangeStart = new Date(currentDate)
         rangeStart.setMonth(rangeStart.getMonth() - 2)
         const rangeEnd = new Date(currentDate)
@@ -168,6 +166,73 @@ export function CalendarPage() {
             showCompleted
         })
     }, [tasks, occurrencesMap, currentDate, showCompleted])
+
+    // Context Menu Hook - must be before early return
+    const contextMenuItems = useCalendarContextMenu({
+        task: contextMenu?.task || null,
+        onClose: () => setContextMenu(null),
+        onDeleteRecurring: () => {
+            if (contextMenu?.task) {
+                setDeleteRecurrenceModal({ isOpen: true, task: contextMenu.task })
+            }
+            setContextMenu(null)
+        }
+    })
+
+    // Delete Recurrence Hook - must be before early return
+    const { handleDeleteInstance, handleDeleteFuture, handleDeleteAll } = useDeleteRecurrence({
+        task: deleteRecurrenceModal.task,
+        taskId: deleteRecurrenceModal.task?.id?.includes('_recur_')
+            ? deleteRecurrenceModal.task.id.split('_recur_')[0]
+            : deleteRecurrenceModal.task?.id,
+        occurrenceDate: deleteRecurrenceModal.task?.occurrence_date || deleteRecurrenceModal.task?.due_date?.split('T')[0],
+        onSuccess: () => setDeleteRecurrenceModal({ isOpen: false, task: null })
+    })
+
+    // Event Did Mount - add context menu handler - must be before early return
+    const handleEventDidMount = useCallback((arg: EventMountArg) => {
+        const eventEl = arg.el
+
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault()
+            e.stopPropagation()
+
+            const event = arg.event
+            const originalId = event.extendedProps.originalId || event.id
+            const originalTask = tasks?.find(t => t.id === originalId)
+
+            if (!originalTask) return
+
+            // Create task object with occurrence info
+            const taskForMenu = {
+                ...originalTask,
+                id: event.id, // May include _recur_ suffix
+                occurrence_date: event.extendedProps.occurrenceDate
+            }
+
+            setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                task: taskForMenu
+            })
+        }
+
+        eventEl.addEventListener('contextmenu', handleContextMenu)
+
+        // Cleanup
+        return () => {
+            eventEl.removeEventListener('contextmenu', handleContextMenu)
+        }
+    }, [tasks])
+
+    if (isLoading && !tasks) {
+        return (
+            <div className="h-full flex items-center justify-center text-gray-400">
+                <Loader2 className="animate-spin mr-2" />
+                Loading calendar...
+            </div>
+        )
+    }
 
     const isTimedEvent = (event: any) => {
         const startStr = event?.startStr
@@ -708,6 +773,7 @@ export function CalendarPage() {
                     eventDrop={handleEventDrop}
                     eventResize={handleEventResize}
                     eventClick={handleEventClickWrapper}
+                    eventDidMount={handleEventDidMount}
                     nowIndicator={true}
                     allDayText="Весь день"
                     slotMinTime={hideNightTime ? "07:00:00" : "00:00:00"}
@@ -726,6 +792,28 @@ export function CalendarPage() {
                     }}
                 />
             </motion.div>
+
+            {/* Context Menu */}
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    items={contextMenuItems}
+                />
+            )}
+
+            {/* Delete Recurrence Modal */}
+            <DeleteRecurrenceModal
+                isOpen={deleteRecurrenceModal.isOpen}
+                onClose={() => setDeleteRecurrenceModal({ isOpen: false, task: null })}
+                onDeleteInstance={handleDeleteInstance}
+                onDeleteFuture={handleDeleteFuture}
+                onDeleteAll={handleDeleteAll}
+                isFirstInstance={
+                    deleteRecurrenceModal.task?.occurrence_date === deleteRecurrenceModal.task?.due_date?.split('T')[0]
+                }
+            />
         </div>
     )
 }

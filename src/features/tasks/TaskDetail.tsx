@@ -178,8 +178,30 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
 
         isCreatingRef.current = true
         hasCreatedRef.current = true
-        const dueDate = getDefaultDueDate()
         const projectId = routeProjectId || null
+        const sectionId = searchParams.get('section') || null
+
+        // Check for calendar parameters
+        const calendarDate = searchParams.get('calendarDate')
+        const calendarStart = searchParams.get('calendarStart')
+        const calendarEnd = searchParams.get('calendarEnd')
+
+        let dueDate: string | null = null
+        let startTime: string | null = null
+        let endTime: string | null = null
+
+        if (calendarStart && calendarEnd) {
+            // Timed event from calendar
+            startTime = calendarStart
+            endTime = calendarEnd
+            dueDate = calendarStart.split('T')[0]
+        } else if (calendarDate) {
+            // All-day event from calendar
+            dueDate = calendarDate
+        } else {
+            // Default based on current page
+            dueDate = getDefaultDueDate()
+        }
 
         createTask(
             {
@@ -188,7 +210,10 @@ export function TaskDetail({ taskId, occurrenceDate: occurrenceDateProp }: TaskD
                 description: descriptionRef.current.trim() || null,
                 userId: user.id,
                 projectId,
-                due_date: dueDate
+                sectionId,
+                due_date: dueDate,
+                start_time: startTime,
+                end_time: endTime
             },
             {
                 onSuccess: () => {

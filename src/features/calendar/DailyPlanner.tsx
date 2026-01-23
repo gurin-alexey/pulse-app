@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, useRef, useMemo } from 'react'
+import { useState, useEffect, Fragment, useRef, useMemo, useCallback } from 'react'
 import { Menu, Transition } from '@headlessui/react'
 import { subMonths, addMonths } from 'date-fns'
 import ruLocale from '@fullcalendar/core/locales/ru'
@@ -7,16 +7,20 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { Loader2, ArrowLeft, Settings } from 'lucide-react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import type { DateSelectArg } from "@fullcalendar/core"
+import type { DateSelectArg, EventMountArg } from "@fullcalendar/core"
 
 import { useAllTasks } from '@/hooks/useAllTasks'
 import { useUpdateTask } from '@/hooks/useUpdateTask'
 import { useCreateTask } from '@/hooks/useCreateTask'
 import { useSettings } from "@/store/useSettings"
+import { useCalendarContextMenu } from "@/hooks/useCalendarContextMenu"
+import { useDeleteRecurrence } from "@/hooks/useDeleteRecurrence"
 import { supabase } from '@/lib/supabase'
 
 import { buildCalendarEvents, renderCalendarEventContent } from '@/features/calendar/calendarEvents'
 import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
+import { DeleteRecurrenceModal } from "@/components/ui/date-picker/DeleteRecurrenceModal"
+import { ContextMenu } from "@/shared/components/ContextMenu"
 import { useTaskOccurrence } from '@/hooks/useTaskOccurrence'
 import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
 
@@ -41,6 +45,19 @@ export function DailyPlanner() {
     const [recurrenceModalOpen, setRecurrenceModalOpen] = useState(false)
     const [pendingCalendarUpdate, setPendingCalendarUpdate] = useState<any>(null)
     const [allowedModes, setAllowedModes] = useState<('single' | 'following' | 'all')[] | undefined>(undefined)
+
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        task: any;
+    } | null>(null)
+
+    // Delete Recurrence Modal State (for context menu)
+    const [deleteRecurrenceModal, setDeleteRecurrenceModal] = useState<{
+        isOpen: boolean;
+        task: any;
+    }>({ isOpen: false, task: null })
 
     const [_, setSearchParams] = useSearchParams()
     const navigate = useNavigate()
@@ -129,33 +146,21 @@ export function DailyPlanner() {
         const calendarApi = selectInfo.view.calendar
         calendarApi.unselect()
 
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        const newId = crypto.randomUUID()
+        const params: Record<string, string> = { task: newId, isNew: 'true', origin: 'calendar' }
 
-        const isAllDay = selectInfo.allDay
-        let updates: any = {
-            title: '',
-            projectId: null,
-            userId: user.id
-        }
-
-        if (isAllDay) {
+        if (selectInfo.allDay) {
             const d = selectInfo.start
             const year = d.getFullYear()
             const month = String(d.getMonth() + 1).padStart(2, '0')
             const day = String(d.getDate()).padStart(2, '0')
-            updates.due_date = `${year}-${month}-${day}`
+            params.calendarDate = `${year}-${month}-${day}`
         } else {
-            updates.start_time = selectInfo.startStr
-            updates.end_time = selectInfo.endStr
-            updates.due_date = selectInfo.startStr.split('T')[0]
+            params.calendarStart = selectInfo.startStr
+            params.calendarEnd = selectInfo.endStr
         }
 
-        createTask(updates, {
-            onSuccess: (newTask) => {
-                setSearchParams({ task: newTask.id, isNew: 'true', origin: 'calendar' })
-            }
-        })
+        setSearchParams(params)
     }
 
     const handleEventClick = (info: any) => {
@@ -295,6 +300,64 @@ export function DailyPlanner() {
         }
     }
 
+    // Context Menu Hook
+    const contextMenuItems = useCalendarContextMenu({
+        task: contextMenu?.task || null,
+        onClose: () => setContextMenu(null),
+        onDeleteRecurring: () => {
+            if (contextMenu?.task) {
+                setDeleteRecurrenceModal({ isOpen: true, task: contextMenu.task })
+            }
+            setContextMenu(null)
+        }
+    })
+
+    // Delete Recurrence Hook
+    const { handleDeleteInstance, handleDeleteFuture, handleDeleteAll } = useDeleteRecurrence({
+        task: deleteRecurrenceModal.task,
+        taskId: deleteRecurrenceModal.task?.id?.includes('_recur_')
+            ? deleteRecurrenceModal.task.id.split('_recur_')[0]
+            : deleteRecurrenceModal.task?.id,
+        occurrenceDate: deleteRecurrenceModal.task?.occurrence_date || deleteRecurrenceModal.task?.due_date?.split('T')[0],
+        onSuccess: () => setDeleteRecurrenceModal({ isOpen: false, task: null })
+    })
+
+    // Event Did Mount - add context menu handler
+    const handleEventDidMount = useCallback((arg: EventMountArg) => {
+        const eventEl = arg.el
+
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault()
+            e.stopPropagation()
+
+            const event = arg.event
+            const originalId = event.extendedProps.originalId || event.id
+            const originalTask = tasks?.find(t => t.id === originalId)
+
+            if (!originalTask) return
+
+            // Create task object with occurrence info
+            const taskForMenu = {
+                ...originalTask,
+                id: event.id, // May include _recur_ suffix
+                occurrence_date: event.extendedProps.occurrenceDate
+            }
+
+            setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                task: taskForMenu
+            })
+        }
+
+        eventEl.addEventListener('contextmenu', handleContextMenu)
+
+        // Cleanup
+        return () => {
+            eventEl.removeEventListener('contextmenu', handleContextMenu)
+        }
+    }, [tasks])
+
 
     return (
         <div className="h-full flex flex-col bg-white overflow-hidden relative">
@@ -387,6 +450,7 @@ export function DailyPlanner() {
                     eventOrderStrict={true}
                     eventDrop={handleEventDrop}
                     eventResize={handleEventResize}
+                    eventDidMount={handleEventDidMount}
                     allDayText="Весь день"
                     nowIndicator={true}
                     slotMinTime={hideNightTime ? "07:00:00" : "00:00:00"}
@@ -418,6 +482,28 @@ export function DailyPlanner() {
                 onConfirm={handleRecurrenceConfirm}
                 allowedModes={allowedModes}
                 title="Изменение времени повторяющейся задачи"
+            />
+
+            {/* Context Menu */}
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    items={contextMenuItems}
+                />
+            )}
+
+            {/* Delete Recurrence Modal */}
+            <DeleteRecurrenceModal
+                isOpen={deleteRecurrenceModal.isOpen}
+                onClose={() => setDeleteRecurrenceModal({ isOpen: false, task: null })}
+                onDeleteInstance={handleDeleteInstance}
+                onDeleteFuture={handleDeleteFuture}
+                onDeleteAll={handleDeleteAll}
+                isFirstInstance={
+                    deleteRecurrenceModal.task?.occurrence_date === deleteRecurrenceModal.task?.due_date?.split('T')[0]
+                }
             />
         </div>
     )

@@ -488,34 +488,13 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
     }
 
     const handleQuickAdd = async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
         const newId = crypto.randomUUID()
-        createTask({
-            id: newId,
-            title: '',
-            userId: user.id,
-            projectId: projectId || null,
-            due_date: targetDate || null
-        })
         setSearchParams({ task: newId, isNew: 'true' })
     }
 
     const handleQuickAddToSection = async (sectionId: string) => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
         const newId = crypto.randomUUID()
-        createTask({
-            id: newId,
-            title: '',
-            userId: user.id,
-            projectId: projectId || null,
-            sectionId: sectionId,
-            due_date: targetDate || null
-        })
-        setSearchParams({ task: newId, isNew: 'true' })
+        setSearchParams({ task: newId, isNew: 'true', section: sectionId })
     }
 
     // Sensors - Removed (Using Global Layout Context)
