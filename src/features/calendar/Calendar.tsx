@@ -100,6 +100,91 @@ export function Calendar({
         return () => container.removeEventListener('wheel', handleWheel)
     }, [])
 
+    // All Day Section Resize Handling
+    useEffect(() => {
+        const container = calendarContainerRef.current
+        if (!container) return
+
+        let isResizing = false
+        let startY = 0
+        let startHeight = 0
+        let targetEl: HTMLElement | null = null
+
+        const handleMouseDown = (e: MouseEvent) => {
+            const allDayBody = container.querySelector('.fc-daygrid-body') as HTMLElement
+            if (!allDayBody) return
+
+            const rect = allDayBody.getBoundingClientRect()
+            // Check if click is near bottom edge (within 8px)
+            // Also ensure we are within vertical bounds of the bottom edge
+            const isNearBottom = e.clientY >= rect.bottom - 8 && e.clientY <= rect.bottom + 5
+
+            // Check horizontal bounds (any point on the line)
+            const isWithinWidth = e.clientX >= rect.left && e.clientX <= rect.right
+
+            if (isNearBottom && isWithinWidth) {
+                isResizing = true
+                startY = e.clientY
+                startHeight = allDayBody.offsetHeight
+                targetEl = allDayBody
+                document.body.style.cursor = 'ns-resize'
+                e.preventDefault() // Prevent text selection
+                e.stopPropagation() // Prevent FullCalendar from seeing this as a date click
+            }
+        }
+
+        const handleMouseMove = (e: MouseEvent) => {
+            if (isResizing && targetEl) {
+                const delta = e.clientY - startY
+                // Min height 40px constraint
+                const newHeight = Math.max(40, startHeight + delta)
+                targetEl.style.height = `${newHeight}px`
+                targetEl.style.maxHeight = 'none' // Override CSS max-height
+                return
+            }
+
+            // Hover effect cursor
+            const allDayBody = container.querySelector('.fc-daygrid-body') as HTMLElement
+            if (allDayBody) {
+                const rect = allDayBody.getBoundingClientRect()
+                const isNearBottom = e.clientY >= rect.bottom - 8 && e.clientY <= rect.bottom + 5
+                const isWithinWidth = e.clientX >= rect.left && e.clientX <= rect.right
+
+                if (isNearBottom && isWithinWidth) {
+                    // Only apply if not already resizing something else
+                    if (!isResizing) {
+                        allDayBody.style.cursor = 'ns-resize'
+                    }
+                } else {
+                    // Reset cursor on element if moved away
+                    if (allDayBody.style.cursor === 'ns-resize') {
+                        allDayBody.style.cursor = ''
+                    }
+                }
+            }
+        }
+
+        const handleMouseUp = () => {
+            if (isResizing) {
+                isResizing = false
+                targetEl = null
+                document.body.style.cursor = ''
+            }
+        }
+
+        // Attach mousedown to container with capture:true to intercept before FullCalendar
+        container.addEventListener('mousedown', handleMouseDown, { capture: true })
+        // Attach move/up to document for drag/up to handle fast movements outside container
+        document.addEventListener('mousemove', handleMouseMove)
+        document.addEventListener('mouseup', handleMouseUp)
+
+        return () => {
+            container.removeEventListener('mousedown', handleMouseDown, { capture: true })
+            document.removeEventListener('mousemove', handleMouseMove)
+            document.removeEventListener('mouseup', handleMouseUp)
+        }
+    }, [])
+
     // Recurrence Edit Modal State
     const [recurrenceModal, setRecurrenceModal] = useState<{
         isOpen: boolean;

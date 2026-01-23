@@ -3,13 +3,14 @@
     font-size: 12px;
 }
 
-.daily-planner-wrapper .fc-theme-standard td, 
+.daily-planner-wrapper .fc-theme-standard td,
 .daily-planner-wrapper .fc-theme-standard th {
     border-color: #f3f4f6;
 }
 
 .daily-planner-wrapper .fc-timegrid-slot {
-    height: 1.5rem; /* Compact slots to fit day in screen */
+    height: 1.5rem;
+    /* Compact slots to fit day in screen */
 }
 
 /* Hide the "today" highlight to make it look cleaner */
@@ -21,9 +22,11 @@
 .daily-planner-wrapper .fc-scroller::-webkit-scrollbar {
     width: 6px;
 }
+
 .daily-planner-wrapper .fc-scroller::-webkit-scrollbar-track {
     background: transparent;
 }
+
 .daily-planner-wrapper .fc-scroller::-webkit-scrollbar-thumb {
     background-color: #e5e7eb;
     border-radius: 20px;
@@ -54,15 +57,28 @@
 
 /* All-day section with scroll on hover */
 .pulse-calendar .fc-daygrid-body {
-    max-height: var(--all-day-max-height, 80px);
-    overflow: hidden;
-    transition: max-height 0.2s ease;
+    /* Remove automatic height transition */
+    height: auto;
+    /* Set a larger default max-height to allow resizing up to this point initially, but JS will override */
+    max-height: 300px;
+    /* Disable native resize handle as we implement custom JS resize that spans full width */
+    resize: none;
+    /* Always show vertical scrollbar if content overflows */
+    overflow-y: auto;
+    /* excessive widths can trigger horizontal scrollbar, hide it */
+    overflow-x: hidden !important;
+
+    /* Ensure it behaves as a block for resizing */
+    display: block;
+    /* Minimal height to not collapse completely */
+    min-height: 40px;
+    padding-bottom: 5px;
+    /* Visual spacing */
+    position: relative;
 }
 
-.pulse-calendar .fc-daygrid-body:hover {
-    max-height: 200px;
-    overflow-y: auto;
-}
+/* Remove the previous hover expansion */
+/* .pulse-calendar .fc-daygrid-body:hover rules are deleted/overwritten above */
 
 /* Custom scrollbar for all-day section */
 .pulse-calendar .fc-daygrid-body::-webkit-scrollbar {
@@ -85,7 +101,9 @@
     vertical-align: top !important;
     padding-top: 8px !important;
     padding-left: 8px !important;
-}.pulse-calendar .fc-timegrid-axis-frame,
+}
+
+.pulse-calendar .fc-timegrid-axis-frame,
 .daily-planner-wrapper .fc-timegrid-axis-frame {
     text-align: left !important;
     justify-content: flex-start !important;
