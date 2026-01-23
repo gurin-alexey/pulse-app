@@ -1,0 +1,727 @@
+import { useAllTasks } from "@/hooks/useAllTasks"
+import { useUpdateTask } from "@/hooks/useUpdateTask"
+import { useSettings } from "@/store/useSettings"
+import { useCreateTask } from "@/hooks/useCreateTask"
+import { useTaskOccurrence } from "@/hooks/useTaskOccurrence"
+import { useCalendarContextMenu } from "@/hooks/useCalendarContextMenu"
+import { useDeleteRecurrence } from "@/hooks/useDeleteRecurrence"
+import FullCalendar from "@fullcalendar/react"
+import dayGridPlugin from "@fullcalendar/daygrid"
+import timeGridPlugin from "@fullcalendar/timegrid"
+import interactionPlugin from "@fullcalendar/interaction"
+import multiMonthPlugin from "@fullcalendar/multimonth"
+import listPlugin from "@fullcalendar/list"
+import ruLocale from '@fullcalendar/core/locales/ru'
+import { useSearchParams, useLocation } from "react-router-dom"
+import { Loader2, Settings, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Check, ArrowRight, ArrowLeft } from "lucide-react"
+import type { DateSelectArg, EventMountArg } from "@fullcalendar/core"
+import { useState, useEffect, useRef, Fragment, useMemo, useCallback } from "react"
+import { buildCalendarEvents, renderCalendarEventContent } from "@/features/calendar/calendarEvents"
+import { useRecurrenceUpdate } from '@/hooks/useRecurrenceUpdate'
+import { RecurrenceEditModal } from "@/components/ui/date-picker/RecurrenceEditModal"
+import { DeleteRecurrenceModal } from "@/components/ui/date-picker/DeleteRecurrenceModal"
+import { ContextMenu } from "@/shared/components/ContextMenu"
+import { Menu, Transition } from "@headlessui/react"
+import { createPortal } from "react-dom"
+import { format } from "date-fns"
+import { useSwipeable } from "react-swipeable"
+import { motion, useMotionValue, useTransform, animate } from "framer-motion"
+import clsx from 'clsx'
+import './calendar.css'
+
+
+interface CalendarProps {
+    initialView?: string
+    enableSwipe?: boolean
+    headerLeft?: React.ReactNode
+    className?: string
+    isMobileOverride?: boolean // For testing or forcing mobile view
+}
+
+export function Calendar({
+    initialView = 'timeGridWeek',
+    enableSwipe = false,
+    headerLeft,
+    className,
+    isMobileOverride
+}: CalendarProps) {
+    const location = useLocation()
+    const { data, isLoading } = useAllTasks()
+    const tasks = data?.tasks
+    const occurrencesMap = data?.occurrencesMap
+    const { settings } = useSettings()
+    const hideNightTime = settings?.preferences?.hide_night_time ?? false
+    const { mutate: updateTask } = useUpdateTask()
+    const { mutate: createTask } = useCreateTask()
+    const { setOccurrenceStatus } = useTaskOccurrence()
+    const [_, setSearchParams] = useSearchParams()
+
+    const calendarRef = useRef<FullCalendar>(null)
+    const calendarContainerRef = useRef<HTMLDivElement>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    const [isMobile, setIsMobile] = useState(isMobileOverride ?? window.innerWidth < 768)
+    const [currentTitle, setCurrentTitle] = useState('')
+    const [currentViewType, setCurrentViewType] = useState(initialView)
+    const [isSwiping, setIsSwiping] = useState(false)
+    const [currentDate, setCurrentDate] = useState(new Date())
+
+    // Zoom State
+    const ZOOM_LEVELS = ['00:15:00', '00:30:00', '01:00:00', '02:00:00', '04:00:00']
+    const [zoomIndex, setZoomIndex] = useState(2) // Default 01:00:00
+
+    useEffect(() => {
+        const handleResize = () => {
+            const mobile = window.innerWidth < 768
+            setIsMobile(isMobileOverride ?? mobile)
+        }
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [isMobileOverride])
+
+    // Zoom Handling
+    useEffect(() => {
+        const container = containerRef.current
+        if (!container) return
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.ctrlKey) {
+                e.preventDefault()
+                const direction = e.deltaY > 0 ? 1 : -1
+                setZoomIndex(prev => {
+                    const next = prev + direction
+                    if (next >= 0 && next < ZOOM_LEVELS.length) return next
+                    return prev
+                })
+            }
+        }
+
+        container.addEventListener('wheel', handleWheel, { passive: false })
+        return () => container.removeEventListener('wheel', handleWheel)
+    }, [])
+
+    // Recurrence Edit Modal State
+    const [recurrenceModal, setRecurrenceModal] = useState<{
+        isOpen: boolean;
+        info: any;
+        allowedModes?: ('single' | 'following' | 'all')[];
+    }>({ isOpen: false, info: null })
+
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        task: any;
+    } | null>(null)
+
+    // Delete Recurrence Modal State (for context menu)
+    const [deleteRecurrenceModal, setDeleteRecurrenceModal] = useState<{
+        isOpen: boolean;
+        task: any;
+    }>({ isOpen: false, task: null })
+
+    const [showCompleted, setShowCompleted] = useState(false)
+
+    // Sync view when isMobile changes
+    useEffect(() => {
+        const calendarApi = calendarRef.current?.getApi()
+        if (calendarApi) {
+            if (isMobile) {
+                if (currentViewType !== 'timeGridDay' && currentViewType !== 'listWeek') {
+                    calendarApi.changeView('timeGridDay')
+                }
+            } else {
+                if (currentViewType === 'timeGridDay') {
+                    calendarApi.changeView(initialView)
+                }
+            }
+        }
+    }, [isMobile, initialView, currentViewType])
+
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    const handleDateSelect = async (selectInfo: DateSelectArg) => {
+        const calendarApi = selectInfo.view.calendar
+        calendarApi.unselect()
+
+        const newId = crypto.randomUUID()
+        const params: Record<string, string> = { task: newId, isNew: 'true' }
+
+        if (selectInfo.allDay) {
+            const d = selectInfo.start
+            const year = d.getFullYear()
+            const month = String(d.getMonth() + 1).padStart(2, '0')
+            const day = String(d.getDate()).padStart(2, '0')
+            params.calendarDate = `${year}-${month}-${day}`
+        } else {
+            params.calendarStart = selectInfo.startStr
+            params.calendarEnd = selectInfo.endStr
+        }
+
+        setSearchParams(params)
+    }
+
+    const events = useMemo(() => {
+        if (!tasks) return []
+        const rangeStart = new Date(currentDate)
+        rangeStart.setMonth(rangeStart.getMonth() - 2)
+        const rangeEnd = new Date(currentDate)
+        rangeEnd.setMonth(rangeEnd.getMonth() + 2)
+
+        return buildCalendarEvents({
+            tasks,
+            occurrencesMap,
+            rangeStart,
+            rangeEnd,
+            showCompleted
+        })
+    }, [tasks, occurrencesMap, currentDate, showCompleted])
+
+    // Context Menu Hook
+    const contextMenuItems = useCalendarContextMenu({
+        task: contextMenu?.task || null,
+        onClose: () => setContextMenu(null),
+        onDeleteRecurring: () => {
+            if (contextMenu?.task) {
+                setDeleteRecurrenceModal({ isOpen: true, task: contextMenu.task })
+            }
+            setContextMenu(null)
+        }
+    })
+
+    // Delete Recurrence Hook
+    const { handleDeleteInstance, handleDeleteFuture, handleDeleteAll } = useDeleteRecurrence({
+        task: deleteRecurrenceModal.task,
+        taskId: deleteRecurrenceModal.task?.id?.includes('_recur_')
+            ? deleteRecurrenceModal.task.id.split('_recur_')[0]
+            : deleteRecurrenceModal.task?.id,
+        occurrenceDate: deleteRecurrenceModal.task?.occurrence_date || deleteRecurrenceModal.task?.due_date?.split('T')[0],
+        onSuccess: () => setDeleteRecurrenceModal({ isOpen: false, task: null })
+    })
+
+    // Event Did Mount
+    const handleEventDidMount = useCallback((arg: EventMountArg) => {
+        const eventEl = arg.el
+
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault()
+            e.stopPropagation()
+
+            const event = arg.event
+            const originalId = event.extendedProps.originalId || event.id
+            const originalTask = tasks?.find(t => t.id === originalId)
+
+            if (!originalTask) return
+
+            const taskForMenu = {
+                ...originalTask,
+                id: event.id,
+                occurrence_date: event.extendedProps.occurrenceDate
+            }
+
+            setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                task: taskForMenu
+            })
+        }
+
+        eventEl.addEventListener('contextmenu', handleContextMenu)
+
+        return () => {
+            eventEl.removeEventListener('contextmenu', handleContextMenu)
+        }
+    }, [tasks])
+
+    if (isLoading && !tasks) {
+        return (
+            <div className="h-full flex items-center justify-center text-gray-400">
+                <Loader2 className="animate-spin mr-2" />
+                Loading calendar...
+            </div>
+        )
+    }
+
+    const isTimedEvent = (event: any) => {
+        const startStr = event?.startStr
+        if (typeof startStr === 'string' && startStr.includes('T')) return true
+
+        const start = event?.start
+        const end = event?.end
+        if (start && end) {
+            const durationMs = end.getTime() - start.getTime()
+            if (durationMs > 0 && durationMs < 24 * 60 * 60 * 1000) return true
+        }
+
+        if (start) {
+            const hasTime = start.getHours() !== 0 || start.getMinutes() !== 0 || start.getSeconds() !== 0
+            if (hasTime) return true
+        }
+
+        return false
+    }
+
+    const isAllDayEvent = (event: any) => !isTimedEvent(event)
+
+    const handleEventDrop = (info: any) => {
+        if (info.event.extendedProps.isVirtual) {
+            const originalId = info.event.extendedProps.originalId
+            const occurrenceDate = info.event.extendedProps.occurrenceDate
+            const originalTask = tasks?.find(t => t.id === originalId)
+
+            if (originalTask) {
+                const eventStartDateStr = info.event.startStr?.split('T')[0] ||
+                    (info.event.start ? format(info.event.start, 'yyyy-MM-dd') : null)
+                const wasAllDaySeries = !originalTask.start_time
+                const isNowTimed = isTimedEvent(info.event)
+                const treatAsTimeOnlyChange = wasAllDaySeries && isNowTimed
+                const isDateChange = treatAsTimeOnlyChange
+                    ? false
+                    : (eventStartDateStr ? eventStartDateStr !== occurrenceDate : false)
+                const isFirstInstance = occurrenceDate === originalTask.due_date?.split('T')[0]
+
+                let modes: ('single' | 'following' | 'all')[] = []
+                if (isDateChange) {
+                    modes = ['single', 'following']
+                } else if (isFirstInstance) {
+                    modes = ['single', 'all']
+                } else {
+                    modes = ['single', 'following', 'all']
+                }
+                setRecurrenceModal({ isOpen: true, info, allowedModes: modes })
+                return
+            }
+        }
+
+        const taskId = info.event.id
+        const task = tasks?.find(t => t.id === taskId)
+        if (task?.recurrence_rule) {
+            setRecurrenceModal({ isOpen: true, info, allowedModes: ['single', 'all'] })
+            return
+        }
+        const isAllDay = isAllDayEvent(info.event)
+
+        if (isAllDay && info.event.start) {
+            const dateStr = info.event.startStr?.split('T')[0] || format(info.event.start, 'yyyy-MM-dd')
+            updateTask({
+                taskId,
+                updates: {
+                    start_time: null,
+                    end_time: null,
+                    due_date: dateStr
+                }
+            })
+        } else {
+            const newStart = info.event.start?.toISOString() || null
+            const newEnd = info.event.end?.toISOString() || null
+            let dateStr = info.event.start ? format(info.event.start, 'yyyy-MM-dd') : null
+
+            updateTask({
+                taskId,
+                updates: {
+                    start_time: newStart,
+                    end_time: newEnd,
+                    due_date: dateStr
+                }
+            })
+        }
+    }
+
+    const handleEventResize = (info: any) => {
+        if (info.event.extendedProps.isVirtual) {
+            const originalId = info.event.extendedProps.originalId
+            const occurrenceDate = info.event.extendedProps.occurrenceDate
+            const originalTask = tasks?.find(t => t.id === originalId)
+
+            if (originalTask) {
+                const isFirstInstance = occurrenceDate === originalTask.due_date?.split('T')[0]
+                const modes: ('single' | 'following' | 'all')[] = isFirstInstance ? ['single', 'all'] : ['single', 'following', 'all']
+
+                setRecurrenceModal({ isOpen: true, info, allowedModes: modes })
+                return
+            }
+        }
+
+        const taskId = info.event.id
+        const newStart = info.event.start?.toISOString() || null
+        const newEnd = info.event.end?.toISOString() || null
+
+        updateTask({
+            taskId,
+            updates: {
+                start_time: newStart,
+                end_time: newEnd
+            }
+        })
+    }
+
+    const { confirmRecurrenceUpdate } = useRecurrenceUpdate()
+
+    const handleRecurrenceConfirm = async (mode: 'single' | 'following' | 'all') => {
+        const { info } = recurrenceModal
+        if (!info) return
+
+        const event = info.event
+        const originalId = event.extendedProps.originalId
+        const occurrenceDate = event.extendedProps.occurrenceDate
+        const originalTask = tasks?.find(t => t.id === originalId)
+
+        if (!originalTask || !occurrenceDate) {
+            info.revert();
+            setRecurrenceModal({ isOpen: false, info: null });
+            return;
+        }
+
+        const isAllDay = isAllDayEvent(event)
+        const newStart = event.start
+        const newEnd = event.end
+        let dateStr = event.startStr?.split('T')[0] || (newStart ? format(newStart, 'yyyy-MM-dd') : null)
+
+        let finalStartTime = isAllDay ? null : (newStart?.toISOString() || null)
+        let finalEndTime = isAllDay ? null : (newEnd?.toISOString() || null)
+
+        if (mode === 'all' && event.extendedProps.isVirtual && originalTask) {
+            const masterDateStr = originalTask.start_time
+                ? originalTask.start_time.split('T')[0]
+                : (originalTask.due_date || '').split('T')[0]
+            if (masterDateStr) {
+                dateStr = masterDateStr
+                if (!isAllDay && newStart) {
+                    const timePart = newStart.toISOString().split('T')[1]
+                    const anchoredStart = `${masterDateStr}T${timePart}`
+                    const anchoredStartMs = new Date(anchoredStart).getTime()
+                    const durationMs = newEnd && newStart ? (newEnd.getTime() - newStart.getTime()) : null
+                    const anchoredEnd = durationMs !== null
+                        ? new Date(anchoredStartMs + durationMs).toISOString()
+                        : null
+                    finalStartTime = anchoredStart
+                    finalEndTime = anchoredEnd
+                }
+            }
+        }
+
+        await confirmRecurrenceUpdate({
+            task: originalTask,
+            mode,
+            occurrenceDate,
+            updates: {
+                start_time: finalStartTime,
+                end_time: finalEndTime,
+                due_date: dateStr
+            }
+        })
+
+        setRecurrenceModal({ isOpen: false, info: null })
+    }
+
+    const handleEventClick = (info: any) => {
+        const popover = document.querySelector('.fc-popover')
+        if (popover) {
+            const closeBtn = popover.querySelector('.fc-popover-close')
+            if (closeBtn instanceof HTMLElement) {
+                closeBtn.click()
+            } else {
+                (popover as HTMLElement).remove()
+            }
+        }
+
+        const params: any = { task: info.event.extendedProps.originalId }
+        if (info.event.extendedProps.isVirtual) {
+            params.occurrence = info.event.extendedProps.occurrenceDate
+        }
+        setSearchParams(params)
+    }
+
+    const x = useMotionValue(0)
+    const opacity = useTransform(x, [-200, 0, 200], [0.5, 1, 0.5])
+
+    const animateViewSwitch = async (newView: string, direction: 'left' | 'right') => {
+        const targetX = direction === 'left' ? -window.innerWidth : window.innerWidth
+        await animate(x, targetX, { duration: 0.2 }).then(() => {
+            calendarRef.current?.getApi().changeView(newView)
+            x.set(-targetX)
+            animate(x, 0, { duration: 0.3, type: "spring", stiffness: 300, damping: 30 })
+        })
+    }
+
+    const headerGoPrev = () => calendarRef.current?.getApi().prev()
+    const headerGoNext = () => calendarRef.current?.getApi().next()
+    const headerGoToday = () => calendarRef.current?.getApi().today()
+    const headerChangeView = (view: string) => {
+        if (view === currentViewType) return
+        calendarRef.current?.getApi().changeView(view)
+    }
+
+    const handleSwipeComplete = async (direction: 'left' | 'right') => {
+        const targetX = direction === 'left' ? -window.innerWidth : window.innerWidth
+        await animate(x, targetX, { duration: 0.2 }).then(() => {
+            if (direction === 'left') {
+                headerGoNext()
+            } else {
+                headerGoPrev()
+            }
+            x.set(-targetX)
+            animate(x, 0, { duration: 0.3, type: "spring", stiffness: 300, damping: 30 })
+            setIsSwiping(false)
+        })
+    }
+
+    const eventHandlers = enableSwipe && !isMobile ? {
+        onSwiping: (e: any) => {
+            if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                setIsSwiping(true)
+                x.set(e.deltaX)
+            }
+        },
+        onSwipedLeft: () => handleSwipeComplete('left'),
+        onSwipedRight: () => handleSwipeComplete('right'),
+        onSwiped: (e: any) => {
+            if (Math.abs(e.deltaX) < 100 || Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                animate(x, 0, { type: "spring", stiffness: 400, damping: 40 })
+                setIsSwiping(false)
+            }
+        },
+        delta: 10,
+        preventScrollOnSwipe: false,
+        trackMouse: false,
+        trackTouch: true
+    } : {}
+
+    const handlers = useSwipeable(eventHandlers)
+    const { ref: swipeRef, ...swipeHandlers } = handlers
+
+    const handleDateSelectWrapper = (arg: any) => {
+        if (isSwiping) return
+        handleDateSelect(arg)
+    }
+
+    const handleEventClickWrapper = (arg: any) => {
+        if (isSwiping) return
+        handleEventClick(arg)
+    }
+
+    const renderEventContent = renderCalendarEventContent
+
+    return (
+        <div className={clsx("h-full flex flex-col bg-white overflow-hidden relative", className)}>
+            <RecurrenceEditModal
+                isOpen={recurrenceModal.isOpen}
+                onClose={() => {
+                    recurrenceModal.info?.revert();
+                    setRecurrenceModal({ isOpen: false, info: null });
+                }}
+                onConfirm={handleRecurrenceConfirm}
+                allowedModes={recurrenceModal.allowedModes}
+            />
+
+            {/* Custom Header (Desktop) */}
+            {!isMobile && (
+                <div className="flex items-center justify-between gap-4 mb-4 shrink-0 px-4 md:px-0 relative min-h-[40px]">
+                    {/* Left Slot */}
+                    <div className="flex items-center z-10">
+                        {headerLeft}
+                    </div>
+
+                    {/* Center: Navigation */}
+                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-4 z-0 pointer-events-none">
+                        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg pointer-events-auto shadow-sm">
+                            <button onClick={headerGoPrev} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
+                                <span className="sr-only">Prev</span>←
+                            </button>
+                            <button onClick={headerGoToday} className="px-3 py-1 text-sm font-semibold hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-700">
+                                Сегодня
+                            </button>
+                            <button onClick={headerGoNext} className="p-1 px-2 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-500 hover:text-gray-900">
+                                <span className="sr-only">Next</span>→
+                            </button>
+                        </div>
+
+                        {/* Switch Back to Week Button (List View or Special) */}
+                        {currentViewType === 'listWeek' && (
+                            <button
+                                onClick={() => animateViewSwitch('timeGridWeek', 'left')}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg text-sm font-semibold transition-colors animate-in fade-in pointer-events-auto"
+                            >
+                                <CalendarIcon size={16} />
+                                Показать неделю
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Right: Settings */}
+                    <div className="flex items-center justify-end z-10 w-10">
+                        <Menu as="div" className="relative inline-block text-left">
+                            <Menu.Button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200">
+                                <Settings size={20} />
+                            </Menu.Button>
+                            <Transition
+                                as={Fragment}
+                                enter="transition ease-out duration-100"
+                                enterFrom="transform opacity-0 scale-95"
+                                enterTo="transform opacity-100 scale-100"
+                                leave="transition ease-in duration-75"
+                                leaveFrom="transform opacity-100 scale-100"
+                                leaveTo="transform opacity-0 scale-95"
+                            >
+                                <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-xl bg-white shadow-xl ring-1 ring-black/5 focus:outline-none z-50">
+                                    <div className="px-4 py-3 border-b border-gray-50">
+                                        <p className="text-sm font-semibold text-gray-900">Настройки отображения</p>
+                                    </div>
+                                    <div className="p-2">
+                                        <Menu.Item>
+                                            {({ active }) => (
+                                                <button
+                                                    onClick={() => setShowCompleted(!showCompleted)}
+                                                    className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition-colors ${active ? 'bg-gray-50' : ''}`}
+                                                >
+                                                    <span className="text-gray-700">Показать завершенные</span>
+                                                    <div className={`w-9 h-5 rounded-full relative transition-colors ${showCompleted ? 'bg-blue-500' : 'bg-gray-200'}`}>
+                                                        <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${showCompleted ? 'translate-x-4' : ''}`} />
+                                                    </div>
+                                                </button>
+                                            )}
+                                        </Menu.Item>
+                                    </div>
+                                    <div className="p-2 border-t border-gray-100">
+                                        <div className="px-2 py-1.5">
+                                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Вид</p>
+                                        </div>
+                                        {[
+                                            { id: 'timeGridDay', label: '1 День' },
+                                            { id: 'threeDay', label: '3 Дня' },
+                                            { id: 'timeGridWeek', label: 'Неделя' }
+                                        ].map(view => (
+                                            <Menu.Item key={view.id}>
+                                                {({ active }) => (
+                                                    <button
+                                                        onClick={() => headerChangeView(view.id)}
+                                                        className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-lg transition-colors ${active ? 'bg-gray-50' : 'hover:bg-gray-50'}`}
+                                                    >
+                                                        <span className={currentViewType === view.id ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                                                            {view.label}
+                                                        </span>
+                                                        {currentViewType === view.id && <Check size={16} className="text-blue-600" />}
+                                                    </button>
+                                                )}
+                                            </Menu.Item>
+                                        ))}
+                                    </div>
+                                </Menu.Items>
+                            </Transition>
+                        </Menu>
+                    </div>
+                </div>
+            )}
+
+            {/* Mobile Header Portals */}
+            {isMobile && mounted && location.pathname.startsWith('/calendar') && document.getElementById('mobile-header-title') && createPortal(
+                <div className="flex items-center justify-center">
+                    <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm divide-x divide-gray-200">
+                        <button onClick={headerGoPrev} className="py-2 px-5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-l-lg active:bg-gray-100 transition-all">
+                            <ChevronLeft size={20} />
+                        </button>
+                        <button onClick={headerGoToday} className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                            Сегодня
+                        </button>
+                        <button onClick={headerGoNext} className="py-2 px-5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-r-lg active:bg-gray-100 transition-all">
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                </div>,
+                document.getElementById('mobile-header-title')!
+            )}
+
+            {isMobile && mounted && location.pathname.startsWith('/calendar') && document.getElementById('mobile-header-right') && createPortal(
+                <Menu as="div" className="relative inline-block text-left">
+                    <Menu.Button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                        <Settings size={20} />
+                    </Menu.Button>
+                    {/* Simplified Mobile Settings ... could be reused code but inline for now */}
+                </Menu>,
+                document.getElementById('mobile-header-right')!
+            )}
+
+            <motion.div
+                ref={(node) => {
+                    swipeRef(node)
+                    // @ts-ignore
+                    containerRef.current = node
+                    // @ts-ignore
+                    calendarContainerRef.current = node
+                }}
+                className="flex-1 min-h-0 relative touch-pan-y pulse-calendar"
+                {...swipeHandlers}
+                style={enableSwipe ? { x, opacity } : {}}
+            >
+                <FullCalendar
+                    ref={calendarRef}
+                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin, listPlugin]}
+                    headerToolbar={false}
+                    locale={ruLocale}
+                    views={{
+                        dayGridMonth: { titleFormat: { month: 'long', year: 'numeric' } },
+                        threeDay: { type: 'timeGrid', duration: { days: 3 }, buttonText: '3 Дня', titleFormat: { month: 'short', day: 'numeric' }, dayHeaderFormat: { weekday: 'short', month: 'numeric', day: 'numeric', omitCommas: false } },
+                        timeGridDay: { titleFormat: { month: 'long', day: 'numeric' }, dayHeaderFormat: { weekday: 'long', month: 'long', day: 'numeric', omitCommas: false } },
+                        timeGridWeek: { titleFormat: { month: 'short', day: 'numeric' } },
+                        listWeek: { titleFormat: { month: 'short', day: 'numeric' } }
+                    }}
+                    initialView={isMobile ? "timeGridDay" : initialView}
+                    firstDay={1}
+                    editable={true}
+                    selectable={true}
+                    selectMirror={true}
+                    expandRows={true}
+                    dayMaxEventRows={false}
+                    select={handleDateSelectWrapper}
+                    datesSet={(arg) => {
+                        setCurrentTitle(arg.view.title)
+                        setCurrentViewType(arg.view.type)
+                        setCurrentDate(arg.view.currentStart)
+                    }}
+                    eventOrder="isCompleted,priorityRank,start,-duration,allDay,title"
+                    eventOrderStrict={true}
+                    height="100%"
+                    events={events}
+                    eventContent={renderEventContent}
+                    eventDrop={handleEventDrop}
+                    eventResize={handleEventResize}
+                    eventClick={handleEventClickWrapper}
+                    eventDidMount={handleEventDidMount}
+                    nowIndicator={true}
+                    allDayText="Весь день"
+                    slotMinTime={hideNightTime ? "07:00:00" : "00:00:00"}
+                    slotMaxTime={hideNightTime ? "23:00:00" : "24:00:00"}
+                    slotDuration={ZOOM_LEVELS[zoomIndex]}
+                    scrollTime="08:00:00"
+                    slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+                    eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+                />
+            </motion.div>
+
+            {/* Context Menu */}
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    items={contextMenuItems}
+                />
+            )}
+
+            {/* Delete Recurrence Modal */}
+            <DeleteRecurrenceModal
+                isOpen={deleteRecurrenceModal.isOpen}
+                onClose={() => setDeleteRecurrenceModal({ isOpen: false, task: null })}
+                onDeleteInstance={handleDeleteInstance}
+                onDeleteFuture={handleDeleteFuture}
+                onDeleteAll={handleDeleteAll}
+                isFirstInstance={
+                    deleteRecurrenceModal.task?.occurrence_date === deleteRecurrenceModal.task?.due_date?.split('T')[0]
+                }
+            />
+        </div>
+    )
+}

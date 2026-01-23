@@ -132,14 +132,62 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
 
 
     // Determine filter
-    const filter: TaskFilter = mode === 'inbox'
-        ? { type: 'inbox', includeSubtasks: true }
-        : (mode === 'today' || mode === 'tomorrow')
-            ? { type: mode, includeSubtasks: true }
-            : { type: 'project', projectId: projectId!, includeSubtasks: true }
+    // Determine filter
+    const filter: TaskFilter = useMemo(() => {
+        if (mode === 'inbox') return { type: 'inbox', includeSubtasks: true }
+        if (mode === 'today' || mode === 'tomorrow') return { type: mode, includeSubtasks: true }
+        return { type: 'project', projectId: projectId!, includeSubtasks: true }
+    }, [mode, projectId])
 
-    // Data Hooks
-    const { data: tasks, isLoading: tasksLoading, isError: tasksError } = useTasks(filter)
+    // Data Hooks - Single Source of Truth
+    const { data: allTasksData, isLoading: tasksLoading, error: tasksError } = useAllTasks()
+    const sharedOccurrencesMap = allTasksData?.occurrencesMap
+
+    // Client-side filtering for instant transitions
+    const tasks = useMemo(() => {
+        if (!allTasksData?.tasks) return []
+        const all = allTasksData.tasks
+        const ft = filter.type
+
+        return all.filter(t => {
+            // 1. Inbox
+            if (ft === 'inbox') {
+                // Inbox: no project_id
+                return t.project_id === null
+            }
+
+            // 2. Project
+            if (ft === 'project') {
+                return t.project_id === filter.projectId
+            }
+
+            // 3. Today / Tomorrow
+            if (ft === 'today' || ft === 'tomorrow') {
+                if (t.recurrence_rule) return true // Let expansion logic handle recurrence
+                if (!t.due_date) return false
+
+                const now = new Date()
+                const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+
+                const tomorrow = new Date(now)
+                tomorrow.setDate(tomorrow.getDate() + 1)
+                const tomorrowStr = new Date(tomorrow.getTime() - (tomorrow.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+
+                const taskDateStr = t.due_date.split('T')[0]
+
+                if (ft === 'today') {
+                    // Overdue (and not completed) OR Due Today
+                    if (!t.is_completed && taskDateStr < todayStr) return true
+                    return taskDateStr === todayStr
+                }
+
+                if (ft === 'tomorrow') {
+                    return taskDateStr === tomorrowStr
+                }
+            }
+            return false
+        })
+    }, [allTasksData, filter])
     const { data: sections, isLoading: sectionsLoading } = useSections(projectId)
     const { filter: todayFilter } = useTodayFilter()
 
@@ -172,9 +220,7 @@ export function ProjectTasks({ mode }: { mode?: 'inbox' | 'today' | 'tomorrow' }
         return undefined
     }, [mode])
 
-    // Use shared data source for occurrences (same as Sidebar)
-    const { data: allTasksData } = useAllTasks()
-    const sharedOccurrencesMap = allTasksData?.occurrencesMap
+
 
     // Convert to Record format for TaskItem compatibility
     const formattedOccurrencesMap = useMemo(() => {
