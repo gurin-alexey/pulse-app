@@ -45,7 +45,9 @@ public class QuickAddActivity extends Activity {
     private String supabaseUrl;
     private String supabaseKey;
     private String accessToken;
+    private String refreshToken;
     private String userId;
+    private boolean isRefreshing = false;
 
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -111,9 +113,10 @@ public class QuickAddActivity extends Activity {
         supabaseUrl = prefs.getString("supabase_url", null);
         supabaseKey = prefs.getString("supabase_key", null);
         accessToken = prefs.getString("access_token", null);
+        refreshToken = prefs.getString("refresh_token", null);
         userId = prefs.getString("user_id", null);
 
-        Log.d(TAG, "Credentials loaded. URL: " + (supabaseUrl != null) + ", User: " + (userId != null));
+        Log.d(TAG, "Credentials loaded. URL: " + (supabaseUrl != null) + ", User: " + (userId != null) + ", HasRefreshToken: " + (refreshToken != null));
         
         if (supabaseUrl == null || accessToken == null) {
             Toast.makeText(this, "Please open the main app to sync login", Toast.LENGTH_LONG).show();
@@ -174,6 +177,10 @@ public class QuickAddActivity extends Activity {
     }
 
     private void sendTask() {
+        sendTaskWithRetry(false);
+    }
+
+    private void sendTaskWithRetry(boolean isRetry) {
         // Cancel timer if manually triggered
         if (autoSendTimer != null) {
             autoSendTimer.cancel();
@@ -235,10 +242,19 @@ public class QuickAddActivity extends Activity {
                             taskInput.setText("");
                             finish();
                         });
+                    } else if ((response.code() == 401 || response.code() == 403) && !isRetry && refreshToken != null) {
+                        // Token expired, try to refresh
+                        Log.d(TAG, "Token expired (code " + response.code() + "), attempting refresh...");
+                        response.close();
+                        refreshAccessToken(() -> sendTaskWithRetry(true));
                     } else {
                         String err = response.body() != null ? response.body().string() : "Unknown error";
                         runOnUiThread(() -> {
-                            Toast.makeText(QuickAddActivity.this, "Error: " + response.code(), Toast.LENGTH_LONG).show();
+                            if (response.code() == 401 || response.code() == 403) {
+                                Toast.makeText(QuickAddActivity.this, "Access denied. Please open the app.", Toast.LENGTH_LONG).show();
+                            } else {
+                                Toast.makeText(QuickAddActivity.this, "Error: " + response.code(), Toast.LENGTH_LONG).show();
+                            }
                             Log.e(TAG, "Error posting task: " + err);
                             sendBtn.setEnabled(true);
                         });
@@ -250,6 +266,82 @@ public class QuickAddActivity extends Activity {
              Toast.makeText(this, "JSON Error", Toast.LENGTH_SHORT).show();
              sendBtn.setEnabled(true);
              Log.e(TAG, "JSON Exception", e);
+        }
+    }
+
+    private void refreshAccessToken(Runnable onSuccess) {
+        if (isRefreshing) return;
+        isRefreshing = true;
+
+        try {
+            JSONObject json = new JSONObject();
+            json.put("refresh_token", refreshToken);
+
+            RequestBody body = RequestBody.create(json.toString(), MediaType.get("application/json; charset=utf-8"));
+            String url = supabaseUrl + "/auth/v1/token?grant_type=refresh_token";
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .addHeader("apikey", supabaseKey)
+                    .addHeader("Content-Type", "application/json")
+                    .post(body)
+                    .build();
+
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    isRefreshing = false;
+                    runOnUiThread(() -> {
+                        Toast.makeText(QuickAddActivity.this, "Token refresh failed. Open app.", Toast.LENGTH_LONG).show();
+                        sendBtn.setEnabled(true);
+                    });
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    isRefreshing = false;
+                    if (response.isSuccessful() && response.body() != null) {
+                        try {
+                            String responseBody = response.body().string();
+                            JSONObject jsonResponse = new JSONObject(responseBody);
+                            String newAccessToken = jsonResponse.getString("access_token");
+                            String newRefreshToken = jsonResponse.optString("refresh_token", refreshToken);
+
+                            // Save new tokens
+                            accessToken = newAccessToken;
+                            refreshToken = newRefreshToken;
+                            
+                            SharedPreferences prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+                            prefs.edit()
+                                .putString("access_token", newAccessToken)
+                                .putString("refresh_token", newRefreshToken)
+                                .apply();
+
+                            Log.d(TAG, "Token refreshed successfully");
+                            
+                            // Retry the original request
+                            runOnUiThread(onSuccess::run);
+                            
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error parsing refresh response", e);
+                            runOnUiThread(() -> {
+                                Toast.makeText(QuickAddActivity.this, "Token error. Open app.", Toast.LENGTH_LONG).show();
+                                sendBtn.setEnabled(true);
+                            });
+                        }
+                    } else {
+                        Log.e(TAG, "Token refresh failed: " + response.code());
+                        runOnUiThread(() -> {
+                            Toast.makeText(QuickAddActivity.this, "Session expired. Open app.", Toast.LENGTH_LONG).show();
+                            sendBtn.setEnabled(true);
+                        });
+                    }
+                }
+            });
+        } catch (Exception e) {
+            isRefreshing = false;
+            Log.e(TAG, "Error creating refresh request", e);
+            runOnUiThread(() -> sendBtn.setEnabled(true));
         }
     }
 }
