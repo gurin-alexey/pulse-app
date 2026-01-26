@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Preferences } from '@capacitor/preferences';
+import { App } from '@capacitor/app';
 import { supabase } from '@/lib/supabase';
 
 export const NativeSync = () => {
@@ -19,15 +20,15 @@ export const NativeSync = () => {
 
                 if (session) {
                     await Preferences.set({ key: 'access_token', value: session.access_token });
-                    await Preferences.set({ key: 'refresh_token', value: session.refresh_token });
+                    if (session.refresh_token) {
+                        await Preferences.set({ key: 'refresh_token', value: session.refresh_token });
+                    }
                     await Preferences.set({ key: 'user_id', value: session.user.id });
                     console.log('[NativeSync] Credentials synced to native storage');
-                } else {
-                    await Preferences.remove({ key: 'access_token' });
-                    await Preferences.remove({ key: 'refresh_token' });
-                    await Preferences.remove({ key: 'user_id' });
-                    console.log('[NativeSync] Credentials cleared from native storage');
                 }
+                // REMOVED: Do not delete credentials here if session is missing.
+                // It might be initializing. Only delete on explicit SIGNED_OUT.
+
             } catch (error) {
                 console.error('[NativeSync] Error syncing credentials:', error);
             }
@@ -35,12 +36,28 @@ export const NativeSync = () => {
 
         syncCredentials();
 
+        // Sync on app resume
+        const resumeListener = App.addListener('appStateChange', (state) => {
+            if (state.isActive) {
+                console.log('[NativeSync] App resumed, syncing credentials...');
+                syncCredentials();
+            }
+        });
+
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
             try {
                 console.log('[NativeSync] Auth event:', event);
+
+                if (event === 'SIGNED_OUT') {
+                    await Preferences.remove({ key: 'access_token' });
+                    await Preferences.remove({ key: 'refresh_token' });
+                    await Preferences.remove({ key: 'user_id' });
+                    console.log('[NativeSync] User signed out, credentials cleared');
+                    return;
+                }
+
                 if (session) {
-                    console.log('[NativeSync] Session exists, provider:', session.user?.app_metadata?.provider);
-                    console.log('[NativeSync] Has refresh_token:', !!session.refresh_token);
+                    console.log('[NativeSync] Session updated');
 
                     await Preferences.set({ key: 'access_token', value: session.access_token });
                     if (session.refresh_token) {
@@ -49,12 +66,6 @@ export const NativeSync = () => {
                         console.warn('[NativeSync] No refresh_token available for this session!');
                     }
                     await Preferences.set({ key: 'user_id', value: session.user.id });
-                    console.log('[NativeSync] Auth change: Credentials synced');
-                } else {
-                    await Preferences.remove({ key: 'access_token' });
-                    await Preferences.remove({ key: 'refresh_token' });
-                    await Preferences.remove({ key: 'user_id' });
-                    console.log('[NativeSync] Auth change: Credentials cleared');
                 }
             } catch (error) {
                 console.error('[NativeSync] Error handling auth change:', error);
@@ -63,6 +74,7 @@ export const NativeSync = () => {
 
         return () => {
             authListener.subscription.unsubscribe();
+            resumeListener.then(l => l.remove());
         };
     }, []);
 

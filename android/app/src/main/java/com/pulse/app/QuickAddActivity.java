@@ -192,8 +192,19 @@ public class QuickAddActivity extends Activity {
             return;
         }
 
-        if (supabaseUrl == null || accessToken == null || userId == null) {
-            Toast.makeText(this, "Credentials missing. Open App.", Toast.LENGTH_LONG).show();
+        if (supabaseUrl == null) {
+            Toast.makeText(this, "Configuration missing (URL). Open App.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        if (userId == null) {
+             Toast.makeText(this, "User not found. Open App.", Toast.LENGTH_LONG).show();
+             return;
+        }
+
+        // if accessToken is null but we have refreshToken, we can try to refresh
+        if (accessToken == null && refreshToken == null) {
+            Toast.makeText(this, "Not logged in. Open App.", Toast.LENGTH_LONG).show();
             return;
         }
 

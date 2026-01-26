@@ -35,7 +35,8 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="com.pulse.app" android:host="auth" />
+                <!-- Catch all URLs with com.pulse.app scheme -->
+                <data android:scheme="com.pulse.app" />
             </intent-filter>
 
         </activity>
