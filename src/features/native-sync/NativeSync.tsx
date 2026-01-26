@@ -37,9 +37,17 @@ export const NativeSync = () => {
 
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
             try {
+                console.log('[NativeSync] Auth event:', event);
                 if (session) {
+                    console.log('[NativeSync] Session exists, provider:', session.user?.app_metadata?.provider);
+                    console.log('[NativeSync] Has refresh_token:', !!session.refresh_token);
+
                     await Preferences.set({ key: 'access_token', value: session.access_token });
-                    await Preferences.set({ key: 'refresh_token', value: session.refresh_token });
+                    if (session.refresh_token) {
+                        await Preferences.set({ key: 'refresh_token', value: session.refresh_token });
+                    } else {
+                        console.warn('[NativeSync] No refresh_token available for this session!');
+                    }
                     await Preferences.set({ key: 'user_id', value: session.user.id });
                     console.log('[NativeSync] Auth change: Credentials synced');
                 } else {
